@@ -42,8 +42,12 @@ export default function App() {
 
   const [newsTeam,      setNewsTeam]      = useState('All')
 
+  // Season gate — no ESPN calls before Sep 9 2026
+  const seasonStarted = new Date() >= new Date('2026-09-09T00:00:00-04:00')
+
   // Also ask ESPN what the current week is and sync if different
   useEffect(() => {
+    if (!seasonStarted) return
     fetch('/api/espn/scoreboard')
       .then(r => r.json())
       .then(data => {
@@ -57,13 +61,12 @@ export default function App() {
       })
   }, [])
 
-  // Live ESPN scoreboard for current week
-  const { data: espnData, loading, error, lastUpdated, refresh } = useScoreboard(activeWeek)
+  // Live ESPN scoreboard for current week — only during season
+  const { data: espnData, loading, error, lastUpdated, refresh } = useScoreboard(
+    seasonStarted ? activeWeek : null
+  )
 
-  // Only use ESPN live data after season starts Sep 9 2026
-  const seasonStarted = new Date() >= new Date('2026-09-09T00:00:00-04:00')
-
-  // Parse ESPN games
+  // Parse ESPN games — empty before season
   const liveGames = seasonStarted
     ? (espnData?.events?.map(parseESPNGame).filter(Boolean) || [])
     : []
@@ -603,17 +606,22 @@ function ScheduleView({ teamFilter, setTeamFilter, weekFilter, setWeekFilter }) 
   const isWeekView = !isTeamView && weekFilter !== 'All'
   const isAllView  = !isTeamView && weekFilter === 'All'
 
-  // Team view — fetch from ESPN directly (accurate bye weeks, correct games)
-  const { games: teamGames, loading: teamLoading, error: teamError } = useTeamSchedule(
-    isTeamView ? teamFilter : null
+  // Only fetch from ESPN after season starts
+  const seasonStarted = new Date() >= new Date('2026-09-09T00:00:00-04:00')
+
+  // Team view — fetch from ESPN only during season, otherwise use static immediately
+  const { games: espnTeamGames, loading: teamLoading } = useTeamSchedule(
+    isTeamView && seasonStarted ? teamFilter : null
   )
 
-  // Week view — fetch from ESPN scoreboard
-  const { games: weekGames, loading: weekLoading } = useWeekSchedule(
-    isWeekView ? weekFilter : null
-  )
+  // During off-season, always use static data for team view
+  const teamGames = (isTeamView && seasonStarted) ? espnTeamGames : []
+  const loading = seasonStarted ? teamLoading : false
 
-  const loading = teamLoading || weekLoading
+  // Week view — fetch from ESPN scoreboard only during season
+  const { games: weekGames } = useWeekSchedule(
+    isWeekView && seasonStarted ? weekFilter : null
+  )
 
   // Group team games by week
   const teamByWeek = {}
