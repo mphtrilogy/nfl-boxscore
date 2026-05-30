@@ -26,7 +26,7 @@ function getAutoWeek() {
 }
 
 // ── TOP-LEVEL NAV VIEWS ───────────────────────────────────────────────────────
-const VIEWS = ['Scores', 'Schedule', 'Standings', 'Injuries', 'Trends', 'Leaders', 'Fantasy', 'History']
+const VIEWS = ['Scores', 'Schedule', 'Standings', 'News', 'Injuries', 'Trends', 'Leaders', 'Fantasy', 'History']
 
 export default function App() {
   const [activeView,    setActiveView]    = useState('Scores')
@@ -39,6 +39,8 @@ export default function App() {
   const [trendsMode,    setTrendsMode]    = useState('std') // 'std' | 'ppr'
   const [trendsRange,   setTrendsRange]   = useState(3)     // 1 | 3 | 5 | 'season'
   const [trendsPos,     setTrendsPos]     = useState('ALL') // ALL QB RB WR TE K DEF
+
+  const [newsTeam,      setNewsTeam]      = useState('All')
 
   // Also ask ESPN what the current week is and sync if different
   useEffect(() => {
@@ -123,6 +125,7 @@ export default function App() {
           />
         )}
         {activeView === 'Standings' && <StandingsView />}
+        {activeView === 'News'      && <NewsView teamFilter={newsTeam} setTeamFilter={setNewsTeam} />}
         {activeView === 'Injuries'  && <InjuriesView />}
         {activeView === 'Trends'    && (
           <TrendsView
@@ -694,42 +697,57 @@ function ScheduleView({ teamFilter, setTeamFilter, weekFilter, setWeekFilter }) 
 
       {loading && <div className="sch-loading">Loading from ESPN…</div>}
 
-      {/* TEAM VIEW — ESPN live data, fallback to static if off-season */}
-      {isTeamView && !loading && (
-        teamGames.length > 0
-          ? Object.keys(teamByWeek).sort((a,b) => Number(a)-Number(b)).map(w => {
-              const meta = WEEK_META[Number(w)] || { label: `Week ${w}`, dates: '' }
-              return (
-                <div key={w} className="sch-week-block">
-                  <div className="sch-week-header">
-                    <span className="swh-title">{meta.label}</span>
-                    <span className="swh-dates">{meta.dates}</span>
+      {/* TEAM VIEW — ESPN live data during season, static fallback off-season */}
+      {isTeamView && (
+        loading
+          ? <div className="sch-loading">Loading {ti(teamFilter).city} schedule…</div>
+          : teamGames.length > 0
+            ? Object.keys(teamByWeek).sort((a,b) => Number(a)-Number(b)).map(w => {
+                const meta = WEEK_META[Number(w)] || { label: `Week ${w}`, dates: '' }
+                return (
+                  <div key={w} className="sch-week-block">
+                    <div className="sch-week-header">
+                      <span className="swh-title">{meta.label}</span>
+                      <span className="swh-dates">{meta.dates}</span>
+                    </div>
+                    <div className="sch-games-list">
+                      {teamByWeek[w].map((g,i) => <ScheduleGame key={i} game={g} onTeamClick={setTeamFilter} />)}
+                    </div>
                   </div>
-                  <div className="sch-games-list">
-                    {teamByWeek[w].map((g,i) => <ScheduleGame key={i} game={g} onTeamClick={setTeamFilter} />)}
+                )
+              })
+            : /* Off-season — always show static schedule */
+              (() => {
+                const teamGamesStatic = SCHEDULE_2026.filter(g =>
+                  g.home === teamFilter || g.away === teamFilter
+                )
+                if (!teamGamesStatic.length) return (
+                  <div className="leaders-coming-soon">
+                    <div className="cs-icon">📅</div>
+                    <div className="cs-title">No schedule found for {teamFilter}</div>
                   </div>
-                </div>
-              )
-            })
-          : /* Off-season fallback — static schedule data */
-            ALL_WEEKS.map(w => {
-              const wGames = SCHEDULE_2026.filter(g =>
-                g.week === w && (g.home === teamFilter || g.away === teamFilter)
-              )
-              if (!wGames.length) return null
-              const meta = WEEK_META[w] || { label: `Week ${w}`, dates: '' }
-              return (
-                <div key={w} className="sch-week-block">
-                  <div className="sch-week-header">
-                    <span className="swh-title">{meta.label}{meta.note ? ` · ${meta.note}` : ''}</span>
-                    <span className="swh-dates">{meta.dates}</span>
-                  </div>
-                  <div className="sch-games-list">
-                    {wGames.map((g,i) => <ScheduleGame key={i} game={g} onTeamClick={setTeamFilter} />)}
-                  </div>
-                </div>
-              )
-            })
+                )
+                const byW = {}
+                teamGamesStatic.forEach(g => {
+                  if (!byW[g.week]) byW[g.week] = []
+                  byW[g.week].push(g)
+                })
+                return ALL_WEEKS.map(w => {
+                  if (!byW[w]) return null
+                  const meta = WEEK_META[w] || { label: `Week ${w}`, dates: '' }
+                  return (
+                    <div key={w} className="sch-week-block">
+                      <div className="sch-week-header">
+                        <span className="swh-title">{meta.label}{meta.note ? ` · ${meta.note}` : ''}</span>
+                        <span className="swh-dates">{meta.dates}</span>
+                      </div>
+                      <div className="sch-games-list">
+                        {byW[w].map((g,i) => <ScheduleGame key={i} game={g} onTeamClick={setTeamFilter} />)}
+                      </div>
+                    </div>
+                  )
+                })
+              })()
       )}
 
       {/* WEEK VIEW — ESPN scoreboard */}
@@ -1328,6 +1346,120 @@ const ESPN_TEAM_IDS = {
   NYJ:20, PHI:21, PIT:23, SEA:26, SF:25,  TB:27,  TEN:10, WAS:28,
 }
 
+// ── NEWS VIEW ─────────────────────────────────────────────────────────────────
+function NewsView({ teamFilter, setTeamFilter }) {
+  const [articles, setArticles]   = useState([])
+  const [loading,  setLoading]    = useState(true)
+  const [error,    setError]      = useState(null)
+
+  // ESPN team IDs for news filtering
+  const ESPN_TEAM_NEWS_IDS = {
+    ARI:22, ATL:1,  BAL:33, BUF:2,  CAR:29, CHI:3,  CIN:4,  CLE:5,
+    DAL:6,  DEN:7,  DET:8,  GB:9,   HOU:34, IND:11, JAC:30, KC:12,
+    LA:14,  LAC:24, LV:13,  MIA:15, MIN:16, NE:17,  NO:18,  NYG:19,
+    NYJ:20, PHI:21, PIT:23, SEA:26, SF:25,  TB:27,  TEN:10, WAS:28,
+  }
+
+  useEffect(() => {
+    setLoading(true)
+    setArticles([])
+    const url = teamFilter !== 'All' && ESPN_TEAM_NEWS_IDS[teamFilter]
+      ? `/api/espn/news?team=${ESPN_TEAM_NEWS_IDS[teamFilter]}&limit=25`
+      : `/api/espn/news?limit=30`
+
+    fetch(url)
+      .then(r => r.json())
+      .then(data => {
+        const items = (data.articles || []).map(a => ({
+          headline:    a.headline || '',
+          description: a.description || a.story || '',
+          link:        a.links?.web?.href || 'https://www.espn.com/nfl',
+          image:       a.images?.[0]?.url || null,
+          published:   a.published ? new Date(a.published) : null,
+          byline:      a.byline || '',
+          categories:  a.categories?.map(c => c.description).filter(Boolean) || [],
+          team:        a.categories?.find(c => c.type === 'team')?.description || '',
+        }))
+        setArticles(items)
+        setLoading(false)
+      })
+      .catch(e => { setError(e.message); setLoading(false) })
+  }, [teamFilter])
+
+  const timeAgo = (date) => {
+    if (!date) return ''
+    const diff = Date.now() - date.getTime()
+    const mins  = Math.floor(diff / 60000)
+    const hours = Math.floor(diff / 3600000)
+    const days  = Math.floor(diff / 86400000)
+    if (mins < 60)  return `${mins}m ago`
+    if (hours < 24) return `${hours}h ago`
+    return `${days}d ago`
+  }
+
+  return (
+    <div>
+      <div className="section-bar">
+        <h2>NFL News</h2>
+        <div className="sb-rule" />
+        <span className="sb-ct">
+          {teamFilter === 'All' ? 'League-Wide' : `${ti(teamFilter).city} ${ti(teamFilter).nick}`}
+          {loading ? ' · Loading…' : ` · ${articles.length} stories`}
+        </span>
+      </div>
+
+      {/* Team filter */}
+      <div className="sch-filters">
+        <div className="filter-group">
+          <span className="filter-label">Team</span>
+          <div className="filter-pills">
+            {['All', ...ALL_TEAMS].map(t => (
+              <button key={t} className={`fpill ${teamFilter === t ? 'on' : ''}`}
+                onClick={() => setTeamFilter(t)}>{t}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {loading && <div className="sch-loading">Loading news from ESPN…</div>}
+      {error   && <div className="sch-error">Could not load news — {error}</div>}
+
+      {!loading && articles.length > 0 && (
+        <div className="news-grid">
+          {articles.map((a, i) => (
+            <a key={i} href={a.link} target="_blank" rel="noopener" className={`news-card ${i === 0 ? 'news-featured' : ''}`}>
+              {a.image && i < 6 && (
+                <div className="news-img-wrap">
+                  <img src={a.image} alt="" className="news-img" loading="lazy" />
+                </div>
+              )}
+              <div className="news-body">
+                {a.team && <span className="news-team-tag">{a.team}</span>}
+                <div className="news-headline">{a.headline}</div>
+                {a.description && i < 10 && (
+                  <div className="news-desc">{a.description.slice(0, 120)}{a.description.length > 120 ? '…' : ''}</div>
+                )}
+                <div className="news-meta">
+                  {a.byline && <span className="news-byline">{a.byline}</span>}
+                  {a.published && <span className="news-time">{timeAgo(a.published)}</span>}
+                </div>
+              </div>
+            </a>
+          ))}
+        </div>
+      )}
+
+      {!loading && articles.length === 0 && !error && (
+        <div className="leaders-coming-soon">
+          <div className="cs-icon">📰</div>
+          <div className="cs-title">No news available</div>
+          <div className="cs-text">Try a different team or check back later.</div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function InjuriesView() {
   const [injuries, setInjuries]   = useState({})
   const [loading,  setLoading]    = useState(false)
@@ -1646,6 +1778,30 @@ const ALL_TIME_LEADERS = {
     { rank:8,  name:'Cris Carter',         team:'MIN',      stat:'130',     label:'Career TDs' },
     { rank:9,  name:'Shaun Alexander',     team:'SEA',      stat:'100',     label:'Career TDs' },
     { rank:10, name:'Jim Brown',           team:'CLE',      stat:'126',     label:'Career TDs' },
+  ],
+  defense: [
+    { rank:1,  name:'Bruce Smith',         team:'BUF/WAS',  stat:'200.0',   label:'Career Sacks' },
+    { rank:2,  name:'Reggie White',        team:'PHI/GB',   stat:'198.0',   label:'Career Sacks' },
+    { rank:3,  name:'Kevin Greene',        team:'Multiple', stat:'160.0',   label:'Career Sacks' },
+    { rank:4,  name:'Julius Peppers',      team:'CAR/CHI',  stat:'159.5',   label:'Career Sacks' },
+    { rank:5,  name:'Chris Doleman',       team:'MIN',      stat:'150.5',   label:'Career Sacks' },
+    { rank:6,  name:'Michael Strahan',     team:'NYG',      stat:'141.5',   label:'Career Sacks' },
+    { rank:7,  name:'Dwight Freeney',      team:'IND',      stat:'125.5',   label:'Career Sacks' },
+    { rank:8,  name:'Jason Taylor',        team:'MIA',      stat:'139.5',   label:'Career Sacks' },
+    { rank:9,  name:'Osi Umenyiora',       team:'NYG',      stat:'85.0',    label:'Career Sacks' },
+    { rank:10, name:'Lawrence Taylor',     team:'NYG',      stat:'132.5',   label:'Career Sacks' },
+  ],
+  interceptions: [
+    { rank:1,  name:'Paul Krause',         team:'WAS/MIN',  stat:'81',      label:'Career INTs' },
+    { rank:2,  name:'Emlen Tunnell',       team:'NYG',      stat:'79',      label:'Career INTs' },
+    { rank:3,  name:'Rod Woodson',         team:'PIT/SF',   stat:'71',      label:'Career INTs' },
+    { rank:4,  name:'Dick "Night Train" Lane',team:'DET',   stat:'68',      label:'Career INTs' },
+    { rank:5,  name:'Ken Riley',           team:'CIN',      stat:'65',      label:'Career INTs' },
+    { rank:6,  name:'Ronnie Lott',         team:'SF/OAK',   stat:'63',      label:'Career INTs' },
+    { rank:7,  name:'Dave Brown',          team:'Multiple', stat:'62',      label:'Career INTs' },
+    { rank:8,  name:'Dick LeBeau',         team:'DET',      stat:'62',      label:'Career INTs' },
+    { rank:9,  name:'Emmitt Thomas',       team:'KC',       stat:'58',      label:'Career INTs' },
+    { rank:10, name:'Mel Blount',          team:'PIT',      stat:'57',      label:'Career INTs' },
   ],
 }
 
