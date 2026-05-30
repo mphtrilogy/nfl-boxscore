@@ -544,3 +544,21 @@ body::before {
 .atl-table tr:hover td{background:var(--paper-dark)}
 .atl-table tr:last-child td{border-bottom:none}
 .atl-note{padding:10px 16px;font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--muted-lt);letter-spacing:.06em;border-top:1px solid var(--rule);background:var(--paper-dark)}
+
+/* ── NEWS VIEW ────────────────────────────────────────────────────────────── */
+.news-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));border-left:1px solid var(--rule);padding:16px;gap:14px}
+.news-card{display:flex;flex-direction:column;border:1px solid var(--rule);border-radius:var(--r);overflow:hidden;text-decoration:none;color:inherit;transition:background .12s;cursor:pointer}
+.news-card:hover{background:var(--paper-mid);border-color:var(--rule-hvy)}
+.news-card.news-featured{grid-column:1/-1;flex-direction:row;max-height:220px}
+.news-img-wrap{overflow:hidden;flex-shrink:0}
+.news-card:not(.news-featured) .news-img-wrap{height:160px}
+.news-card.news-featured .news-img-wrap{width:340px}
+.news-img{width:100%;height:100%;object-fit:cover;display:block}
+.news-body{padding:12px;display:flex;flex-direction:column;gap:6px;flex:1;min-width:0}
+.news-team-tag{font-family:'IBM Plex Mono',monospace;font-size:7px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);background:rgba(139,26,26,.08);padding:2px 6px;border-radius:2px;align-self:flex-start}
+.news-headline{font-family:'Playfair Display',serif;font-size:14px;font-weight:700;line-height:1.3;color:var(--ink)}
+.news-card.news-featured .news-headline{font-size:18px}
+.news-desc{font-family:'Libre Baskerville',serif;font-size:11px;color:var(--muted);line-height:1.5}
+.news-meta{display:flex;justify-content:space-between;align-items:center;margin-top:auto;padding-top:6px;border-top:1px solid rgba(42,31,14,.06)}
+.news-byline{font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--muted-lt);letter-spacing:.06em}
+.news-time{font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--muted-lt);letter-spacing:.06em}
