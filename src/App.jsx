@@ -70,7 +70,7 @@ export default function App() {
 
   // Merge live scores into schedule — only during season
   const mergedGames = SCHEDULE_2026.filter(g => g.week === activeWeek).map(g => {
-    if (!seasonStarted) return g
+    if (!seasonStarted) return { ...g, status: 'upcoming', homeScore: null, awayScore: null }
     const live = liveGames.find(lg =>
       lg.home === g.home && lg.away === g.away
     )
@@ -1902,7 +1902,7 @@ function HistoryView() {
           </div>
           <div className="hof-grid">
             {FANTASY_HOF.map((p, i) => (
-              <div key={i} className={`hof-card ${i < 3 ? 'hof-elite' : ''}`}>
+              <a key={i} href={`https://www.google.com/search?q=${encodeURIComponent(p.player+' '+p.year+' fantasy football '+p.pos)}`} target="_blank" rel="noopener" className={`hof-card ${i < 3 ? 'hof-elite' : ''}`} style={{textDecoration:'none',color:'inherit'}}>
                 <div className="hof-rank">#{i + 1}</div>
                 <div className="hof-player">{p.player}</div>
                 <div className="hof-meta">
@@ -1913,7 +1913,7 @@ function HistoryView() {
                 <div className="hof-pts">{p.pts} <span>pts</span></div>
                 <div className="hof-line">{p.line}</div>
                 <div className="hof-note">{p.note}</div>
-              </div>
+              </a>
             ))}
           </div>
         </div>
@@ -1943,7 +1943,9 @@ function HistoryView() {
               {ALL_TIME_LEADERS[statCat].map((p, i) => (
                 <tr key={i} className={i === 0 ? 'atl-top' : ''}>
                   <td className="atl-rank">{p.rank}</td>
-                  <td className="atl-name">{p.name}</td>
+                  <td className="atl-name">
+                    <a href={`https://www.google.com/search?q=${encodeURIComponent(p.name+' NFL career stats')}`} target="_blank" rel="noopener" className="sb-google-link">{p.name}</a>
+                  </td>
                   <td className="atl-team">{p.team}</td>
                   <td className="atl-stat">{p.stat}</td>
                 </tr>
