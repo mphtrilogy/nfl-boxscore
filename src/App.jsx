@@ -26,7 +26,7 @@ function getAutoWeek() {
 }
 
 // ── TOP-LEVEL NAV VIEWS ───────────────────────────────────────────────────────
-const VIEWS = ['Scores', 'Schedule', 'Standings', 'News', 'Injuries', 'Trends', 'Leaders', 'Fantasy', 'History']
+const VIEWS = ['Scores', 'Schedule', 'Standings', 'News', 'Injuries', 'Trends', 'Leaders', 'Fantasy', 'History', 'TV Guide']
 
 export default function App() {
   const [activeView,    setActiveView]    = useState('Scores')
@@ -61,7 +61,7 @@ export default function App() {
   const { data: espnData, loading, error, lastUpdated, refresh } = useScoreboard(activeWeek)
 
   // Only use ESPN live data after season starts Sep 9 2026
-  const seasonStarted = new Date() >= new Date('2026-09-09T00:00:00')
+  const seasonStarted = new Date() >= new Date('2026-09-09T00:00:00-04:00')
 
   // Parse ESPN games
   const liveGames = seasonStarted
@@ -145,6 +145,7 @@ export default function App() {
           <FantasyView mode={fantMode} setMode={setFantMode} />
         )}
         {activeView === 'History'   && <HistoryView />}
+        {activeView === 'TV Guide'  && <TVGuideView currentWeek={activeWeek} />}
       </main>
 
       <Footer />
@@ -812,6 +813,7 @@ function ScheduleGame({ game: g, onTeamClick }) {
   const homeWin    = isFinal && g.homeScore > g.awayScore
   const awayWin    = isFinal && g.awayScore > g.homeScore
   const netColor   = networkColor(g.network)
+  const netLink    = NETWORK_LINKS[g.network] || NETWORK_LINKS[g.network?.split('/')?.[0]] || null
 
   return (
     <div className={`sch-game ${isFinal ? 'sg-final' : isLive ? 'sg-live' : ''}`}>
@@ -820,25 +822,28 @@ function ScheduleGame({ game: g, onTeamClick }) {
         <span className={`sg-status ${isFinal ? 'final' : isLive ? 'live' : ''}`}>
           {isFinal ? 'Final' : isLive ? `Q${g.period} ${g.displayClock}` : g.date}
         </span>
-        {g.intl && <span className="sg-intl">🌍</span>}
-        {g.network && (
+        {g.intl && <span className="sg-intl">🌍 {g.intlCity}</span>}
+        {g.network && netLink ? (
+          <a href={netLink} target="_blank" rel="noopener" className="sg-net sg-net-link" style={{ background: netColor.bg, color: netColor.text }}
+             onClick={e => e.stopPropagation()}>
+            {g.network.split('/')[0]}
+          </a>
+        ) : g.network ? (
           <span className="sg-net" style={{ background: netColor.bg, color: netColor.text }}>
             {g.network.split('/')[0]}
           </span>
-        )}
+        ) : null}
       </div>
       <div className="sg-teams">
-        <div className={`sg-team ${awayWin ? 'win' : homeWin ? 'lose' : ''}`}
-             onClick={() => onTeamClick(g.away)}>
-          <span className="sg-abv">{g.away}</span>
-          <span className="sg-city">{ti(g.away).city}</span>
+        <div className={`sg-team ${awayWin ? 'win' : homeWin ? 'lose' : ''}`}>
+          <span className="sg-abv" onClick={() => onTeamClick(g.away)} style={{cursor:'pointer'}}>{g.away}</span>
+          <a href={ti(g.away).url} target="_blank" rel="noopener" className="sg-city sg-team-link" onClick={e => e.stopPropagation()}>{ti(g.away).city}</a>
           <span className="sg-ha">Away</span>
         </div>
         <div className="sg-vs">at</div>
-        <div className={`sg-team ${homeWin ? 'win' : awayWin ? 'lose' : ''}`}
-             onClick={() => onTeamClick(g.home)}>
-          <span className="sg-abv">{g.home}</span>
-          <span className="sg-city">{ti(g.home).city}</span>
+        <div className={`sg-team ${homeWin ? 'win' : awayWin ? 'lose' : ''}`}>
+          <span className="sg-abv" onClick={() => onTeamClick(g.home)} style={{cursor:'pointer'}}>{g.home}</span>
+          <a href={ti(g.home).url} target="_blank" rel="noopener" className="sg-city sg-team-link" onClick={e => e.stopPropagation()}>{ti(g.home).city}</a>
           <span className="sg-ha">Home</span>
         </div>
       </div>
@@ -1645,7 +1650,7 @@ function InjuriesView() {
 
 // ── HISTORY DATA ─────────────────────────────────────────────────────────────
 const SUPER_BOWLS = [
-  { num:'LX',   year:2026, winner:'Seattle Seahawks',    loser:'New England Patriots',  score:'29-13', mvp:'Geno Smith',           site:'New Orleans, LA' },
+  { num:'LX',   year:2026, winner:'Seattle Seahawks',    loser:'New England Patriots',  score:'29-13', mvp:'Kenneth Walker III',   site:'Santa Clara, CA' },
   { num:'LIX',  year:2025, winner:'Philadelphia Eagles', loser:'Kansas City Chiefs',    score:'40-22', mvp:'Jalen Hurts',          site:'New Orleans, LA' },
   { num:'LVIII',year:2024, winner:'Kansas City Chiefs',  loser:'San Francisco 49ers',   score:'25-22', mvp:'Patrick Mahomes',      site:'Las Vegas, NV' },
   { num:'LVII', year:2023, winner:'Kansas City Chiefs',  loser:'Philadelphia Eagles',   score:'38-35', mvp:'Patrick Mahomes',      site:'Glendale, AZ' },
@@ -1868,12 +1873,16 @@ function HistoryView() {
             <tbody>
               {filteredSBs.map((sb, i) => (
                 <tr key={i} className={i === 0 ? 'sb-latest' : ''}>
-                  <td className="sb-num">{sb.num}</td>
+                  <td className="sb-num">
+                    <a href={`https://www.google.com/search?q=Super+Bowl+${sb.num}+${sb.year}`} target="_blank" rel="noopener" className="sb-google-link">{sb.num}</a>
+                  </td>
                   <td className="sb-year">{sb.year}</td>
                   <td className="sbt-winner sb-winner">{sb.winner}</td>
                   <td className="sbt-loser sb-loser">{sb.loser}</td>
                   <td className="sb-score">{sb.score}</td>
-                  <td className="sbt-mvp sb-mvp">{sb.mvp}</td>
+                  <td className="sbt-mvp sb-mvp">
+                    <a href={`https://www.google.com/search?q=${encodeURIComponent(sb.mvp)}+Super+Bowl+MVP+${sb.year}`} target="_blank" rel="noopener" className="sb-google-link">{sb.mvp}</a>
+                  </td>
                   <td className="sbt-site sb-site">{sb.site}</td>
                 </tr>
               ))}
@@ -1944,6 +1953,267 @@ function HistoryView() {
           <div className="atl-note">Stats current through 2025 season. Active players may have updated totals.</div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ── TV GUIDE VIEW ─────────────────────────────────────────────────────────────
+const STREAMING_SERVICES = [
+  {
+    name: 'Peacock',
+    url: 'https://www.peacocktv.com',
+    networks: ['NBC', 'NBC/Peacock', 'NBC/SNF'],
+    description: 'Sunday Night Football · Kickoff Game · Playoffs',
+    color: '#000000',
+    textColor: '#ffffff',
+    price: '$7.99/mo',
+    games: 'SNF + Peacock exclusives',
+  },
+  {
+    name: 'ESPN / ABC',
+    url: 'https://www.espn.com/watch',
+    networks: ['ESPN', 'ESPN/MNF', 'ABC'],
+    description: 'Monday Night Football · Playoffs',
+    color: '#CC0000',
+    textColor: '#ffffff',
+    price: 'ESPN+ $10.99/mo',
+    games: 'MNF · 2 Wild Card games',
+  },
+  {
+    name: 'Prime Video',
+    url: `https://www.amazon.com/primevideo?tag=nysportsdaily-20`,
+    networks: ['Amazon/TNF', 'Amazon'],
+    description: 'Thursday Night Football exclusively on Prime',
+    color: '#00A8E0',
+    textColor: '#ffffff',
+    price: '$14.99/mo (Prime)',
+    games: 'TNF all season',
+    amazon: true,
+  },
+  {
+    name: 'Netflix',
+    url: 'https://www.netflix.com',
+    networks: ['Netflix'],
+    description: 'International games · Christmas Day · Week 18',
+    color: '#E50914',
+    textColor: '#ffffff',
+    price: '$15.49/mo',
+    games: 'International Series · Christmas',
+  },
+  {
+    name: 'Paramount+',
+    url: 'https://www.paramountplus.com',
+    networks: ['CBS'],
+    description: 'CBS Sunday afternoon games · AFC coverage',
+    color: '#0064FF',
+    textColor: '#ffffff',
+    price: '$5.99/mo',
+    games: 'AFC games · Super Bowl (alternate years)',
+  },
+  {
+    name: 'Fox Sports',
+    url: 'https://www.foxsports.com',
+    networks: ['Fox'],
+    description: 'Fox Sunday afternoon games · NFC coverage',
+    color: '#003087',
+    textColor: '#ffffff',
+    price: 'Free with cable / Fubo',
+    games: 'NFC games · Super Bowl (alternate years)',
+  },
+  {
+    name: 'NFL+',
+    url: 'https://www.nfl.com/plus',
+    networks: ['NFL Network', 'NFL+'],
+    description: 'Live local & primetime games on mobile',
+    color: '#013369',
+    textColor: '#ffffff',
+    price: '$6.99/mo',
+    games: 'Local games on mobile · NFL Network',
+  },
+  {
+    name: 'YouTube TV',
+    url: 'https://tv.youtube.com',
+    networks: [],
+    description: 'All broadcast channels + NFL Sunday Ticket',
+    color: '#FF0000',
+    textColor: '#ffffff',
+    price: '$72.99/mo',
+    games: 'NFL Sunday Ticket add-on available',
+  },
+  {
+    name: 'NFL Sunday Ticket',
+    url: 'https://nflsundayticket.com',
+    networks: [],
+    description: 'Every out-of-market Sunday afternoon game',
+    color: '#013369',
+    textColor: '#ffffff',
+    price: '$249-$449/season',
+    games: 'All out-of-market Sunday games',
+  },
+  {
+    name: 'Fubo',
+    url: 'https://www.fubo.tv',
+    networks: [],
+    description: 'Sports-focused streaming with all NFL channels',
+    color: '#E8000D',
+    textColor: '#ffffff',
+    price: '$79.99/mo',
+    games: 'CBS · NBC · Fox · ESPN + NFL Network',
+  },
+  {
+    name: 'Hulu Live TV',
+    url: 'https://www.hulu.com/live-tv',
+    networks: [],
+    description: 'Live TV + on-demand bundle',
+    color: '#1CE783',
+    textColor: '#000000',
+    price: '$82.99/mo',
+    games: 'CBS · NBC · Fox · ESPN',
+  },
+  {
+    name: 'DirecTV Stream',
+    url: 'https://www.directv.com/stream',
+    networks: [],
+    description: 'Cable replacement with NFL Network',
+    color: '#00A8E0',
+    textColor: '#ffffff',
+    price: '$79.99/mo',
+    games: 'All channels + NFL Network + RedZone',
+  },
+]
+
+function TVGuideView({ currentWeek }) {
+  const [weekFilter, setWeekFilter] = useState(currentWeek || 1)
+  const seasonStarted = new Date() >= new Date('2026-09-09T00:00:00-04:00')
+
+  // Get games for selected week with network info
+  const weekGames = SCHEDULE_2026.filter(g => g.week === weekFilter)
+  const byNetwork = {}
+  weekGames.forEach(g => {
+    const net = g.network || 'TBD'
+    if (!byNetwork[net]) byNetwork[net] = []
+    byNetwork[net].push(g)
+  })
+
+  // Network display order
+  const netOrder = ['NBC/Peacock', 'ESPN/MNF', 'Amazon/TNF', 'Netflix', 'CBS', 'Fox', 'NBC/SNF', 'NFL Network', 'TBD']
+
+  return (
+    <div>
+      <div className="section-bar">
+        <h2>TV Guide</h2>
+        <div className="sb-rule" />
+        <span className="sb-ct">Where to Watch · Streaming Guide · 2026 Season</span>
+      </div>
+
+      {/* Streaming services grid */}
+      <div className="tvg-services-wrap">
+        <div className="tvg-services-header">
+          <span>📺 Where to Stream NFL Games in 2026</span>
+        </div>
+        <div className="tvg-services-grid">
+          {STREAMING_SERVICES.map((s, i) => (
+            <a key={i} href={s.url} target="_blank" rel="noopener" className="tvg-service-card">
+              <div className="tvg-svc-badge" style={{ background: s.color, color: s.textColor }}>
+                {s.name}
+                {s.amazon && <span className="tvg-amazon-tag">★ Supports Site</span>}
+              </div>
+              <div className="tvg-svc-body">
+                <div className="tvg-svc-games">{s.games}</div>
+                <div className="tvg-svc-desc">{s.description}</div>
+                <div className="tvg-svc-price">{s.price}</div>
+              </div>
+            </a>
+          ))}
+        </div>
+      </div>
+
+      {/* Week selector */}
+      <div className="tvg-week-wrap">
+        <div className="tvg-week-header">
+          <span>📅 Week-by-Week TV Schedule</span>
+        </div>
+        <div className="week-selector" style={{borderBottom:'none'}}>
+          <div className="week-label-row">
+            <span className="ws-label">Week</span>
+            <div className="ws-pills">
+              {ALL_WEEKS.map(w => (
+                <button key={w} className={`ws-btn ${weekFilter === w ? 'on' : ''}`}
+                  onClick={() => setWeekFilter(w)}>{w}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Games grouped by network */}
+        <div className="tvg-games-wrap">
+          {netOrder.filter(net => byNetwork[net]).map(net => {
+            const games = byNetwork[net]
+            const netColor = networkColor(net)
+            const netLink = NETWORK_LINKS[net] || null
+            return (
+              <div key={net} className="tvg-net-block">
+                <div className="tvg-net-header">
+                  {netLink ? (
+                    <a href={netLink} target="_blank" rel="noopener" className="tvg-net-badge" style={{ background: netColor.bg, color: netColor.text }}>
+                      {net.replace('/SNF','').replace('/MNF','').replace('/TNF','')} ↗
+                    </a>
+                  ) : (
+                    <span className="tvg-net-badge" style={{ background: netColor.bg, color: netColor.text }}>
+                      {net}
+                    </span>
+                  )}
+                  <span className="tvg-net-count">{games.length} game{games.length !== 1 ? 's' : ''}</span>
+                </div>
+                <div className="tvg-games-list">
+                  {games.map((g, i) => (
+                    <div key={i} className="tvg-game">
+                      <span className="tvg-time">{g.time !== 'TBD' ? g.time : g.day}</span>
+                      <span className="tvg-matchup">
+                        <a href={ti(g.away).url} target="_blank" rel="noopener" className="tvg-team-link">{g.away}</a>
+                        <span className="tvg-at"> at </span>
+                        <a href={ti(g.home).url} target="_blank" rel="noopener" className="tvg-team-link">{g.home}</a>
+                      </span>
+                      <span className="tvg-teams-full">
+                        {ti(g.away).city} {ti(g.away).nick} at {ti(g.home).city} {ti(g.home).nick}
+                      </span>
+                      {g.intl && <span className="tvg-intl">🌍 {g.intlCity}</span>}
+                      {g.note && <span className="tvg-note">{g.note}</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+
+          {/* Any networks not in the order list */}
+          {Object.keys(byNetwork).filter(n => !netOrder.includes(n)).map(net => {
+            const games = byNetwork[net]
+            const netColor = networkColor(net)
+            return (
+              <div key={net} className="tvg-net-block">
+                <div className="tvg-net-header">
+                  <span className="tvg-net-badge" style={{ background: netColor.bg, color: netColor.text }}>{net}</span>
+                  <span className="tvg-net-count">{games.length} game{games.length !== 1 ? 's' : ''}</span>
+                </div>
+                <div className="tvg-games-list">
+                  {games.map((g, i) => (
+                    <div key={i} className="tvg-game">
+                      <span className="tvg-time">{g.time !== 'TBD' ? g.time : g.day}</span>
+                      <span className="tvg-matchup">
+                        <a href={ti(g.away).url} target="_blank" rel="noopener" className="tvg-team-link">{g.away}</a>
+                        <span className="tvg-at"> at </span>
+                        <a href={ti(g.home).url} target="_blank" rel="noopener" className="tvg-team-link">{g.home}</a>
+                      </span>
+                      {g.note && <span className="tvg-note">{g.note}</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }
