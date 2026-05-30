@@ -13,7 +13,7 @@ export const SCHEDULE_2026 = [
   { week:1, date:'Sep 13', day:'Sun', time:'1:00 PM', home:'ATL', away:'PIT', network:'Fox',            status:'upcoming', intl:false },
   { week:1, date:'Sep 13', day:'Sun', time:'1:00 PM', home:'HOU', away:'TEN', network:'CBS',            status:'upcoming', intl:false },
   { week:1, date:'Sep 13', day:'Sun', time:'1:00 PM', home:'IND', away:'JAC', network:'CBS',            status:'upcoming', intl:false },
-  { week:1, date:'Sep 13', day:'Sun', time:'1:00 PM', home:'MIA', away:'NYJ', network:'CBS',            status:'upcoming', intl:false },
+  { week:1, date:'Sep 13', day:'Sun', time:'1:00 PM', home:'TEN', away:'NYJ', network:'CBS',            status:'upcoming', intl:false },
   { week:1, date:'Sep 13', day:'Sun', time:'1:00 PM', home:'TB',  away:'CAR', network:'Fox',            status:'upcoming', intl:false },
   { week:1, date:'Sep 13', day:'Sun', time:'1:00 PM', home:'WAS', away:'DAL', network:'Fox',            status:'upcoming', intl:false },
   { week:1, date:'Sep 13', day:'Sun', time:'1:00 PM', home:'CLE', away:'CIN', network:'CBS',            status:'upcoming', intl:false },
@@ -31,21 +31,21 @@ export const SCHEDULE_2026 = [
   { week:2, date:'Sep 20', day:'Sun', time:'1:00 PM', home:'TEN', away:'HOU', network:'CBS',            status:'upcoming', intl:false },
   { week:2, date:'Sep 20', day:'Sun', time:'1:00 PM', home:'JAC', away:'IND', network:'CBS',            status:'upcoming', intl:false },
   { week:2, date:'Sep 20', day:'Sun', time:'1:00 PM', home:'CIN', away:'CLE', network:'CBS',            status:'upcoming', intl:false },
-  { week:2, date:'Sep 20', day:'Sun', time:'1:00 PM', home:'NYJ', away:'MIA', network:'CBS',            status:'upcoming', intl:false },
+  { week:2, date:'Sep 20', day:'Sun', time:'1:00 PM', home:'NYJ', away:'GB',  network:'Fox',            status:'upcoming', intl:false },
   { week:2, date:'Sep 20', day:'Sun', time:'1:00 PM', home:'ATL', away:'CAR', network:'Fox',            status:'upcoming', intl:false },
   { week:2, date:'Sep 20', day:'Sun', time:'1:00 PM', home:'NO',  away:'TB',  network:'Fox',            status:'upcoming', intl:false },
   { week:2, date:'Sep 20', day:'Sun', time:'1:00 PM', home:'MIN', away:'GB',  network:'Fox',            status:'upcoming', intl:false },
   { week:2, date:'Sep 20', day:'Sun', time:'4:25 PM', home:'SEA', away:'ARI', network:'Fox',            status:'upcoming', intl:false },
   { week:2, date:'Sep 20', day:'Sun', time:'4:25 PM', home:'DEN', away:'LV',  network:'CBS',            status:'upcoming', intl:false },
   { week:2, date:'Sep 20', day:'Sun', time:'4:25 PM', home:'SF',  away:'LAC', network:'Fox',            status:'upcoming', intl:false },
-  { week:2, date:'Sep 20', day:'Sun', time:'8:20 PM', home:'LA',  away:'NYG', network:'NBC/SNF',        status:'upcoming', intl:false },
+  { week:2, date:'Sep 21', day:'Mon', time:'8:15 PM', home:'LA',  away:'NYG', network:'ESPN/MNF',       status:'upcoming', intl:false },
   { week:2, date:'Sep 21', day:'Mon', time:'8:15 PM', home:'BUF', away:'KC',  network:'ESPN/MNF',       status:'upcoming', intl:false },
 
   // ── WEEK 3 · Sep 24–28 ──────────────────────────────────────────────────
   { week:3, date:'Sep 24', day:'Thu', time:'8:15 PM', home:'GB',  away:'ATL', network:'Amazon/TNF',     status:'upcoming', intl:false },
   // International — Rio de Janeiro
   { week:3, date:'Sep 27', day:'Sun', time:'1:00 PM', home:'DAL', away:'BAL', network:'CBS',            status:'upcoming', intl:true,  intlCity:'Rio de Janeiro, Brazil', note:'International Series · Estádio Nilton Santos' },
-  { week:3, date:'Sep 27', day:'Sun', time:'1:00 PM', home:'NE',  away:'NYJ', network:'CBS',            status:'upcoming', intl:false },
+  { week:3, date:'Sep 27', day:'Sun', time:'1:00 PM', home:'DET', away:'NYJ', network:'Fox',            status:'upcoming', intl:false },
   { week:3, date:'Sep 27', day:'Sun', time:'1:00 PM', home:'HOU', away:'IND', network:'CBS',            status:'upcoming', intl:false },
   { week:3, date:'Sep 27', day:'Sun', time:'1:00 PM', home:'PIT', away:'CLE', network:'CBS',            status:'upcoming', intl:false },
   { week:3, date:'Sep 27', day:'Sun', time:'1:00 PM', home:'TEN', away:'JAC', network:'CBS',            status:'upcoming', intl:false },
@@ -62,18 +62,18 @@ export const SCHEDULE_2026 = [
   { week:4, date:'Oct 1',  day:'Thu', time:'8:15 PM', home:'MIA', away:'NE',  network:'Amazon/TNF',     status:'upcoming', intl:false },
   // International — London
   { week:4, date:'Oct 4',  day:'Sun', time:'9:30 AM', home:'WAS', away:'IND', network:'NFL Network',    status:'upcoming', intl:true,  intlCity:'London, UK', note:'International Series · Tottenham Hotspur Stadium' },
-  { week:4, date:'Oct 4',  day:'Sun', time:'1:00 PM', home:'BUF', away:'NYJ', network:'CBS',            status:'upcoming', intl:false },
+  { week:4, date:'Oct 4',  day:'Sun', time:'1:00 PM', home:'CHI', away:'NYJ', network:'Fox',            status:'upcoming', intl:false },
   { week:4, date:'Oct 4',  day:'Sun', time:'1:00 PM', home:'JAC', away:'HOU', network:'CBS',            status:'upcoming', intl:false },
   { week:4, date:'Oct 4',  day:'Sun', time:'1:00 PM', home:'CIN', away:'PIT', network:'CBS',            status:'upcoming', intl:false },
   { week:4, date:'Oct 4',  day:'Sun', time:'1:00 PM', home:'TEN', away:'CLE', network:'CBS',            status:'upcoming', intl:false },
   { week:4, date:'Oct 4',  day:'Sun', time:'1:00 PM', home:'ATL', away:'NO',  network:'Fox',            status:'upcoming', intl:false },
   { week:4, date:'Oct 4',  day:'Sun', time:'1:00 PM', home:'CHI', away:'DET', network:'Fox',            status:'upcoming', intl:false },
-  { week:4, date:'Oct 4',  day:'Sun', time:'1:00 PM', home:'NYG', away:'PHI', network:'Fox',            status:'upcoming', intl:false },
+  { week:4, date:'Oct 4',  day:'Sun', time:'1:00 PM', home:'NYG', away:'ARI', network:'CBS',            status:'upcoming', intl:false },
   { week:4, date:'Oct 4',  day:'Sun', time:'4:25 PM', home:'SF',  away:'SEA', network:'Fox',            status:'upcoming', intl:false },
   { week:4, date:'Oct 4',  day:'Sun', time:'4:25 PM', home:'KC',  away:'LV',  network:'CBS',            status:'upcoming', intl:false },
   { week:4, date:'Oct 4',  day:'Sun', time:'4:25 PM', home:'LA',  away:'ARI', network:'Fox',            status:'upcoming', intl:false },
   { week:4, date:'Oct 4',  day:'Sun', time:'8:20 PM', home:'CAR', away:'DET', network:'NBC/SNF',        status:'upcoming', intl:false },
-  { week:4, date:'Oct 5',  day:'Mon', time:'8:15 PM', home:'GB',  away:'NYG', network:'ESPN/MNF',       status:'upcoming', intl:false },
+  { week:5, date:'Oct 11', day:'Sun', time:'1:00 PM', home:'WAS', away:'NYG', network:'Fox',            status:'upcoming', intl:false },
 
   // ── WEEK 5 · Oct 8–12 ───────────────────────────────────────────────────
   { week:5, date:'Oct 8',  day:'Thu', time:'8:15 PM', home:'TB',  away:'DAL', network:'Amazon/TNF',     status:'upcoming', intl:false },
@@ -82,7 +82,7 @@ export const SCHEDULE_2026 = [
   { week:5, date:'Oct 11', day:'Sun', time:'1:00 PM', home:'NE',  away:'MIA', network:'CBS',            status:'upcoming', intl:false },
   { week:5, date:'Oct 11', day:'Sun', time:'1:00 PM', home:'IND', away:'TEN', network:'CBS',            status:'upcoming', intl:false },
   { week:5, date:'Oct 11', day:'Sun', time:'1:00 PM', home:'CLE', away:'CIN', network:'CBS',            status:'upcoming', intl:false },
-  { week:5, date:'Oct 11', day:'Sun', time:'1:00 PM', home:'NYJ', away:'HOU', network:'CBS',            status:'upcoming', intl:false },
+  { week:5, date:'Oct 11', day:'Sun', time:'1:00 PM', home:'NYJ', away:'CLE', network:'CBS',            status:'upcoming', intl:false },
   { week:5, date:'Oct 11', day:'Sun', time:'1:00 PM', home:'MIN', away:'CHI', network:'Fox',            status:'upcoming', intl:false },
   { week:5, date:'Oct 11', day:'Sun', time:'1:00 PM', home:'LV',  away:'ARI', network:'Fox',            status:'upcoming', intl:false },
   { week:5, date:'Oct 11', day:'Sun', time:'1:00 PM', home:'NO',  away:'CAR', network:'Fox',            status:'upcoming', intl:false },
@@ -96,7 +96,7 @@ export const SCHEDULE_2026 = [
   { week:6, date:'Oct 18', day:'Sun', time:'1:00 PM', home:'BUF', away:'NE',  network:'CBS',            status:'upcoming', intl:false },
   { week:6, date:'Oct 18', day:'Sun', time:'1:00 PM', home:'PIT', away:'BAL', network:'CBS',            status:'upcoming', intl:false },
   { week:6, date:'Oct 18', day:'Sun', time:'1:00 PM', home:'JAC', away:'TEN', network:'CBS',            status:'upcoming', intl:false },
-  { week:6, date:'Oct 18', day:'Sun', time:'1:00 PM', home:'IND', away:'NYJ', network:'CBS',            status:'upcoming', intl:false },
+  { week:6, date:'Oct 18', day:'Sun', time:'1:00 PM', home:'NE',  away:'NYJ', network:'CBS',            status:'upcoming', intl:false },
   { week:6, date:'Oct 18', day:'Sun', time:'1:00 PM', home:'ATL', away:'NO',  network:'Fox',            status:'upcoming', intl:false },
   { week:6, date:'Oct 18', day:'Sun', time:'1:00 PM', home:'MIN', away:'DET', network:'Fox',            status:'upcoming', intl:false },
   { week:6, date:'Oct 18', day:'Sun', time:'1:00 PM', home:'CHI', away:'GB',  network:'Fox',            status:'upcoming', intl:false },
@@ -114,7 +114,7 @@ export const SCHEDULE_2026 = [
   { week:7, date:'Oct 25', day:'Sun', time:'1:00 PM', home:'HOU', away:'TEN', network:'CBS',            status:'upcoming', intl:false },
   { week:7, date:'Oct 25', day:'Sun', time:'1:00 PM', home:'CIN', away:'CLE', network:'CBS',            status:'upcoming', intl:false },
   { week:7, date:'Oct 25', day:'Sun', time:'1:00 PM', home:'CAR', away:'ATL', network:'Fox',            status:'upcoming', intl:false },
-  { week:7, date:'Oct 25', day:'Sun', time:'1:00 PM', home:'NYG', away:'WAS', network:'Fox',            status:'upcoming', intl:false },
+  { week:7, date:'Oct 25', day:'Sun', time:'1:00 PM', home:'HOU', away:'NYG', network:'Fox',            status:'upcoming', intl:false },
   { week:7, date:'Oct 25', day:'Sun', time:'1:00 PM', home:'GB',  away:'MIN', network:'Fox',            status:'upcoming', intl:false },
   { week:7, date:'Oct 25', day:'Sun', time:'1:00 PM', home:'DAL', away:'PHI', network:'Fox',            status:'upcoming', intl:false },
   { week:7, date:'Oct 25', day:'Sun', time:'4:25 PM', home:'SEA', away:'KC',  network:'CBS',            status:'upcoming', intl:false },
@@ -124,7 +124,7 @@ export const SCHEDULE_2026 = [
 
   // ── WEEK 8 · Oct 29 – Nov 2 ─────────────────────────────────────────────
   { week:8, date:'Oct 29', day:'Thu', time:'8:15 PM', home:'CAR', away:'GB',  network:'Amazon/TNF',     status:'upcoming', intl:false },
-  { week:8, date:'Nov 1',  day:'Sun', time:'1:00 PM', home:'NYJ', away:'BUF', network:'CBS',            status:'upcoming', intl:false },
+  { week:8, date:'Nov 1',  day:'Sun', time:'1:00 PM', home:'NYJ', away:'LV',  network:'Fox',            status:'upcoming', intl:false },
   { week:8, date:'Nov 1',  day:'Sun', time:'1:00 PM', home:'BAL', away:'NE',  network:'CBS',            status:'upcoming', intl:false },
   { week:8, date:'Nov 1',  day:'Sun', time:'1:00 PM', home:'PIT', away:'CIN', network:'CBS',            status:'upcoming', intl:false },
   { week:8, date:'Nov 1',  day:'Sun', time:'1:00 PM', home:'JAC', away:'HOU', network:'CBS',            status:'upcoming', intl:false },
@@ -143,7 +143,7 @@ export const SCHEDULE_2026 = [
   { week:9, date:'Nov 8',  day:'Sun', time:'2:00 PM', home:'ATL', away:'CIN', network:'NFL Network',    status:'upcoming', intl:true,  intlCity:'Madrid, Spain', note:'International Series · Estadio Santiago Bernabéu' },
   { week:9, date:'Nov 5',  day:'Thu', time:'8:15 PM', home:'SF',  away:'LA',  network:'Amazon/TNF',     status:'upcoming', intl:false },
   { week:9, date:'Nov 8',  day:'Sun', time:'1:00 PM', home:'NE',  away:'MIA', network:'CBS',            status:'upcoming', intl:false },
-  { week:9, date:'Nov 8',  day:'Sun', time:'1:00 PM', home:'BUF', away:'NYJ', network:'CBS',            status:'upcoming', intl:false },
+  { week:9, date:'Nov 8',  day:'Sun', time:'1:00 PM', home:'KC',  away:'NYJ', network:'CBS',            status:'upcoming', intl:false },
   { week:9, date:'Nov 8',  day:'Sun', time:'1:00 PM', home:'HOU', away:'JAC', network:'CBS',            status:'upcoming', intl:false },
   { week:9, date:'Nov 8',  day:'Sun', time:'1:00 PM', home:'CLE', away:'PIT', network:'CBS',            status:'upcoming', intl:false },
   { week:9, date:'Nov 8',  day:'Sun', time:'1:00 PM', home:'DET', away:'CHI', network:'Fox',            status:'upcoming', intl:false },
@@ -154,7 +154,7 @@ export const SCHEDULE_2026 = [
   { week:9, date:'Nov 9',  day:'Mon', time:'8:15 PM', home:'MIN', away:'BUF', network:'ESPN/MNF',       status:'upcoming', intl:false },
 
   // ── WEEK 10 · Nov 12–16 ─────────────────────────────────────────────────
-  { week:10, date:'Nov 12', day:'Thu', time:'8:15 PM', home:'NYJ', away:'IND', network:'Amazon/TNF',    status:'upcoming', intl:false },
+  { week:10, date:'Nov 15', day:'Sun', time:'1:00 PM', home:'NYJ', away:'BUF', network:'CBS',           status:'upcoming', intl:false },
   // International — Munich, Germany (Lions vs Patriots)
   { week:10, date:'Nov 15', day:'Sun', time:'9:30 AM', home:'DET', away:'NE',  network:'Fox',           status:'upcoming', intl:true,  intlCity:'Munich, Germany', note:'International Series · Allianz Arena' },
   { week:10, date:'Nov 15', day:'Sun', time:'1:00 PM', home:'MIA', away:'HOU', network:'CBS',           status:'upcoming', intl:false },
@@ -162,11 +162,11 @@ export const SCHEDULE_2026 = [
   { week:10, date:'Nov 15', day:'Sun', time:'1:00 PM', home:'TEN', away:'CLE', network:'CBS',           status:'upcoming', intl:false },
   { week:10, date:'Nov 15', day:'Sun', time:'1:00 PM', home:'TB',  away:'ATL', network:'Fox',           status:'upcoming', intl:false },
   { week:10, date:'Nov 15', day:'Sun', time:'1:00 PM', home:'CAR', away:'DAL', network:'Fox',           status:'upcoming', intl:false },
-  { week:10, date:'Nov 15', day:'Sun', time:'1:00 PM', home:'PHI', away:'NYG', network:'Fox',           status:'upcoming', intl:false },
+  { week:10, date:'Nov 12', day:'Thu', time:'8:15 PM', home:'NYG', away:'WAS', network:'Amazon/TNF',    status:'upcoming', intl:false },
   { week:10, date:'Nov 15', day:'Sun', time:'4:25 PM', home:'SEA', away:'SF',  network:'Fox',           status:'upcoming', intl:false },
   { week:10, date:'Nov 15', day:'Sun', time:'4:25 PM', home:'LV',  away:'LAC', network:'CBS',           status:'upcoming', intl:false },
   { week:10, date:'Nov 15', day:'Sun', time:'4:25 PM', home:'LA',  away:'DEN', network:'CBS',           status:'upcoming', intl:false },
-  { week:10, date:'Nov 15', day:'Sun', time:'8:20 PM', home:'WAS', away:'NYG', network:'NBC/SNF',       status:'upcoming', intl:false },
+  { week:11, date:'Nov 22', day:'Sun', time:'4:05 PM', home:'LAC', away:'NYJ', network:'Fox',           status:'upcoming', intl:false },
   { week:10, date:'Nov 16', day:'Mon', time:'8:15 PM', home:'GB',  away:'MIN', network:'ESPN/MNF',       status:'upcoming', intl:false },
 
   // ── WEEK 11 · Nov 19–23 ─────────────────────────────────────────────────
@@ -180,7 +180,7 @@ export const SCHEDULE_2026 = [
   { week:11, date:'Nov 22', day:'Sun', time:'1:00 PM', home:'NO',  away:'ATL', network:'Fox',           status:'upcoming', intl:false },
   { week:11, date:'Nov 22', day:'Sun', time:'1:00 PM', home:'DET', away:'CAR', network:'Fox',           status:'upcoming', intl:false },
   { week:11, date:'Nov 22', day:'Sun', time:'1:00 PM', home:'WAS', away:'CIN', network:'Fox',           status:'upcoming', intl:false },
-  { week:11, date:'Nov 22', day:'Sun', time:'1:00 PM', home:'GB',  away:'NYG', network:'Fox',           status:'upcoming', intl:false },
+  { week:11, date:'Nov 22', day:'Sun', time:'1:00 PM', home:'NYG', away:'JAC', network:'CBS',           status:'upcoming', intl:false },
   { week:11, date:'Nov 22', day:'Sun', time:'4:25 PM', home:'SEA', away:'LAC', network:'CBS',           status:'upcoming', intl:false },
   { week:11, date:'Nov 22', day:'Sun', time:'4:25 PM', home:'ARI', away:'LA',  network:'Fox',           status:'upcoming', intl:false },
   { week:11, date:'Nov 23', day:'Mon', time:'8:15 PM', home:'PHI', away:'WAS', network:'ESPN/MNF',      status:'upcoming', intl:false },
@@ -211,10 +211,10 @@ export const SCHEDULE_2026 = [
   { week:13, date:'Dec 6',  day:'Sun', time:'1:00 PM', home:'BUF', away:'MIA', network:'CBS',           status:'upcoming', intl:false },
   { week:13, date:'Dec 6',  day:'Sun', time:'1:00 PM', home:'PIT', away:'CIN', network:'CBS',           status:'upcoming', intl:false },
   { week:13, date:'Dec 6',  day:'Sun', time:'1:00 PM', home:'HOU', away:'TEN', network:'CBS',           status:'upcoming', intl:false },
-  { week:13, date:'Dec 6',  day:'Sun', time:'1:00 PM', home:'NYJ', away:'JAC', network:'CBS',           status:'upcoming', intl:false },
+  { week:14, date:'Dec 13', day:'Sun', time:'1:00 PM', home:'MIA', away:'NYJ', network:'CBS',           status:'upcoming', intl:false },
   { week:13, date:'Dec 6',  day:'Sun', time:'1:00 PM', home:'NO',  away:'ATL', network:'Fox',           status:'upcoming', intl:false },
   { week:13, date:'Dec 6',  day:'Sun', time:'1:00 PM', home:'GB',  away:'CHI', network:'Fox',           status:'upcoming', intl:false },
-  { week:13, date:'Dec 6',  day:'Sun', time:'1:00 PM', home:'NYG', away:'WAS', network:'Fox',           status:'upcoming', intl:false },
+  { week:13, date:'Dec 6',  day:'Sun', time:'1:00 PM', home:'NYG', away:'SF',  network:'Fox',           status:'upcoming', intl:false },
   { week:13, date:'Dec 6',  day:'Sun', time:'4:25 PM', home:'SEA', away:'DAL', network:'Fox',           status:'upcoming', intl:false },
   { week:13, date:'Dec 6',  day:'Sun', time:'4:25 PM', home:'DEN', away:'LV',  network:'CBS',           status:'upcoming', intl:false },
   { week:13, date:'Dec 6',  day:'Sun', time:'4:25 PM', home:'ARI', away:'LAC', network:'Fox',           status:'upcoming', intl:false },
@@ -223,7 +223,6 @@ export const SCHEDULE_2026 = [
 
   // ── WEEK 14 · Dec 10–14 ─────────────────────────────────────────────────
   { week:14, date:'Dec 10', day:'Thu', time:'8:15 PM', home:'MIN', away:'NE',  network:'Amazon/TNF',    status:'upcoming', intl:false },
-  { week:14, date:'Dec 13', day:'Sun', time:'1:00 PM', home:'MIA', away:'NYJ', network:'CBS',           status:'upcoming', intl:false },
   { week:14, date:'Dec 13', day:'Sun', time:'1:00 PM', home:'BUF', away:'IND', network:'CBS',           status:'upcoming', intl:false },
   { week:14, date:'Dec 13', day:'Sun', time:'1:00 PM', home:'BAL', away:'HOU', network:'CBS',           status:'upcoming', intl:false },
   { week:14, date:'Dec 13', day:'Sun', time:'1:00 PM', home:'TEN', away:'PIT', network:'CBS',           status:'upcoming', intl:false },
@@ -266,12 +265,12 @@ export const SCHEDULE_2026 = [
   { week:16, date:'Dec 27', day:'Sun', time:'1:00 PM', home:'MIN', away:'DET', network:'Fox',           status:'upcoming', intl:false },
   { week:16, date:'Dec 27', day:'Sun', time:'4:25 PM', home:'LV',  away:'DEN', network:'CBS',           status:'upcoming', intl:false },
   { week:16, date:'Dec 27', day:'Sun', time:'4:25 PM', home:'LAC', away:'KC',  network:'CBS',           status:'upcoming', intl:false },
-  { week:16, date:'Dec 27', day:'Sun', time:'8:20 PM', home:'DET', away:'NYG', network:'NBC/SNF',       status:'upcoming', intl:false },
+  { week:16, date:'Dec 28', day:'Mon', time:'8:15 PM', home:'DET', away:'NYG', network:'ESPN/MNF',      status:'upcoming', intl:false },
   { week:16, date:'Dec 28', day:'Mon', time:'8:15 PM', home:'BUF', away:'DEN', network:'ESPN/MNF',      status:'upcoming', intl:false, note:'SB LX Rematch' },
 
   // ── WEEK 17 · Dec 31 – Jan 4, 2027 ─────────────────────────────────────
   // New Year's Eve game
-  { week:17, date:'Dec 31', day:'Thu', time:'8:15 PM', home:'NYJ', away:'MIA', network:'Amazon/TNF',    status:'upcoming', intl:false, note:"New Year's Eve" },
+  { week:17, date:'Jan 3',  day:'Sun', time:'1:00 PM', home:'NYJ', away:'MIN', network:'CBS',           status:'upcoming', intl:false },
   // Championship rematches
   { week:17, date:'Jan 3',  day:'Sun', time:'1:00 PM', home:'NE',  away:'DEN', network:'CBS',           status:'upcoming', intl:false, note:'AFC Championship Rematch' },
   { week:17, date:'Jan 3',  day:'Sun', time:'1:00 PM', home:'MIA', away:'BUF', network:'CBS',           status:'upcoming', intl:false },
@@ -286,7 +285,7 @@ export const SCHEDULE_2026 = [
   { week:17, date:'Jan 4',  day:'Mon', time:'8:15 PM', home:'SF',  away:'PHI', network:'ESPN/MNF',      status:'upcoming', intl:false },
 
   // ── WEEK 18 · Jan 8–10, 2027 (ALL INTRA-DIVISION) ───────────────────────
-  { week:18, date:'Jan 10', day:'Sun', time:'TBD',     home:'NE',  away:'MIA', network:'TBD',           status:'upcoming', intl:false, note:'All Week 18 games at same time' },
+  { week:18, date:'Jan 10', day:'Sun', time:'TBD',     home:'NE',  away:'BUF', network:'TBD',           status:'upcoming', intl:false, note:'All Week 18 games at same time' },
   { week:18, date:'Jan 10', day:'Sun', time:'TBD',     home:'BUF', away:'NYJ', network:'TBD',           status:'upcoming', intl:false },
   { week:18, date:'Jan 10', day:'Sun', time:'TBD',     home:'BAL', away:'CLE', network:'TBD',           status:'upcoming', intl:false },
   { week:18, date:'Jan 10', day:'Sun', time:'TBD',     home:'CIN', away:'PIT', network:'TBD',           status:'upcoming', intl:false },
