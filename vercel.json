@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/espn/:path*",
+      "destination": "https://site.api.espn.com/apis/site/v2/sports/football/nfl/:path*"
+    },
+    {
+      "source": "/api/espn-core/:path*",
+      "destination": "https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/:path*"
+    }
+  ]
+}
