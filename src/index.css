@@ -604,3 +604,46 @@ body::before {
 .sg-net-link:hover{opacity:.8}
 .sg-team-link{color:var(--muted);text-decoration:none;font-size:10px;transition:color .12s}
 .sg-team-link:hover{color:var(--accent)}
+
+/* ── DRAFT VIEW ───────────────────────────────────────────────────────────── */
+.draft-filters{display:flex;flex-wrap:wrap;gap:8px;padding:10px 16px;border-bottom:1px solid var(--rule);background:var(--paper-mid);align-items:center}
+.draft-round-btns{display:flex;gap:3px;flex-wrap:wrap}
+.draft-pos-btns{display:flex;gap:3px;flex-wrap:wrap}
+.draft-table{width:100%;border-collapse:collapse;font-family:'IBM Plex Mono',monospace;font-size:10px}
+.draft-table th{font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-lt);padding:6px 10px;text-align:left;border-bottom:2px solid var(--rule-hvy);background:var(--paper-dark);font-weight:500;white-space:nowrap}
+.draft-table td{padding:8px 10px;border-bottom:1px solid rgba(42,31,14,.05);vertical-align:middle}
+.draft-table tr:hover td{background:var(--paper-dark)}
+.draft-table tr.draft-elite td{background:rgba(45,138,80,.04)}
+.draft-table tr:last-child td{border-bottom:none}
+.dt-pick{font-family:'Playfair Display',serif;font-size:14px;font-weight:700;color:var(--gold);white-space:nowrap}
+.dt-team{font-weight:700;color:var(--ink)}
+.dt-player{font-family:'Libre Baskerville',serif;font-size:12px;font-weight:700;color:var(--ink)}
+.dt-pos{color:var(--accent);font-weight:600;font-size:9px}
+.dt-college{color:var(--muted);font-size:9px}
+.dt-note{color:var(--muted);font-size:9px;max-width:220px;line-height:1.4}
+.draft-grade{font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;color:#fff;padding:2px 7px;border-radius:2px;white-space:nowrap}
+
+.draft-byteam-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));border-left:1px solid var(--rule);padding:16px;gap:14px}
+.draft-team-card{border:1px solid var(--rule);border-radius:var(--r);overflow:hidden}
+.dtc-header{display:flex;align-items:center;gap:8px;background:var(--ink);color:var(--paper);padding:8px 12px}
+.dtc-abbr{font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:var(--gold);text-decoration:none}
+.dtc-abbr:hover{color:var(--paper)}
+.dtc-name{font-family:'IBM Plex Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:rgba(245,240,232,.5);flex:1}
+.dtc-count{font-family:'IBM Plex Mono',monospace;font-size:8px;color:rgba(245,240,232,.35)}
+.dtc-pick{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid rgba(42,31,14,.05)}
+.dtc-pick:last-child{border-bottom:none}
+.dtc-pick:hover{background:var(--paper-dark)}
+.dtc-round{font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--muted-lt);flex-shrink:0}
+.dtc-player{font-family:'Libre Baskerville',serif;font-size:12px;font-weight:700;color:var(--ink);text-decoration:none;flex:1}
+.dtc-player:hover{color:var(--accent)}
+.dtc-pos{font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--accent);font-weight:600}
+.dtc-empty{padding:12px;font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted-lt)}
+
+.draft-fantasy-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));border-left:1px solid var(--rule);padding:16px;gap:14px}
+
+/* ── WEATHER + ODDS ───────────────────────────────────────────────────────── */
+.gi-odds{background:rgba(200,168,75,.06);border-radius:var(--r)}
+.gi-odds-val{font-weight:700;color:var(--ink);font-family:'IBM Plex Mono',monospace}
+.gi-weather{background:rgba(0,100,200,.04)}
+.gi-weather-val{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ink)}
+.gi-weather-warning{color:#c8a84b;font-size:9px;display:block;margin-top:3px;font-style:italic}
