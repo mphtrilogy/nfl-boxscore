@@ -612,6 +612,8 @@ function LiveDrawer({ game: g, espnData, loading }) {
 }
 
 function GameInfoDrawer({ game: g }) {
+  // Season gate defined locally for this component
+  const seasonStarted = new Date() >= new Date('2026-09-09T00:00:00-04:00')
   // Weather for outdoor stadiums during season
   const homeTeam = g.home
   const isOutdoor = OUTDOOR_STADIUMS.includes(homeTeam)
@@ -2376,53 +2378,53 @@ function useWeather(city) {
 
 // ── 2026 NFL DRAFT DATA ───────────────────────────────────────────────────────
 const DRAFT_2026 = [
-  // Round 1
-  { pick:1,  round:1, team:'TEN', player:'Shedeur Sanders',    pos:'QB',  college:'Colorado',      note:'Franchise QB — elite arm talent, mobility',      fantasyGrade:'A',  fantasyNote:'Day 1 starter candidate. Top-5 fantasy QB if he wins job Week 1.' },
-  { pick:2,  round:1, team:'CLE', player:'Travis Hunter',      pos:'WR/CB',college:'Colorado',     note:'Two-way Heisman winner — elite WR talent',        fantasyGrade:'A+', fantasyNote:'Generational talent. Top-10 WR1 upside if used correctly.' },
-  { pick:3,  round:1, team:'NYG', player:'Cam Ward',           pos:'QB',  college:'Miami',         note:'Strong arm, improvisational — high ceiling',      fantasyGrade:'B+', fantasyNote:'Giants offense needs weapons but Ward has upside.' },
-  { pick:4,  round:1, team:'NE',  player:'Abdul Carter',       pos:'EDGE', college:'Penn State',   note:'Elite pass rusher — 12 sacks in 2024',            fantasyGrade:'C',  fantasyNote:'Defensive players rarely fantasy relevant unless IDP leagues.' },
-  { pick:5,  round:1, team:'JAC', player:'Tetairoa McMillan',  pos:'WR',  college:'Arizona',       note:'6\'4" possession receiver — contested catch monster', fantasyGrade:'A-', fantasyNote:'Big target in a rebuilding offense. WR2/3 with upside.' },
-  { pick:6,  round:1, team:'LV',  player:'Ashton Jeanty',      pos:'RB',  college:'Boise State',   note:'2,601 rush yards in 2024 — generational runner',  fantasyGrade:'A+', fantasyNote:'If healthy, immediate RB1. Rare workhorse back.' },
-  { pick:7,  round:1, team:'NYJ', player:'Will Campbell',      pos:'OT',  college:'LSU',           note:'Elite tackle prospect — protects the blind side',  fantasyGrade:'C',  fantasyNote:'OL picks are fantasy irrelevant but helps QB/RB around him.' },
-  { pick:8,  round:1, team:'CAR', player:'Mason Graham',       pos:'DT',  college:'Michigan',      note:'Dominant interior defender',                       fantasyGrade:'C',  fantasyNote:'IDP only.' },
-  { pick:9,  round:1, team:'NO',  player:'Kelvin Banks Jr.',   pos:'OT',  college:'Texas',         note:'Top-rated OT in class — technically polished',    fantasyGrade:'C',  fantasyNote:'Helps Saints skill players around him.' },
-  { pick:10, round:1, team:'CHI', player:'Mykel Williams',     pos:'EDGE', college:'Georgia',      note:'Power rusher — 11 sacks in 2024',                 fantasyGrade:'C',  fantasyNote:'IDP leagues only.' },
-  { pick:11, round:1, team:'SF',  player:'Jalon Walker',       pos:'LB',  college:'Georgia',       note:'Swiss army knife defender',                        fantasyGrade:'C',  fantasyNote:'IDP only.' },
-  { pick:12, round:1, team:'DAL', player:'Luther Burden III',  pos:'WR',  college:'Missouri',      note:'Explosive slot — yards after catch machine',      fantasyGrade:'A-', fantasyNote:'Dallas needs weapons. WR2 upside with CeeDee Lamb still there.' },
-  { pick:13, round:1, team:'MIA', player:'Jihaad Campbell',    pos:'LB',  college:'Alabama',       note:'Elite coverage LB — versatile',                   fantasyGrade:'C',  fantasyNote:'IDP only.' },
-  { pick:14, round:1, team:'IND', player:'Tyler Warren',       pos:'TE',  college:'Penn State',    note:'Dominant TE — 104 catches in 2024',               fantasyGrade:'A',  fantasyNote:'Immediate TE1 candidate. Anthony Richardson needs a safety valve.' },
-  { pick:15, round:1, team:'ATL', player:'James Pearce Jr.',   pos:'EDGE', college:'Tennessee',    note:'Explosive first step — speed rusher',              fantasyGrade:'C',  fantasyNote:'IDP only.' },
-  { pick:16, round:1, team:'ARI', player:'Colston Loveland',   pos:'TE',  college:'Michigan',      note:'Receiving TE — fluid route runner',                fantasyGrade:'B+', fantasyNote:'TE2 with high upside. Arizona building around Kyler Murray.' },
-  { pick:17, round:1, team:'CIN', player:'Darius Alexander',   pos:'DT',  college:'Toledo',        note:'Power interior rusher',                            fantasyGrade:'C',  fantasyNote:'IDP only.' },
-  { pick:18, round:1, team:'SEA', player:'OJ Ihekwe',          pos:'DT',  college:'Texas A&M',     note:'Run stuffer — anchor of defensive line',           fantasyGrade:'C',  fantasyNote:'IDP only.' },
-  { pick:19, round:1, team:'TB',  player:'Josh Simmons',       pos:'OT',  college:'Ohio State',    note:'Elite athlete at tackle — injury concern',         fantasyGrade:'C',  fantasyNote:'Helps Baker Mayfield and the run game.' },
-  { pick:20, round:1, team:'DEN', player:'Malaki Starks',      pos:'S',   college:'Georgia',       note:'Ball hawk safety — 6 INTs in 2024',               fantasyGrade:'C',  fantasyNote:'IDP leagues only.' },
-  { pick:21, round:1, team:'PIT', player:'Derrick Harmon',     pos:'DT',  college:'Oregon',        note:'Versatile interior lineman',                       fantasyGrade:'C',  fantasyNote:'IDP only.' },
-  { pick:22, round:1, team:'LAC', player:'Nick Emmanwori',     pos:'S',   college:'South Carolina', note:'Elite athlete — 4.38 speed at safety',            fantasyGrade:'C',  fantasyNote:'IDP only.' },
-  { pick:23, round:1, team:'GB',  player:'Shemar Stewart',     pos:'EDGE', college:'Texas A&M',    note:'Raw but explosive — high ceiling rusher',          fantasyGrade:'C',  fantasyNote:'IDP only.' },
-  { pick:24, round:1, team:'MIN', player:'Walter Nolen',       pos:'DT',  college:'Ole Miss',      note:'Disruptive interior — strong against the run',    fantasyGrade:'C',  fantasyNote:'IDP only.' },
-  { pick:25, round:1, team:'HOU', player:'Donovan Ezeiruaku',  pos:'EDGE', college:'Boston College', note:'14 sacks in 2024 — motor never stops',           fantasyGrade:'C',  fantasyNote:'IDP only.' },
-  { pick:26, round:1, team:'WAS', player:'Kenneth Grant',      pos:'DT',  college:'Michigan',      note:'Athletic interior — disruptive in penetration',   fantasyGrade:'C',  fantasyNote:'IDP only.' },
-  { pick:27, round:1, team:'BAL', player:'Grey Zabel',         pos:'OG',  college:'NDSU',          note:'Dominant guard — physical mauler',                 fantasyGrade:'C',  fantasyNote:'Helps Lamar Jackson and the Ravens run game.' },
-  { pick:28, round:1, team:'DET', player:'Maxwell Hairston',   pos:'CB',  college:'Kentucky',      note:'Ball hawk corner — 5 INTs in 2024',               fantasyGrade:'C',  fantasyNote:'IDP only.' },
-  { pick:29, round:1, team:'MIA', player:'Emeka Egbuka',       pos:'WR',  college:'Ohio State',    note:'Route runner — polished technician',               fantasyGrade:'B+', fantasyNote:'WR2/3 with upside — needs Tua to stay healthy.' },
-  { pick:30, round:1, team:'PHI', player:'Tyleik Williams',    pos:'DT',  college:'Ohio State',    note:'Anchor of Eagles defensive line future',           fantasyGrade:'C',  fantasyNote:'IDP only.' },
-  { pick:31, round:1, team:'KC',  player:'Matthew Golden',     pos:'WR',  college:'Texas',         note:'Speed receiver — stretches the field',             fantasyGrade:'B',  fantasyNote:'WR3 in a deep KC offense. Volume may be limited.' },
-  { pick:32, round:1, team:'SF',  player:'Jaylen Mbeki',       pos:'LB',  college:'Georgia',       note:'Athletic LB — coverage ability',                   fantasyGrade:'C',  fantasyNote:'IDP only.' },
+  // ── ROUND 1 ──────────────────────────────────────────────────────────────
+  { pick:1,  round:1, team:'LV',  player:'Fernando Mendoza',  pos:'QB',   college:'Indiana',       note:'No. 1 overall — strong arm, poised pocket passer. Raiders bet on him as franchise QB.',      fantasyGrade:'A',  fantasyNote:'If he starts Week 1, top-8 fantasy QB upside. Watch training camp depth chart closely.' },
+  { pick:2,  round:1, team:'NYJ', player:'David Bailey',      pos:'EDGE', college:'Texas Tech',    note:'Elite pass rusher — explosive off the edge, motor never stops.',                             fantasyGrade:'C',  fantasyNote:'IDP leagues only. No fantasy value in standard formats.' },
+  { pick:3,  round:1, team:'ARI', player:'Jeremiyah Love',    pos:'RB',   college:'Notre Dame',    note:'Highest-drafted RB since Saquon Barkley. Explosive, versatile, elite pass catcher.',        fantasyGrade:'A+', fantasyNote:'Immediate RB1 candidate. Arizona will feed him touches. Top-5 fantasy RB if healthy.' },
+  { pick:4,  round:1, team:'TEN', player:'Carnell Tate',      pos:'WR',   college:'Ohio State',    note:'Surprise pick — smooth route runner, elite hands. Titans went WR over QB.',                  fantasyGrade:'A-', fantasyNote:'WR1 upside if Tennessee\'s QB situation solidifies. Top-20 WR with upside.' },
+  { pick:5,  round:1, team:'NYG', player:'Arvell Reese',      pos:'LB',   college:'Ohio State',    note:'Athletic LB — elite coverage ability, instincts. Part of Buckeyes\' dominant defense.',     fantasyGrade:'C',  fantasyNote:'IDP leagues only.' },
+  { pick:6,  round:1, team:'KC',  player:'Mansoor Delane',    pos:'CB',   college:'LSU',           note:'(via CLE) — Ball-hawk corner, elite athleticism. Chiefs trade up for defensive help.',      fantasyGrade:'C',  fantasyNote:'IDP only.' },
+  { pick:7,  round:1, team:'WAS', player:'Sonny Styles',      pos:'LB',   college:'Ohio State',    note:'Four Ohio State players top 11 — Styles is a do-it-all defender with elite range.',          fantasyGrade:'C',  fantasyNote:'IDP only.' },
+  { pick:8,  round:1, team:'NO',  player:'Jordyn Tyson',      pos:'WR',   college:'Arizona State', note:'Electric playmaker — yards after catch specialist. Saints need a weapon.',                   fantasyGrade:'B+', fantasyNote:'WR2/3 with upside. Saints throw it around. Monitor training camp.' },
+  { pick:9,  round:1, team:'CLE', player:'Spencer Fano',      pos:'OT',   college:'Utah',          note:'(via KC) — First of NINE OL taken in Round 1. Protects the blind side.',                   fantasyGrade:'C',  fantasyNote:'Helps Deshaun Watson / whoever starts. OL picks boost skill players around them.' },
+  { pick:10, round:1, team:'NYG', player:'Francis Mauigoa',   pos:'OT',   college:'Miami',         note:'(via CIN) — Giants grab two picks, two needs. Athletic OT with versatility.',               fantasyGrade:'C',  fantasyNote:'Helps protect the QB and opens holes for Giants RBs.' },
+  { pick:11, round:1, team:'DAL', player:'Caleb Downs',       pos:'S',    college:'Ohio State',    note:'(via MIA) — Ball hawk safety. 4th Ohio State player in top 11 picks.',                     fantasyGrade:'C',  fantasyNote:'IDP only.' },
+  { pick:12, round:1, team:'MIA', player:'Kadyn Proctor',     pos:'OT',   college:'Alabama',       note:'(via DAL) — Tua needs protection. Elite length, strong hands.',                             fantasyGrade:'C',  fantasyNote:'Helps Tua, Tyreek Hill and the Dolphins offense overall.' },
+  { pick:13, round:1, team:'LA',  player:'Ty Simpson',        pos:'QB',   college:'Alabama',       note:'(via ATL) — Surprise QB pick by the Rams. Developmental behind whoever starts.',            fantasyGrade:'C',  fantasyNote:'Long-term project. Not a 2026 fantasy factor.' },
+  { pick:14, round:1, team:'BAL', player:'Olaivavega Ioane',  pos:'G',    college:'Penn State',    note:'Dominant interior guard — physical mauler. Fits Ravens\' power run scheme.',               fantasyGrade:'C',  fantasyNote:'Helps Lamar Jackson and the Ravens running game.' },
+  { pick:15, round:1, team:'TB',  player:'Rueben Bain Jr.',   pos:'EDGE', college:'Miami',         note:'Top edge rusher in class. Miami product brings elite pass rush to Tampa Bay.',             fantasyGrade:'C',  fantasyNote:'IDP leagues only.' },
+  { pick:16, round:1, team:'NYJ', player:'Kenyon Sadiq',      pos:'TE',   college:'Oregon',        note:'(via IND) — Jets get their TE of the future. Athletic, reliable pass catcher.',            fantasyGrade:'B+', fantasyNote:'TE2 with upside. NYJ needs weapons around their QB.' },
+  { pick:17, round:1, team:'DET', player:'Blake Miller',      pos:'OT',   college:'Clemson',       note:'Athletic tackle — Lions continue building the best OL in football.',                        fantasyGrade:'C',  fantasyNote:'Helps Jahmyr Gibbs and David Montgomery continue their dominance.' },
+  { pick:18, round:1, team:'MIN', player:'Caleb Banks',       pos:'DT',   college:'Florida',       note:'Disruptive interior — Vikings add to their defensive front.',                               fantasyGrade:'C',  fantasyNote:'IDP only.' },
+  { pick:19, round:1, team:'CAR', player:'Monroe Freeling',   pos:'OT',   college:'Georgia',       note:'Panthers continue OL rebuild. Protecting their young QB is priority.',                      fantasyGrade:'C',  fantasyNote:'Helps Panthers skill players long term.' },
+  { pick:20, round:1, team:'PHI', player:'Makai Lemon',       pos:'WR',   college:'USC',           note:'(via DAL/GB) — Eagles add explosiveness at WR. Speed merchant, big play ability.',         fantasyGrade:'B+', fantasyNote:'WR3 in a talented Eagles offense. Touchdown upside in red zone.' },
+  { pick:21, round:1, team:'PIT', player:'Max Iheanachor',    pos:'OT',   college:'Arizona State', note:'9 OL in Round 1 — Steelers protect whoever wins the QB battle.',                           fantasyGrade:'C',  fantasyNote:'Helps Steelers ground game.' },
+  { pick:22, round:1, team:'LAC', player:'Akheem Mesidor',    pos:'EDGE', college:'Miami',         note:'Explosive edge rusher — pairs with Joey Bosa to form elite pass rush duo.',               fantasyGrade:'C',  fantasyNote:'IDP only.' },
+  { pick:23, round:1, team:'DAL', player:'Malachi Lawrence',  pos:'EDGE', college:'UCF',           note:'Cowboys add pass rush depth. Versatile speed rusher.',                                      fantasyGrade:'C',  fantasyNote:'IDP only.' },
+  { pick:24, round:1, team:'CLE', player:'KC Concepcion',     pos:'WR',   college:'Texas A&M',     note:'(via JAX) — Browns grab a weapon. Concepcion is a yards-after-catch machine.',            fantasyGrade:'B',  fantasyNote:'WR3 upside — depends heavily on QB situation in Cleveland.' },
+  { pick:25, round:1, team:'CHI', player:'Dillon Thieneman',  pos:'S',    college:'Oregon',        note:'Ball-hawk safety — led nation in INTs. Bears add defensive playmaker.',                    fantasyGrade:'C',  fantasyNote:'IDP only.' },
+  { pick:26, round:1, team:'HOU', player:'Keylan Rutledge',   pos:'G',    college:'Georgia Tech',  note:'(via BUF) — Texans protect C.J. Stroud. Physical interior guard.',                        fantasyGrade:'C',  fantasyNote:'Helps Stroud, Tank Dell and Stefon Diggs.' },
+  { pick:27, round:1, team:'MIA', player:'Chris Johnson',     pos:'CB',   college:'San Diego State',note:'(via SF) — Dolphins grab a corner. Athletic, physical in coverage.',                     fantasyGrade:'C',  fantasyNote:'IDP only.' },
+  { pick:28, round:1, team:'NE',  player:'Caleb Lomu',        pos:'OT',   college:'Utah',          note:'(via BUF/HOU) — 9th OL in Round 1. Patriots rebuild their line.',                        fantasyGrade:'C',  fantasyNote:'Helps Drake Maye develop behind solid protection.' },
+  { pick:29, round:1, team:'KC',  player:'Peter Woods',       pos:'DT',   college:'Clemson',       note:'(via LAR) — Chiefs\' second first-round pick. Disruptive interior rusher.',               fantasyGrade:'C',  fantasyNote:'IDP only.' },
+  { pick:30, round:1, team:'NYJ', player:'Omar Cooper Jr.',   pos:'WR',   college:'Indiana',       note:'Jets\' second Round 1 pick — gives their new QB a weapon to throw to.',                   fantasyGrade:'B+', fantasyNote:'WR2/3 upside — huge if paired with a capable QB in NY.' },
+  { pick:31, round:1, team:'TEN', player:'Keldric Faulk',     pos:'EDGE', college:'Auburn',        note:'Titans\' second Round 1 — athletic pass rusher to complement their WR pick.',             fantasyGrade:'C',  fantasyNote:'IDP only.' },
+  { pick:32, round:1, team:'SEA', player:'Jadarian Price',    pos:'RB',   college:'Notre Dame',    note:'Seahawks grab the second Notre Dame RB. Complements Kenneth Walker III.',                  fantasyGrade:'B-', fantasyNote:'Backup role in 2026 behind Walker. Handcuff/watch list only.' },
 ]
 
 // Fantasy relevant picks summary by grade
 const FANTASY_SLEEPERS_2026 = [
-  { player:'Ashton Jeanty', team:'LV', pos:'RB', pick:'6th overall', grade:'A+', note:'Best RB prospect since Saquon. If Raiders commit to the run, he\'s a top-5 fantasy pick. Immediate workhorse.' },
-  { player:'Travis Hunter', team:'CLE', pos:'WR', pick:'2nd overall', grade:'A+', note:'Heisman winner plays both ways but as a receiver he\'s generational. Top-10 WR ceiling Day 1.' },
-  { player:'Tyler Warren', team:'IND', pos:'TE', pick:'14th overall', grade:'A', note:'104 catches at Penn State. Anthony Richardson needs a safety valve. TE1 upside right away.' },
-  { player:'Shedeur Sanders', team:'TEN', pos:'QB', pick:'1st overall', grade:'A', note:'If he starts Week 1, top-5 fantasy QB. Elite touch, mobility, football IQ. Watch camp closely.' },
-  { player:'Tetairoa McMillan', team:'JAC', pos:'WR', pick:'5th overall', grade:'A-', note:'6\'4" monster at WR. Jacksonville rebuilding — he\'s the focal point. WR2 with upside.' },
-  { player:'Luther Burden III', team:'DAL', pos:'WR', pick:'12th overall', grade:'A-', note:'Explosive slot with CeeDee Lamb on the field. WR2/3 but Dallas throws a lot.' },
-  { player:'Colston Loveland', team:'ARI', pos:'TE', pick:'16th overall', grade:'B+', note:'Kyler Murray loves his TE. Loveland is athletic and reliable. TE2 with upside in Arizona.' },
-  { player:'Cam Ward', team:'NYG', pos:'QB', pick:'3rd overall', grade:'B+', note:'Giants have weapons (Malik Nabers). If Ward starts, sneaky fantasy QB2/3.' },
-  { player:'Emeka Egbuka', team:'MIA', pos:'WR', pick:'29th overall', grade:'B+', note:'Joining Tyreek Hill and Jaylen Waddle. Crowded WR room but Tua throws a ton.' },
-  { player:'Matthew Golden', team:'KC', pos:'WR', pick:'31st overall', grade:'B', note:'Speed in KC is always valuable. Deep threat WR3/4 with touchdown upside.' },
+  { player:'Jeremiyah Love',   team:'ARI', pos:'RB',  pick:'3rd overall',  grade:'A+', note:'Highest-drafted RB since Saquon Barkley. Arizona will make him the centerpiece of the offense. Top-5 fantasy RB upside immediately.' },
+  { player:'Fernando Mendoza', team:'LV',  pos:'QB',  pick:'1st overall',  grade:'A',  note:'No. 1 overall to the Raiders. Strong arm, poised pocket presence. Top-8 fantasy QB if he starts Week 1. Watch training camp closely.' },
+  { player:'Carnell Tate',     team:'TEN', pos:'WR',  pick:'4th overall',  grade:'A-', note:'Surprise pick — smooth route runner with elite hands. Tennessee\'s WR1 immediately. Top-20 WR upside if the QB situation solidifies.' },
+  { player:'Jordyn Tyson',     team:'NO',  pos:'WR',  pick:'8th overall',  grade:'B+', note:'Electric yards-after-catch specialist. Saints desperately needed a weapon. WR2/3 with high upside in a pass-happy offense.' },
+  { player:'Kenyon Sadiq',     team:'NYJ', pos:'TE',  pick:'16th overall', grade:'B+', note:'Jets\' TE of the future — athletic, reliable. NYJ has needed a tight end for years. TE2 with ceiling if Aaron Rodgers stays healthy.' },
+  { player:'Omar Cooper Jr.',  team:'NYJ', pos:'WR',  pick:'30th overall', grade:'B+', note:'Jets\' third Round 1 pick — gives their QB another weapon. Fast, explosive slot receiver from Indiana.' },
+  { player:'Makai Lemon',      team:'PHI', pos:'WR',  pick:'20th overall', grade:'B+', note:'Speed merchant added to an already loaded Eagles offense. WR3 with big-play touchdown upside.' },
+  { player:'KC Concepcion',    team:'CLE', pos:'WR',  pick:'24th overall', grade:'B',  note:'Browns needed a receiver badly. Yards-after-catch machine but dependent on Cleveland\'s QB situation being resolved.' },
+  { player:'Jadarian Price',   team:'SEA', pos:'RB',  pick:'32nd overall', grade:'B-', note:'Second Notre Dame RB taken late Round 1. Backup to Kenneth Walker III in 2026. Handcuff only but long-term upside.' },
+  { player:'Ty Simpson',       team:'LA',  pos:'QB',  pick:'13th overall', grade:'C+', note:'Developmental QB behind current Rams starter. Not a 2026 fantasy factor but worth monitoring for future seasons.' },
 ]
 
 // ── DRAFT VIEW ────────────────────────────────────────────────────────────────
@@ -2430,7 +2432,7 @@ function DraftView() {
   const [tab,       setTab]       = useState('results')  // 'results' | 'fantasy' | 'byteam'
   const [teamFilter, setTeamFilter] = useState('All')
   const [posFilter,  setPosFilter]  = useState('All')
-  const [roundFilter, setRoundFilter] = useState(1)
+  const [roundFilter, setRoundFilter] = useState('all')
   const [search,    setSearch]    = useState('')
 
   const POSITIONS = ['All', 'QB', 'RB', 'WR', 'TE', 'OT', 'OG', 'EDGE', 'DT', 'LB', 'CB', 'S']
@@ -2449,7 +2451,7 @@ function DraftView() {
   const filtered = DRAFT_2026.filter(p => {
     if (teamFilter !== 'All' && p.team !== teamFilter) return false
     if (posFilter  !== 'All' && p.pos  !== posFilter)  return false
-    if (roundFilter && p.round !== roundFilter)          return false
+    if (roundFilter !== 'all' && p.round !== roundFilter) return false
     if (search && !p.player.toLowerCase().includes(search.toLowerCase()) &&
         !p.team.toLowerCase().includes(search.toLowerCase())) return false
     return true
@@ -2486,6 +2488,7 @@ function DraftView() {
             <input className="hist-search" placeholder="Search player or team…"
               value={search} onChange={e => setSearch(e.target.value)} style={{maxWidth:200}} />
             <div className="draft-round-btns">
+              <button className={`tc-btn ${roundFilter === 'all' ? 'on' : ''}`} onClick={() => setRoundFilter('all')}>All</button>
               {[1,2,3,4,5,6,7].map(r => (
                 <button key={r} className={`tc-btn ${roundFilter === r ? 'on' : ''}`}
                   onClick={() => setRoundFilter(r)}>Rd {r}</button>
@@ -2539,8 +2542,8 @@ function DraftView() {
               ))}
             </tbody>
           </table>
-          {roundFilter > 1 && (
-            <div className="atl-note">Rounds 2-7 picks coming soon as data is confirmed.</div>
+          {roundFilter !== 'all' && roundFilter > 1 && (
+            <div className="atl-note">Rounds 2-7 data coming soon — checking sources for complete picks.</div>
           )}
         </div>
       )}
