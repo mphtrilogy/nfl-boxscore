@@ -451,7 +451,7 @@ body::before {
 .news-ticker-wrap{display:flex;align-items:center;border-top:1px solid var(--rule);overflow:hidden;height:28px;background:var(--ink)}
 .ticker-label{font-family:'IBM Plex Mono',monospace;font-size:8px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--paper);background:var(--accent);padding:0 10px;height:28px;display:flex;align-items:center;flex-shrink:0;white-space:nowrap}
 .ticker-track{flex:1;overflow:hidden;height:28px;display:flex;align-items:center}
-.ticker-inner{display:flex;align-items:center;animation:ticker-scroll 60s linear infinite;white-space:nowrap}
+.ticker-inner{display:flex;align-items:center;animation:ticker-scroll 120s linear infinite;white-space:nowrap}
 .ticker-inner:hover{animation-play-state:paused}
 @keyframes ticker-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 .ticker-item{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.06em;color:rgba(245,240,232,.7);text-decoration:none;padding:0 6px;transition:color .15s;white-space:nowrap}
