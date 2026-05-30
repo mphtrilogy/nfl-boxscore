@@ -446,3 +446,101 @@ body::before {
 .trend-cold{font-size:14px;opacity:.7}
 .trend-new{font-size:14px}
 .trends-footer{padding:8px 16px;font-family:'IBM Plex Mono',monospace;font-size:8px;letter-spacing:.08em;color:var(--muted-lt);border-top:1px solid var(--rule);background:var(--paper-dark)}
+
+/* ── NEWS TICKER ──────────────────────────────────────────────────────────── */
+.news-ticker-wrap{display:flex;align-items:center;border-top:1px solid var(--rule);overflow:hidden;height:28px;background:var(--ink)}
+.ticker-label{font-family:'IBM Plex Mono',monospace;font-size:8px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--paper);background:var(--accent);padding:0 10px;height:28px;display:flex;align-items:center;flex-shrink:0;white-space:nowrap}
+.ticker-track{flex:1;overflow:hidden;height:28px;display:flex;align-items:center}
+.ticker-inner{display:flex;align-items:center;animation:ticker-scroll 60s linear infinite;white-space:nowrap}
+.ticker-inner:hover{animation-play-state:paused}
+@keyframes ticker-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.ticker-item{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.06em;color:rgba(245,240,232,.7);text-decoration:none;padding:0 6px;transition:color .15s;white-space:nowrap}
+.ticker-item:hover{color:var(--paper)}
+.ticker-sep{margin-left:6px;color:rgba(245,240,232,.25)}
+
+/* ── AMAZON LINK ──────────────────────────────────────────────────────────── */
+.support-link.amazon{color:var(--ink);border-bottom-color:var(--gold)}
+.support-link.amazon:hover{color:var(--gold)}
+
+/* ── INJURY REPORT ────────────────────────────────────────────────────────── */
+.injury-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));border-left:1px solid var(--rule);padding:16px;gap:16px}
+.injury-team-block{border:1px solid var(--rule);border-radius:var(--r);overflow:hidden}
+.itb-header{display:flex;align-items:center;gap:8px;background:var(--ink);color:var(--paper);padding:6px 10px}
+.itb-abbr{font-family:'Playfair Display',serif;font-size:15px;font-weight:700;flex-shrink:0}
+.itb-name{font-family:'IBM Plex Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:rgba(245,240,232,.5);flex:1}
+.itb-count{font-family:'IBM Plex Mono',monospace;font-size:8px;color:rgba(245,240,232,.35);flex-shrink:0}
+.injury-table{width:100%;border-collapse:collapse}
+.injury-table th{font-family:'IBM Plex Mono',monospace;font-size:7px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-lt);padding:4px 8px;text-align:left;border-bottom:1px solid var(--rule);background:var(--paper-mid);font-weight:500}
+.injury-table th.it-name{min-width:120px}
+.injury-table td{font-family:'IBM Plex Mono',monospace;font-size:9px;padding:5px 8px;border-bottom:1px solid rgba(42,31,14,.05);color:var(--muted);vertical-align:middle}
+.injury-table td.it-name{font-family:'Libre Baskerville',serif;font-size:10px;color:var(--ink);font-weight:400}
+.injury-table td.it-pos{color:var(--accent);font-weight:600;font-size:8px}
+.injury-table td.it-detail{color:var(--muted);font-size:8px}
+.injury-table td.it-date{color:var(--muted-lt);font-size:8px;white-space:nowrap}
+.injury-table tr:last-child td{border-bottom:none}
+.injury-table tr:hover td{background:var(--paper-dark)}
+.inj-status-badge{font-family:'IBM Plex Mono',monospace;font-size:7px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:2px 5px;border-radius:2px;white-space:nowrap}
+
+/* ── HISTORY VIEW ─────────────────────────────────────────────────────────── */
+.hist-tabs{display:flex;overflow-x:auto;border-bottom:1px solid var(--rule);background:var(--paper-mid);padding:0 8px;scrollbar-width:none}
+.hist-tabs::-webkit-scrollbar{display:none}
+.htab{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;padding:9px 14px;border:none;background:none;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;cursor:pointer}
+.htab:hover{color:var(--ink)}
+.htab.on{color:var(--ink);border-bottom-color:var(--gold);font-weight:600}
+
+/* Super Bowl table */
+.hist-search-bar{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--rule);background:var(--paper-mid)}
+.hist-search{font-family:'IBM Plex Mono',monospace;font-size:10px;padding:5px 10px;border:1px solid var(--rule);background:var(--paper);color:var(--ink);border-radius:var(--r);flex:1;max-width:320px}
+.hist-search:focus{outline:none;border-color:var(--ink)}
+.hist-count{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted-lt);letter-spacing:.08em}
+.sb-table{width:100%;border-collapse:collapse;font-family:'IBM Plex Mono',monospace;font-size:10px}
+.sb-table th{font-size:8px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-lt);padding:6px 10px;text-align:left;border-bottom:2px solid var(--rule-hvy);background:var(--paper-dark);font-weight:500;white-space:nowrap}
+.sb-table td{padding:7px 10px;border-bottom:1px solid rgba(42,31,14,.05);vertical-align:middle}
+.sb-num{font-family:'Playfair Display',serif;font-size:13px;font-weight:700;color:var(--gold);white-space:nowrap}
+.sb-year{color:var(--muted-lt);font-size:9px}
+.sb-winner{font-family:'Libre Baskerville',serif;font-size:11px;color:var(--green);font-weight:700}
+.sb-loser{font-family:'Libre Baskerville',serif;font-size:11px;color:var(--muted)}
+.sb-score{font-weight:700;color:var(--ink);white-space:nowrap}
+.sb-mvp{color:var(--ink);font-size:9px}
+.sb-site{color:var(--muted-lt);font-size:9px;white-space:nowrap}
+.sb-table tr.sb-latest td{background:rgba(200,168,75,.08)}
+.sb-table tr:hover td{background:var(--paper-dark)}
+.sb-table tr:last-child td{border-bottom:none}
+@media(max-width:700px){.sbt-loser,.sbt-mvp,.sbt-site{display:none}}
+
+/* Fantasy HOF */
+.hof-intro{padding:12px 16px;border-bottom:1px solid var(--rule);background:var(--paper-mid)}
+.hof-intro-text{font-family:'Playfair Display',serif;font-style:italic;font-size:13px;color:var(--muted)}
+.hof-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));border-left:1px solid var(--rule);padding:16px;gap:14px}
+.hof-card{border:1px solid var(--rule);border-radius:var(--r);padding:14px;position:relative;transition:background .12s}
+.hof-card:hover{background:var(--paper-mid)}
+.hof-card.hof-elite{border-color:var(--gold);background:rgba(200,168,75,.04)}
+.hof-rank{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-lt);margin-bottom:4px}
+.hof-card.hof-elite .hof-rank{color:var(--gold);font-weight:700}
+.hof-player{font-family:'Playfair Display',serif;font-size:17px;font-weight:700;line-height:1.2;margin-bottom:6px}
+.hof-meta{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+.hof-team{font-family:'IBM Plex Mono',monospace;font-size:8px;font-weight:600;color:var(--accent);letter-spacing:.08em}
+.hof-pos{font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--muted-lt);background:var(--paper-dark);padding:1px 5px;border-radius:2px}
+.hof-year{font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--muted-lt)}
+.hof-pts{font-family:'IBM Plex Mono',monospace;font-size:28px;font-weight:700;color:var(--ink);line-height:1;margin-bottom:6px}
+.hof-pts span{font-size:11px;color:var(--muted);font-weight:400}
+.hof-line{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted);margin-bottom:6px;line-height:1.4}
+.hof-note{font-family:'Playfair Display',serif;font-style:italic;font-size:11px;color:var(--muted);line-height:1.4;border-top:1px solid var(--rule);padding-top:6px;margin-top:2px}
+
+/* All-Time Leaders */
+.atl-cats{display:flex;gap:4px;padding:10px 16px;border-bottom:1px solid var(--rule);background:var(--paper-mid);flex-wrap:wrap}
+.atl-cat{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;padding:4px 12px;border:1px solid var(--rule);background:none;color:var(--muted);border-radius:var(--r);cursor:pointer;transition:all .12s}
+.atl-cat:hover{border-color:var(--ink);color:var(--ink)}
+.atl-cat.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.atl-table{width:100%;border-collapse:collapse;font-family:'IBM Plex Mono',monospace;font-size:11px}
+.atl-table th{font-size:8px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-lt);padding:6px 16px;text-align:left;border-bottom:2px solid var(--rule-hvy);background:var(--paper-dark);font-weight:500}
+.atl-table td{padding:10px 16px;border-bottom:1px solid rgba(42,31,14,.05)}
+.atl-rank{color:var(--muted-lt);font-size:9px;width:30px}
+.atl-name{font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:var(--ink)}
+.atl-team{color:var(--muted-lt);font-size:9px}
+.atl-stat{font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:700;color:var(--ink);text-align:right}
+.atl-table tr.atl-top td{background:rgba(200,168,75,.06)}
+.atl-table tr.atl-top .atl-name{color:var(--gold)}
+.atl-table tr:hover td{background:var(--paper-dark)}
+.atl-table tr:last-child td{border-bottom:none}
+.atl-note{padding:10px 16px;font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--muted-lt);letter-spacing:.06em;border-top:1px solid var(--rule);background:var(--paper-dark)}
