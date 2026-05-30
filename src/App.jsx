@@ -26,7 +26,7 @@ function getAutoWeek() {
 }
 
 // ── TOP-LEVEL NAV VIEWS ───────────────────────────────────────────────────────
-const VIEWS = ['Scores', 'Schedule', 'Standings', 'Trends', 'Leaders', 'Fantasy']
+const VIEWS = ['Scores', 'Schedule', 'Standings', 'Injuries', 'Trends', 'Leaders', 'Fantasy', 'History']
 
 export default function App() {
   const [activeView,    setActiveView]    = useState('Scores')
@@ -58,11 +58,17 @@ export default function App() {
   // Live ESPN scoreboard for current week
   const { data: espnData, loading, error, lastUpdated, refresh } = useScoreboard(activeWeek)
 
-  // Parse ESPN games
-  const liveGames = espnData?.events?.map(parseESPNGame).filter(Boolean) || []
+  // Only use ESPN live data after season starts Sep 9 2026
+  const seasonStarted = new Date() >= new Date('2026-09-09T00:00:00')
 
-  // Merge live scores into schedule
+  // Parse ESPN games
+  const liveGames = seasonStarted
+    ? (espnData?.events?.map(parseESPNGame).filter(Boolean) || [])
+    : []
+
+  // Merge live scores into schedule — only during season
   const mergedGames = SCHEDULE_2026.filter(g => g.week === activeWeek).map(g => {
+    if (!seasonStarted) return g
     const live = liveGames.find(lg =>
       lg.home === g.home && lg.away === g.away
     )
@@ -71,7 +77,7 @@ export default function App() {
   })
 
   // Detect if any game is live (for auto-refresh indicator)
-  const hasLiveGame = liveGames.some(g => g.status === 'live')
+  const hasLiveGame = seasonStarted && liveGames.some(g => g.status === 'live')
 
   return (
     <div className="app">
@@ -117,6 +123,7 @@ export default function App() {
           />
         )}
         {activeView === 'Standings' && <StandingsView />}
+        {activeView === 'Injuries'  && <InjuriesView />}
         {activeView === 'Trends'    && (
           <TrendsView
             currentWeek={activeWeek}
@@ -134,11 +141,51 @@ export default function App() {
         {activeView === 'Fantasy'   && (
           <FantasyView mode={fantMode} setMode={setFantMode} />
         )}
+        {activeView === 'History'   && <HistoryView />}
       </main>
 
       <Footer />
     </div>
   )
+}
+
+// ── AMAZON ASSOCIATES ─────────────────────────────────────────────────────────
+const AMAZON_TAG = 'nysportsdaily-20'
+const AMAZON_URL = `https://www.amazon.com?tag=${AMAZON_TAG}`
+
+// ── STREAMING LINKS ───────────────────────────────────────────────────────────
+const NETWORK_LINKS = {
+  'NBC':        'https://www.peacocktv.com',
+  'NBC/SNF':    'https://www.peacocktv.com',
+  'CBS':        'https://www.paramountplus.com',
+  'Fox':        'https://www.foxsports.com',
+  'ESPN':       'https://www.espn.com/watch',
+  'ESPN/MNF':   'https://www.espn.com/watch',
+  'Amazon/TNF': 'https://www.amazon.com/primevideo?tag=' + AMAZON_TAG,
+  'Amazon':     'https://www.amazon.com/primevideo?tag=' + AMAZON_TAG,
+  'Netflix':    'https://www.netflix.com',
+  'NFL Network':'https://www.nfl.com/network',
+}
+
+// ── NEWS TICKER HOOK ──────────────────────────────────────────────────────────
+function useNFLNews() {
+  const [headlines, setHeadlines] = useState([])
+
+  useEffect(() => {
+    fetch('/api/espn/news?limit=20')
+      .then(r => r.json())
+      .then(data => {
+        const items = (data.articles || []).map(a => ({
+          headline: a.headline,
+          link:     a.links?.web?.href || 'https://www.espn.com/nfl',
+          time:     a.published ? new Date(a.published).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '',
+        }))
+        setHeadlines(items)
+      })
+      .catch(() => {})
+  }, [])
+
+  return headlines
 }
 
 // ── MASTHEAD ──────────────────────────────────────────────────────────────────
@@ -148,6 +195,7 @@ function Masthead({ lastUpdated, hasLiveGame, onRefresh }) {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
   })
   const vol = `Vol. ${now.getFullYear()} · No. ${Math.ceil((now - new Date(now.getFullYear(),0,1))/(7*86400000))}`
+  const headlines = useNFLNews()
 
   return (
     <header className="masthead">
@@ -156,12 +204,16 @@ function Masthead({ lastUpdated, hasLiveGame, onRefresh }) {
         <span>{dateStr}</span>
       </div>
       <div className="logo">The Final Whistle</div>
-      <div className="tagline">NFL · Scores · Box Scores · Fantasy · Schedule</div>
+      <div className="tagline">NFL · Scores · Box Scores · Fantasy · Schedule · nflboxscore.com</div>
       <div className="support-bar">
         <span className="support-text">Independent &amp; ad-free. If it's useful,</span>
         <span className="support-div">—</span>
         <a className="support-link" href="https://buymeacoffee.com/mhughes65v" target="_blank" rel="noopener">
           buy me a coffee ☕
+        </a>
+        <span className="support-div">·</span>
+        <a className="support-link amazon" href={AMAZON_URL} target="_blank" rel="noopener">
+          shop amazon 🛒
         </a>
         {lastUpdated && (
           <span className="live-badge" onClick={onRefresh} title="Click to refresh">
@@ -170,6 +222,21 @@ function Masthead({ lastUpdated, hasLiveGame, onRefresh }) {
           </span>
         )}
       </div>
+      {headlines.length > 0 && (
+        <div className="news-ticker-wrap">
+          <span className="ticker-label">NFL NEWS</span>
+          <div className="ticker-track">
+            <div className="ticker-inner">
+              {[...headlines, ...headlines].map((h, i) => (
+                <a key={i} href={h.link} target="_blank" rel="noopener" className="ticker-item">
+                  {h.headline}
+                  <span className="ticker-sep">·</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   )
 }
@@ -265,9 +332,16 @@ function GameCard({ game: g, isOpen, onToggle, index }) {
             {statusLabel}
           </span>
           {g.network && (
-            <span className="network-badge" style={{ background: netColor.bg, color: netColor.text }}>
+            <a
+              href={NETWORK_LINKS[g.network] || '#'}
+              target="_blank"
+              rel="noopener"
+              className="network-badge"
+              style={{ background: netColor.bg, color: netColor.text }}
+              onClick={e => e.stopPropagation()}
+            >
               {g.network.replace('/SNF','').replace('/MNF','').replace('/TNF','')}
-            </span>
+            </a>
           )}
         </div>
 
@@ -1238,12 +1312,470 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos }
     </div>
   )
 }
+// ── INJURIES VIEW ─────────────────────────────────────────────────────────────
+// ESPN team IDs for all 32 NFL teams
+const TEAM_ESPN_IDS = {
+  ARI:1, ATL:2, BAL:3, BUF:4, CAR:5, CHI:6, CIN:7, CLE:8,
+  DAL:9, DEN:10, DET:11, GB:12, HOU:34, IND:14, JAC:15, KC:16,
+  LA:19, LAC:24, LV:13, MIA:20, MIN:21, NE:17, NO:18, NYG:22,
+  NYJ:23, PHI:25, PIT:26, SEA:28, SF:29, TB:27, TEN:10, WAS:28,
+}
+// Fixed ESPN IDs
+const ESPN_TEAM_IDS = {
+  ARI:22, ATL:1,  BAL:33, BUF:2,  CAR:29, CHI:3,  CIN:4,  CLE:5,
+  DAL:6,  DEN:7,  DET:8,  GB:9,   HOU:34, IND:11, JAC:30, KC:12,
+  LA:14,  LAC:24, LV:13,  MIA:15, MIN:16, NE:17,  NO:18,  NYG:19,
+  NYJ:20, PHI:21, PIT:23, SEA:26, SF:25,  TB:27,  TEN:10, WAS:28,
+}
+
+function InjuriesView() {
+  const [injuries, setInjuries]   = useState({})
+  const [loading,  setLoading]    = useState(false)
+  const [teamFilter, setTeamFilter] = useState('All')
+  const [statusFilter, setStatusFilter] = useState('All')
+  const [fetched,  setFetched]    = useState(false)
+
+  const STATUS_ORDER = ['Out', 'Doubtful', 'Questionable', 'Probable', 'IR', 'PUP']
+  const STATUS_COLORS = {
+    'Out':          { bg: '#c00',    text: '#fff' },
+    'Doubtful':     { bg: '#c66',    text: '#fff' },
+    'Questionable': { bg: '#c8a84b', text: '#000' },
+    'Probable':     { bg: '#2a6b2a', text: '#fff' },
+    'IR':           { bg: '#333',    text: '#fff' },
+    'PUP':          { bg: '#555',    text: '#fff' },
+  }
+
+  useEffect(() => {
+    fetchAllInjuries()
+  }, [])
+
+  async function fetchAllInjuries() {
+    setLoading(true)
+    try {
+      // Fetch injuries for all 32 teams in parallel
+      const teams = Object.keys(ESPN_TEAM_IDS)
+      const results = await Promise.all(
+        teams.map(abbr =>
+          fetch(`/api/espn-core/teams/${ESPN_TEAM_IDS[abbr]}/injuries`)
+            .then(r => r.json())
+            .then(data => ({ abbr, items: data.items || [] }))
+            .catch(() => ({ abbr, items: [] }))
+        )
+      )
+
+      const byTeam = {}
+      results.forEach(({ abbr, items }) => {
+        if (!items.length) return
+        byTeam[abbr] = items.map(inj => ({
+          name:     inj.athlete?.displayName || '—',
+          pos:      inj.athlete?.position?.abbreviation || '—',
+          status:   inj.status || '—',
+          detail:   inj.detail || '',
+          side:     inj.side || '',
+          type:     inj.type || '',
+          date:     inj.date ? new Date(inj.date).toLocaleDateString('en-US', {month:'short', day:'numeric'}) : '',
+        })).sort((a, b) => {
+          const order = ['Out','Doubtful','Questionable','Probable','IR','PUP']
+          return (order.indexOf(a.status) || 99) - (order.indexOf(b.status) || 99)
+        })
+      })
+
+      setInjuries(byTeam)
+      setFetched(true)
+    } catch(e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Filter teams
+  const teamsToShow = teamFilter === 'All'
+    ? Object.keys(injuries).sort()
+    : Object.keys(injuries).filter(t => t === teamFilter)
+
+  // Count total
+  const totalCount = Object.values(injuries).reduce((a, b) => a + b.length, 0)
+
+  // All statuses present
+  const allStatuses = ['All', ...STATUS_ORDER.filter(s =>
+    Object.values(injuries).some(injs => injs.some(i => i.status === s))
+  )]
+
+  return (
+    <div>
+      <div className="section-bar">
+        <h2>NFL Injury Report</h2>
+        <div className="sb-rule" />
+        <span className="sb-ct">
+          {loading ? 'Loading…' : fetched ? `${totalCount} players listed` : 'All 32 Teams'}
+        </span>
+      </div>
+
+      {/* Filters */}
+      <div className="sch-filters">
+        <div className="filter-group">
+          <span className="filter-label">Team</span>
+          <div className="filter-pills">
+            {['All', ...ALL_TEAMS].map(t => (
+              <button key={t} className={`fpill ${teamFilter === t ? 'on' : ''}`}
+                onClick={() => setTeamFilter(t)}>{t}</button>
+            ))}
+          </div>
+        </div>
+        <div className="filter-group">
+          <span className="filter-label">Status</span>
+          <div className="filter-pills">
+            {allStatuses.map(s => (
+              <button key={s} className={`fpill ${statusFilter === s ? 'on' : ''}`}
+                onClick={() => setStatusFilter(s)}>{s}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {loading && <div className="sch-loading">Loading injury reports from ESPN…</div>}
+
+      {!loading && fetched && totalCount === 0 && (
+        <div className="leaders-coming-soon">
+          <div className="cs-icon">🏥</div>
+          <div className="cs-title">No injuries reported yet</div>
+          <div className="cs-text">Injury reports populate during the season, typically Wednesday–Friday each week.</div>
+          <div className="cs-date">Season opens Sep 9 · SEA vs NE</div>
+        </div>
+      )}
+
+      {!loading && fetched && totalCount > 0 && (
+        <div className="injury-grid">
+          {teamsToShow.map(abbr => {
+            const teamInjs = injuries[abbr]?.filter(i =>
+              statusFilter === 'All' || i.status === statusFilter
+            ) || []
+            if (!teamInjs.length) return null
+            return (
+              <div key={abbr} className="injury-team-block">
+                <div className="itb-header">
+                  <span className="itb-abbr">{abbr}</span>
+                  <span className="itb-name">{ti(abbr).city} {ti(abbr).nick}</span>
+                  <span className="itb-count">{teamInjs.length} listed</span>
+                </div>
+                <table className="injury-table">
+                  <thead>
+                    <tr>
+                      <th className="it-name">Player</th>
+                      <th>POS</th>
+                      <th>Injury</th>
+                      <th>Status</th>
+                      <th>Updated</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {teamInjs.map((inj, i) => {
+                      const sc = STATUS_COLORS[inj.status] || { bg: '#555', text: '#fff' }
+                      return (
+                        <tr key={i}>
+                          <td className="it-name">{inj.name}</td>
+                          <td className="it-pos">{inj.pos}</td>
+                          <td className="it-detail">{inj.side ? `${inj.side} ` : ''}{inj.type || inj.detail}</td>
+                          <td>
+                            <span className="inj-status-badge" style={{ background: sc.bg, color: sc.text }}>
+                              {inj.status}
+                            </span>
+                          </td>
+                          <td className="it-date">{inj.date}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Off-season placeholder */}
+      {!loading && !fetched && (
+        <div className="leaders-coming-soon">
+          <div className="cs-icon">🏥</div>
+          <div className="cs-title">Injury Report</div>
+          <div className="cs-text">
+            Full injury reports for all 32 teams — pulled live from ESPN every time you visit.
+            Out, Doubtful, Questionable, IR, and PUP designations. Filter by team or status.
+            Reports are published Wednesday–Friday each week during the season.
+          </div>
+          <div className="cs-date">Season opens Sep 9 · SEA vs NE</div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── HISTORY DATA ─────────────────────────────────────────────────────────────
+const SUPER_BOWLS = [
+  { num:'LX',   year:2026, winner:'Seattle Seahawks',    loser:'New England Patriots',  score:'29-13', mvp:'Geno Smith',           site:'New Orleans, LA' },
+  { num:'LIX',  year:2025, winner:'Philadelphia Eagles', loser:'Kansas City Chiefs',    score:'40-22', mvp:'Jalen Hurts',          site:'New Orleans, LA' },
+  { num:'LVIII',year:2024, winner:'Kansas City Chiefs',  loser:'San Francisco 49ers',   score:'25-22', mvp:'Patrick Mahomes',      site:'Las Vegas, NV' },
+  { num:'LVII', year:2023, winner:'Kansas City Chiefs',  loser:'Philadelphia Eagles',   score:'38-35', mvp:'Patrick Mahomes',      site:'Glendale, AZ' },
+  { num:'LVI',  year:2022, winner:'Los Angeles Rams',    loser:'Cincinnati Bengals',    score:'23-20', mvp:'Cooper Kupp',          site:'Inglewood, CA' },
+  { num:'LV',   year:2021, winner:'Tampa Bay Buccaneers',loser:'Kansas City Chiefs',    score:'31-9',  mvp:'Tom Brady',            site:'Tampa, FL' },
+  { num:'LIV',  year:2020, winner:'Kansas City Chiefs',  loser:'San Francisco 49ers',   score:'31-20', mvp:'Patrick Mahomes',      site:'Miami, FL' },
+  { num:'LIII', year:2019, winner:'New England Patriots',loser:'Los Angeles Rams',      score:'13-3',  mvp:'Julian Edelman',       site:'Atlanta, GA' },
+  { num:'LII',  year:2018, winner:'Philadelphia Eagles', loser:'New England Patriots',  score:'41-33', mvp:'Nick Foles',           site:'Minneapolis, MN' },
+  { num:'LI',   year:2017, winner:'New England Patriots',loser:'Atlanta Falcons',       score:'34-28', mvp:'Tom Brady',            site:'Houston, TX' },
+  { num:'50',   year:2016, winner:'Denver Broncos',      loser:'Carolina Panthers',     score:'24-10', mvp:'Von Miller',           site:'Santa Clara, CA' },
+  { num:'XLIX', year:2015, winner:'New England Patriots',loser:'Seattle Seahawks',      score:'28-24', mvp:'Tom Brady',            site:'Glendale, AZ' },
+  { num:'XLVIII',year:2014,winner:'Seattle Seahawks',    loser:'Denver Broncos',        score:'43-8',  mvp:'Malcolm Smith',        site:'East Rutherford, NJ' },
+  { num:'XLVII',year:2013, winner:'Baltimore Ravens',    loser:'San Francisco 49ers',   score:'34-31', mvp:'Joe Flacco',           site:'New Orleans, LA' },
+  { num:'XLVI', year:2012, winner:'New York Giants',     loser:'New England Patriots',  score:'21-17', mvp:'Eli Manning',          site:'Indianapolis, IN' },
+  { num:'XLV',  year:2011, winner:'Green Bay Packers',   loser:'Pittsburgh Steelers',   score:'31-25', mvp:'Aaron Rodgers',        site:'Arlington, TX' },
+  { num:'XLIV', year:2010, winner:'New Orleans Saints',  loser:'Indianapolis Colts',    score:'31-17', mvp:'Drew Brees',           site:'Miami, FL' },
+  { num:'XLIII',year:2009, winner:'Pittsburgh Steelers', loser:'Arizona Cardinals',     score:'27-23', mvp:'Santonio Holmes',      site:'Tampa, FL' },
+  { num:'XLII', year:2008, winner:'New York Giants',     loser:'New England Patriots',  score:'17-14', mvp:'Eli Manning',          site:'Glendale, AZ' },
+  { num:'XLI',  year:2007, winner:'Indianapolis Colts',  loser:'Chicago Bears',         score:'29-17', mvp:'Peyton Manning',       site:'Miami, FL' },
+  { num:'XL',   year:2006, winner:'Pittsburgh Steelers', loser:'Seattle Seahawks',      score:'21-10', mvp:'Hines Ward',           site:'Detroit, MI' },
+  { num:'XXXIX',year:2005, winner:'New England Patriots',loser:'Philadelphia Eagles',   score:'24-21', mvp:'Deion Branch',         site:'Jacksonville, FL' },
+  { num:'XXXVIII',year:2004,winner:'New England Patriots',loser:'Carolina Panthers',    score:'32-29', mvp:'Tom Brady',            site:'Houston, TX' },
+  { num:'XXXVII',year:2003,winner:'Tampa Bay Buccaneers',loser:'Oakland Raiders',      score:'48-21', mvp:'Dexter Jackson',       site:'San Diego, CA' },
+  { num:'XXXVI',year:2002, winner:'New England Patriots',loser:'Los Angeles Rams',      score:'20-17', mvp:'Tom Brady',            site:'New Orleans, LA' },
+  { num:'XXXV', year:2001, winner:'Baltimore Ravens',    loser:'New York Giants',       score:'34-7',  mvp:'Ray Lewis',            site:'Tampa, FL' },
+  { num:'XXXIV',year:2000, winner:'Los Angeles Rams',    loser:'Tennessee Titans',      score:'23-16', mvp:'Kurt Warner',          site:'Atlanta, GA' },
+  { num:'XXXIII',year:1999,winner:'Denver Broncos',      loser:'Atlanta Falcons',       score:'34-19', mvp:'John Elway',           site:'Miami, FL' },
+  { num:'XXXII',year:1998, winner:'Denver Broncos',      loser:'Green Bay Packers',     score:'31-24', mvp:'Terrell Davis',        site:'San Diego, CA' },
+  { num:'XXXI', year:1997, winner:'Green Bay Packers',   loser:'New England Patriots',  score:'35-21', mvp:'Desmond Howard',       site:'New Orleans, LA' },
+  { num:'XXX',  year:1996, winner:'Dallas Cowboys',      loser:'Pittsburgh Steelers',   score:'27-17', mvp:'Larry Brown',          site:'Tempe, AZ' },
+  { num:'XXIX', year:1995, winner:'San Francisco 49ers', loser:'San Diego Chargers',    score:'49-26', mvp:'Steve Young',          site:'Miami, FL' },
+  { num:'XXVIII',year:1994,winner:'Dallas Cowboys',      loser:'Buffalo Bills',         score:'30-13', mvp:'Emmitt Smith',         site:'Atlanta, GA' },
+  { num:'XXVII',year:1993, winner:'Dallas Cowboys',      loser:'Buffalo Bills',         score:'52-17', mvp:'Troy Aikman',          site:'Pasadena, CA' },
+  { num:'XXVI', year:1992, winner:'Washington Redskins', loser:'Buffalo Bills',         score:'37-24', mvp:'Mark Rypien',          site:'Minneapolis, MN' },
+  { num:'XXV',  year:1991, winner:'New York Giants',     loser:'Buffalo Bills',         score:'20-19', mvp:'Ottis Anderson',       site:'Tampa, FL' },
+  { num:'XXIV', year:1990, winner:'San Francisco 49ers', loser:'Denver Broncos',        score:'55-10', mvp:'Joe Montana',          site:'New Orleans, LA' },
+  { num:'XXIII',year:1989, winner:'San Francisco 49ers', loser:'Cincinnati Bengals',    score:'20-16', mvp:'Jerry Rice',           site:'Miami, FL' },
+  { num:'XXII', year:1988, winner:'Washington Redskins', loser:'Denver Broncos',        score:'42-10', mvp:'Doug Williams',        site:'San Diego, CA' },
+  { num:'XXI',  year:1987, winner:'New York Giants',     loser:'Denver Broncos',        score:'39-20', mvp:'Phil Simms',           site:'Pasadena, CA' },
+  { num:'XX',   year:1986, winner:'Chicago Bears',       loser:'New England Patriots',  score:'46-10', mvp:'Richard Dent',         site:'New Orleans, LA' },
+  { num:'XIX',  year:1985, winner:'San Francisco 49ers', loser:'Miami Dolphins',        score:'38-16', mvp:'Joe Montana',          site:'Stanford, CA' },
+  { num:'XVIII',year:1984, winner:'Los Angeles Raiders', loser:'Washington Redskins',   score:'38-9',  mvp:'Marcus Allen',         site:'Tampa, FL' },
+  { num:'XVII', year:1983, winner:'Washington Redskins', loser:'Miami Dolphins',        score:'27-17', mvp:'John Riggins',         site:'Pasadena, CA' },
+  { num:'XVI',  year:1982, winner:'San Francisco 49ers', loser:'Cincinnati Bengals',    score:'26-21', mvp:'Joe Montana',          site:'Pontiac, MI' },
+  { num:'XV',   year:1981, winner:'Oakland Raiders',     loser:'Philadelphia Eagles',   score:'27-10', mvp:'Jim Plunkett',         site:'New Orleans, LA' },
+  { num:'XIV',  year:1980, winner:'Pittsburgh Steelers', loser:'Los Angeles Rams',      score:'31-19', mvp:'Terry Bradshaw',       site:'Pasadena, CA' },
+  { num:'XIII', year:1979, winner:'Pittsburgh Steelers', loser:'Dallas Cowboys',        score:'35-31', mvp:'Terry Bradshaw',       site:'Miami, FL' },
+  { num:'XII',  year:1978, winner:'Dallas Cowboys',      loser:'Denver Broncos',        score:'27-10', mvp:'Harvey Martin / Randy White', site:'New Orleans, LA' },
+  { num:'XI',   year:1977, winner:'Oakland Raiders',     loser:'Minnesota Vikings',     score:'32-14', mvp:'Fred Biletnikoff',     site:'Pasadena, CA' },
+  { num:'X',    year:1976, winner:'Pittsburgh Steelers', loser:'Dallas Cowboys',        score:'21-17', mvp:'Lynn Swann',           site:'Miami, FL' },
+  { num:'IX',   year:1975, winner:'Pittsburgh Steelers', loser:'Minnesota Vikings',     score:'16-6',  mvp:'Franco Harris',        site:'New Orleans, LA' },
+  { num:'VIII', year:1974, winner:'Miami Dolphins',      loser:'Minnesota Vikings',     score:'24-7',  mvp:'Larry Csonka',         site:'Houston, TX' },
+  { num:'VII',  year:1973, winner:'Miami Dolphins',      loser:'Washington Redskins',   score:'14-7',  mvp:'Jake Scott',           site:'Los Angeles, CA' },
+  { num:'VI',   year:1972, winner:'Dallas Cowboys',      loser:'Miami Dolphins',        score:'24-3',  mvp:'Roger Staubach',       site:'New Orleans, LA' },
+  { num:'V',    year:1971, winner:'Baltimore Colts',     loser:'Dallas Cowboys',        score:'16-13', mvp:'Chuck Howley',         site:'Miami, FL' },
+  { num:'IV',   year:1970, winner:'Kansas City Chiefs',  loser:'Minnesota Vikings',     score:'23-7',  mvp:'Len Dawson',           site:'New Orleans, LA' },
+  { num:'III',  year:1969, winner:'New York Jets',       loser:'Baltimore Colts',       score:'16-7',  mvp:'Joe Namath',           site:'Miami, FL' },
+  { num:'II',   year:1968, winner:'Green Bay Packers',   loser:'Oakland Raiders',       score:'33-14', mvp:'Bart Starr',           site:'Miami, FL' },
+  { num:'I',    year:1967, winner:'Green Bay Packers',   loser:'Kansas City Chiefs',    score:'35-10', mvp:'Bart Starr',           site:'Los Angeles, CA' },
+]
+
+const FANTASY_HOF = [
+  { player:'LaDainian Tomlinson', team:'SD',  pos:'RB',  year:2006, week:16, pts:55.4, line:'28 car, 193 rush yds, 3 TD + 4 rec, 57 yds, 1 TD', note:'Greatest fantasy RB season ever — 28 TDs, 1,815 rush yds' },
+  { player:'Jamaal Charles',      team:'KC',  pos:'RB',  year:2013, week:14, pts:55.2, line:'6 rush TD, 1 rec TD, 195 scrimmage yds', note:'7 touchdowns in a single game' },
+  { player:'Alvin Kamara',        team:'NO',  pos:'RB',  year:2020, week:16, pts:61.8, line:'22 rush yds, 6 rush TD + 6 rec, 46 yds', note:'Six rushing TDs on Christmas Day — all-time record' },
+  { player:'Jerry Rice',          team:'SF',  pos:'WR',  year:1987, week:11, pts:52.0, line:'3 rec TD, 12 rec, 204 yds', note:'Greatest receiver of all time — 22 TD season' },
+  { player:'Tom Brady',           team:'NE',  pos:'QB',  year:2007, week:17, pts:52.3, line:'6 TD, 392 yds, 0 INT', note:'Record 50 TD season — perfect regular season' },
+  { player:'Adrian Peterson',     team:'MIN', pos:'RB',  year:2012, week:16, pts:50.1, line:'34 car, 212 yds, 2 TD', note:'2,097 rush yards — came within 9 yds of Dickerson record' },
+  { player:'Randy Moss',          team:'MIN', pos:'WR',  year:1998, week:8,  pts:48.7, line:'5 TD, 190 yds, 8 rec', note:'Rookie record 17 TD season — Vikings went 15-1' },
+  { player:'Peyton Manning',      team:'IND', pos:'QB',  year:2004, week:6,  pts:51.2, line:'6 TD, 472 yds, 0 INT', note:'49 TD season record (broken by Brady in 2007)' },
+  { player:'Marshall Faulk',      team:'STL', pos:'RB',  year:2000, week:15, pts:54.6, line:'5 TD, 220 scrimmage yds', note:'Greatest fantasy season ever — 26 TDs, 2,189 scrimmage yds' },
+  { player:'Calvin Johnson',      team:'DET', pos:'WR',  year:2012, week:16, pts:49.3, line:'11 rec, 225 yds, 1 TD', note:'Record 1,964 receiving yards in a season' },
+  { player:'Patrick Mahomes',     team:'KC',  pos:'QB',  year:2018, week:6,  pts:56.7, line:'6 TD, 478 yds, 0 INT', note:'50 TD season — youngest QB ever to win MVP' },
+  { player:'Priest Holmes',       team:'KC',  pos:'RB',  year:2003, week:8,  pts:53.2, line:'6 TD, 148 yds', note:'27 TD season — dominated fantasy for 3 years' },
+  { player:'Steve Smith Sr.',     team:'CAR', pos:'WR',  year:2005, week:16, pts:47.8, line:'15 rec, 201 yds, 3 TD', note:'Led NFL in yards AND TDs — unstoppable season' },
+  { player:'Gale Sayers',         team:'CHI', pos:'RB',  year:1965, week:12, pts:48.0, line:'6 TD — 4 rush, 1 rec, 1 return', note:'6 TDs in mud at Wrigley Field — still legendary' },
+  { player:'Tyreek Hill',         team:'KC',  pos:'WR',  year:2020, week:12, pts:50.2, line:'13 rec, 269 yds, 3 TD', note:'269 yards — one of greatest WR games ever' },
+]
+
+const ALL_TIME_LEADERS = {
+  passing: [
+    { rank:1,  name:'Tom Brady',        team:'NE/TB',  stat:'89,214',  label:'Career Pass Yards' },
+    { rank:2,  name:'Drew Brees',       team:'NO',     stat:'80,358',  label:'Career Pass Yards' },
+    { rank:3,  name:'Peyton Manning',   team:'IND/DEN',stat:'71,940',  label:'Career Pass Yards' },
+    { rank:4,  name:'Brett Favre',      team:'GB/MIN', stat:'71,838',  label:'Career Pass Yards' },
+    { rank:5,  name:'Philip Rivers',    team:'SD/LAC', stat:'63,440',  label:'Career Pass Yards' },
+  ],
+  rushing: [
+    { rank:1,  name:'Emmitt Smith',     team:'DAL/ARI',stat:'18,355',  label:'Career Rush Yards' },
+    { rank:2,  name:'Walter Payton',    team:'CHI',    stat:'16,726',  label:'Career Rush Yards' },
+    { rank:3,  name:'Barry Sanders',    team:'DET',    stat:'15,269',  label:'Career Rush Yards' },
+    { rank:4,  name:'Frank Gore',       team:'Multiple',stat:'16,000', label:'Career Rush Yards' },
+    { rank:5,  name:'Adrian Peterson',  team:'MIN',    stat:'14,918',  label:'Career Rush Yards' },
+  ],
+  receiving: [
+    { rank:1,  name:'Jerry Rice',       team:'SF/OAK', stat:'22,895',  label:'Career Rec Yards' },
+    { rank:2,  name:'Larry Fitzgerald', team:'ARI',    stat:'17,492',  label:'Career Rec Yards' },
+    { rank:3,  name:'Terrell Owens',    team:'Multiple',stat:'15,934', label:'Career Rec Yards' },
+    { rank:4,  name:'Randy Moss',       team:'Multiple',stat:'15,292', label:'Career Rec Yards' },
+    { rank:5,  name:'Tony Gonzalez',    team:'KC/ATL', stat:'15,127',  label:'Career Rec Yards' },
+  ],
+  touchdowns: [
+    { rank:1,  name:'Jerry Rice',       team:'SF/OAK', stat:'208',     label:'Career TDs' },
+    { rank:2,  name:'Emmitt Smith',     team:'DAL',    stat:'175',     label:'Career TDs' },
+    { rank:3,  name:'LaDainian Tomlinson',team:'SD',   stat:'162',     label:'Career TDs' },
+    { rank:4,  name:'Randy Moss',       team:'Multiple',stat:'156',    label:'Career TDs' },
+    { rank:5,  name:'Terrell Owens',    team:'Multiple',stat:'153',    label:'Career TDs' },
+  ],
+}
+
+// ── HISTORY VIEW ──────────────────────────────────────────────────────────────
+function HistoryView() {
+  const [tab, setTab] = useState('superbowl')
+  const [sbSearch, setSbSearch] = useState('')
+  const [statCat, setStatCat] = useState('passing')
+
+  const TABS = [
+    { id: 'superbowl', label: '🏆 Super Bowl History' },
+    { id: 'fantasyhof', label: '⚡ Fantasy Hall of Fame' },
+    { id: 'alltime', label: '📊 All-Time Leaders' },
+  ]
+
+  const filteredSBs = SUPER_BOWLS.filter(sb =>
+    !sbSearch ||
+    sb.winner.toLowerCase().includes(sbSearch.toLowerCase()) ||
+    sb.loser.toLowerCase().includes(sbSearch.toLowerCase()) ||
+    sb.mvp.toLowerCase().includes(sbSearch.toLowerCase()) ||
+    String(sb.year).includes(sbSearch)
+  )
+
+  return (
+    <div>
+      <div className="section-bar">
+        <h2>NFL History</h2>
+        <div className="sb-rule" />
+        <span className="sb-ct">Super Bowls · Fantasy HOF · All-Time Leaders</span>
+      </div>
+
+      {/* Sub-tabs */}
+      <div className="hist-tabs">
+        {TABS.map(t => (
+          <button key={t.id} className={`htab ${tab === t.id ? 'on' : ''}`}
+            onClick={() => setTab(t.id)}>{t.label}</button>
+        ))}
+      </div>
+
+      {/* SUPER BOWL HISTORY */}
+      {tab === 'superbowl' && (
+        <div>
+          <div className="hist-search-bar">
+            <input
+              className="hist-search"
+              placeholder="Search by team, year, or MVP…"
+              value={sbSearch}
+              onChange={e => setSbSearch(e.target.value)}
+            />
+            <span className="hist-count">{filteredSBs.length} of {SUPER_BOWLS.length} games</span>
+          </div>
+          <table className="sb-table">
+            <thead>
+              <tr>
+                <th>SB</th>
+                <th>Year</th>
+                <th className="sbt-winner">Champion</th>
+                <th className="sbt-loser">Runner-Up</th>
+                <th>Score</th>
+                <th className="sbt-mvp">MVP</th>
+                <th className="sbt-site">Site</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredSBs.map((sb, i) => (
+                <tr key={i} className={i === 0 ? 'sb-latest' : ''}>
+                  <td className="sb-num">{sb.num}</td>
+                  <td className="sb-year">{sb.year}</td>
+                  <td className="sbt-winner sb-winner">{sb.winner}</td>
+                  <td className="sbt-loser sb-loser">{sb.loser}</td>
+                  <td className="sb-score">{sb.score}</td>
+                  <td className="sbt-mvp sb-mvp">{sb.mvp}</td>
+                  <td className="sbt-site sb-site">{sb.site}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* FANTASY HOF */}
+      {tab === 'fantasyhof' && (
+        <div>
+          <div className="hof-intro">
+            <span className="hof-intro-text">
+              The greatest single-game and single-season fantasy performances in NFL history.
+              Compiled across Standard and PPR formats.
+            </span>
+          </div>
+          <div className="hof-grid">
+            {FANTASY_HOF.map((p, i) => (
+              <div key={i} className={`hof-card ${i < 3 ? 'hof-elite' : ''}`}>
+                <div className="hof-rank">#{i + 1}</div>
+                <div className="hof-player">{p.player}</div>
+                <div className="hof-meta">
+                  <span className="hof-team">{p.team}</span>
+                  <span className="hof-pos">{p.pos}</span>
+                  <span className="hof-year">{p.year} · Wk {p.week}</span>
+                </div>
+                <div className="hof-pts">{p.pts} <span>pts</span></div>
+                <div className="hof-line">{p.line}</div>
+                <div className="hof-note">{p.note}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ALL-TIME LEADERS */}
+      {tab === 'alltime' && (
+        <div>
+          <div className="atl-cats">
+            {Object.keys(ALL_TIME_LEADERS).map(cat => (
+              <button key={cat} className={`atl-cat ${statCat === cat ? 'on' : ''}`}
+                onClick={() => setStatCat(cat)}>
+                {cat.charAt(0).toUpperCase() + cat.slice(1)}
+              </button>
+            ))}
+          </div>
+          <table className="atl-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th className="atl-name">Player</th>
+                <th>Teams</th>
+                <th>{ALL_TIME_LEADERS[statCat][0]?.label}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ALL_TIME_LEADERS[statCat].map((p, i) => (
+                <tr key={i} className={i === 0 ? 'atl-top' : ''}>
+                  <td className="atl-rank">{p.rank}</td>
+                  <td className="atl-name">{p.name}</td>
+                  <td className="atl-team">{p.team}</td>
+                  <td className="atl-stat">{p.stat}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="atl-note">Stats current through 2025 season. Active players may have updated totals.</div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── FOOTER ────────────────────────────────────────────────────────────────────
 function Footer() {
   return (
     <footer className="footer">
-      <span>The Final Whistle · NFL 2026</span>
+      <span>The Final Whistle · nflboxscore.com · 2026</span>
       <span className="footer-bmac">
         Enjoying this? <a href="https://buymeacoffee.com/mhughes65v" target="_blank" rel="noopener">Buy me a coffee</a>
+        {' · '}
+        <a href={`https://www.amazon.com?tag=${AMAZON_TAG}`} target="_blank" rel="noopener">Shop Amazon</a>
       </span>
       <span>6pt TD · Standard / PPR</span>
     </footer>
