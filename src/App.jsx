@@ -26,7 +26,7 @@ function getAutoWeek() {
 }
 
 // ── TOP-LEVEL NAV VIEWS ───────────────────────────────────────────────────────
-const VIEWS = ['Scores', 'Schedule', 'Standings', 'News', 'Injuries', 'Trends', 'Leaders', 'Fantasy', 'History', 'TV Guide']
+const VIEWS = ['Scores', 'Schedule', 'Standings', 'News', 'Injuries', 'Trends', 'Leaders', 'Fantasy', 'Draft', 'History', 'TV Guide']
 
 export default function App() {
   const [activeView,    setActiveView]    = useState('Scores')
@@ -147,6 +147,7 @@ export default function App() {
         {activeView === 'Fantasy'   && (
           <FantasyView mode={fantMode} setMode={setFantMode} />
         )}
+        {activeView === 'Draft'     && <DraftView />}
         {activeView === 'History'   && <HistoryView />}
         {activeView === 'TV Guide'  && <TVGuideView currentWeek={activeWeek} />}
       </main>
@@ -160,18 +161,42 @@ export default function App() {
 const AMAZON_TAG = 'nysportsdaily-20'
 const AMAZON_URL = `https://www.amazon.com?tag=${AMAZON_TAG}`
 
+// ── ROSTER LINKS ──────────────────────────────────────────────────────────────
+const ROSTER_LINKS = {
+  ARI:'https://www.azcardinals.com/team/players-roster/', ATL:'https://www.atlantafalcons.com/team/players-roster/',
+  BAL:'https://www.baltimoreravens.com/team/players-roster/', BUF:'https://www.buffalobills.com/team/players-roster/',
+  CAR:'https://www.panthers.com/team/players-roster/', CHI:'https://www.chicagobears.com/team/players-roster/',
+  CIN:'https://www.bengals.com/team/players-roster/', CLE:'https://www.clevelandbrowns.com/team/players-roster/',
+  DAL:'https://www.dallascowboys.com/team/players-roster/', DEN:'https://www.denverbroncos.com/team/players-roster/',
+  DET:'https://www.detroitlions.com/team/players-roster/', GB:'https://www.packers.com/team/players-roster/',
+  HOU:'https://www.houstontexans.com/team/players-roster/', IND:'https://www.colts.com/team/players-roster/',
+  JAC:'https://www.jaguars.com/team/players-roster/', KC:'https://www.chiefs.com/team/players-roster/',
+  LA:'https://www.therams.com/team/players-roster/', LAC:'https://www.chargers.com/team/players-roster/',
+  LV:'https://www.raiders.com/team/players-roster/', MIA:'https://www.miamidolphins.com/team/players-roster/',
+  MIN:'https://www.vikings.com/team/players-roster/', NE:'https://www.patriots.com/team/players-roster/',
+  NO:'https://www.neworleanssaints.com/team/players-roster/', NYG:'https://www.giants.com/team/players-roster/',
+  NYJ:'https://www.newyorkjets.com/team/players-roster/', PHI:'https://www.philadelphiaeagles.com/team/players-roster/',
+  PIT:'https://www.steelers.com/team/players-roster/', SEA:'https://www.seahawks.com/team/players-roster/',
+  SF:'https://www.49ers.com/team/players-roster/', TB:'https://www.buccaneers.com/team/players-roster/',
+  TEN:'https://www.titansonline.com/team/players-roster/', WAS:'https://www.commanders.com/team/players-roster/',
+}
+
 // ── STREAMING LINKS ───────────────────────────────────────────────────────────
 const NETWORK_LINKS = {
-  'NBC':        'https://www.peacocktv.com',
-  'NBC/SNF':    'https://www.peacocktv.com',
-  'CBS':        'https://www.paramountplus.com',
-  'Fox':        'https://www.foxsports.com',
-  'ESPN':       'https://www.espn.com/watch',
-  'ESPN/MNF':   'https://www.espn.com/watch',
-  'Amazon/TNF': 'https://www.amazon.com/primevideo?tag=' + AMAZON_TAG,
-  'Amazon':     'https://www.amazon.com/primevideo?tag=' + AMAZON_TAG,
-  'Netflix':    'https://www.netflix.com',
-  'NFL Network':'https://www.nfl.com/network',
+  'NBC':           'https://www.peacocktv.com',
+  'NBC/SNF':       'https://www.peacocktv.com',
+  'NBC/Peacock':   'https://www.peacocktv.com',
+  'Peacock':       'https://www.peacocktv.com',
+  'CBS':           'https://www.paramountplus.com',
+  'Fox':           'https://www.foxsports.com',
+  'ESPN':          'https://www.espn.com/watch',
+  'ESPN/MNF':      'https://www.espn.com/watch',
+  'ABC':           'https://www.espn.com/watch',
+  'Amazon/TNF':    `https://www.amazon.com/primevideo?tag=${AMAZON_TAG}`,
+  'Amazon':        `https://www.amazon.com/primevideo?tag=${AMAZON_TAG}`,
+  'Netflix':       'https://www.netflix.com',
+  'NFL Network':   'https://www.nfl.com/network',
+  'NFL+':          'https://www.nfl.com/plus',
 }
 
 // ── NEWS TICKER HOOK ──────────────────────────────────────────────────────────
@@ -340,14 +365,14 @@ function GameCard({ game: g, isOpen, onToggle, index }) {
           </span>
           {g.network && (
             <a
-              href={NETWORK_LINKS[g.network] || '#'}
+              href={NETWORK_LINKS[g.network] || NETWORK_LINKS[g.network?.split('/')?.[0]] || NETWORK_LINKS[g.network?.split('/')?.[1]] || 'https://www.nfl.com'}
               target="_blank"
               rel="noopener"
               className="network-badge"
               style={{ background: netColor.bg, color: netColor.text }}
               onClick={e => e.stopPropagation()}
             >
-              {g.network.replace('/SNF','').replace('/MNF','').replace('/TNF','')}
+              {g.network.replace('/SNF','').replace('/MNF','').replace('/TNF','').replace('/Peacock','')}
             </a>
           )}
         </div>
@@ -587,14 +612,74 @@ function LiveDrawer({ game: g, espnData, loading }) {
 }
 
 function GameInfoDrawer({ game: g }) {
+  // Weather for outdoor stadiums during season
+  const homeTeam = g.home
+  const isOutdoor = OUTDOOR_STADIUMS.includes(homeTeam)
+  const weatherCity = isOutdoor ? STADIUM_CITIES[homeTeam] : null
+  const weather = useWeather(seasonStarted && weatherCity ? weatherCity : null)
+
+  // Parse odds for display
+  const parseOdds = (oddsStr) => {
+    if (!oddsStr) return null
+    // Format: "KC -3.5" or "Over/Under 47.5"
+    const parts = oddsStr.split(' ')
+    return oddsStr
+  }
+
   return (
     <div className="game-info-drawer">
       <div className="gi-row"><span>Date</span><span>{g.date} · {g.day}</span></div>
       <div className="gi-row"><span>Kickoff</span><span>{g.time} ET</span></div>
-      <div className="gi-row"><span>Network</span><span>{g.network}</span></div>
-      {g.venue && <div className="gi-row"><span>Venue</span><span>{g.venue}</span></div>}
+      <div className="gi-row">
+        <span>Network</span>
+        <span>
+          {g.network && NETWORK_LINKS[g.network] ? (
+            <a href={NETWORK_LINKS[g.network] || NETWORK_LINKS[g.network?.split('/')?.[0]]} target="_blank" rel="noopener" className="sb-google-link">
+              {g.network} ↗
+            </a>
+          ) : g.network}
+        </span>
+      </div>
+      {g.venue && (
+        <div className="gi-row">
+          <span>Venue</span>
+          <a href={`https://www.google.com/search?q=${encodeURIComponent(g.venue)}`} target="_blank" rel="noopener" className="sb-google-link">
+            {g.venue}
+          </a>
+        </div>
+      )}
       {g.intl  && <div className="gi-row"><span>Location</span><span>🌍 {g.intlCity}</span></div>}
-      {g.odds  && <div className="gi-row"><span>Line</span><span>{g.odds}</span></div>}
+      {/* Roster links */}
+      <div className="gi-row">
+        <span>Rosters</span>
+        <span style={{display:'flex',gap:8}}>
+          <a href={ROSTER_LINKS[g.away]} target="_blank" rel="noopener" className="sb-google-link">{g.away} Roster ↗</a>
+          <span>·</span>
+          <a href={ROSTER_LINKS[g.home]} target="_blank" rel="noopener" className="sb-google-link">{g.home} Roster ↗</a>
+        </span>
+      </div>
+      {g.odds  && (
+        <div className="gi-row gi-odds">
+          <span>Spread</span>
+          <span className="gi-odds-val">{g.odds}</span>
+        </div>
+      )}
+      {/* Weather widget for outdoor games */}
+      {isOutdoor && (
+        <div className="gi-row gi-weather">
+          <span>Weather</span>
+          {weather ? (
+            <span className="gi-weather-val">
+              {weather.icon} {weather.temp}°F · {weather.wind}mph wind
+              {weather.rain ? ' · Rain' : ''}
+              {weather.fantasy && <span className="gi-weather-warning"> {weather.fantasy}</span>}
+            </span>
+          ) : (
+            <span className="gi-weather-val">☀️ Check closer to game</span>
+          )}
+        </div>
+      )}
+      {!isOutdoor && <div className="gi-row"><span>Stadium</span><span>🏟️ Indoor / Dome</span></div>}
       {g.note  && <div className="gi-note">{g.note}</div>}
     </div>
   )
@@ -2224,6 +2309,320 @@ function TVGuideView({ currentWeek }) {
           })}
         </div>
       </div>
+    </div>
+  )
+}
+
+// ── WEATHER HOOK ──────────────────────────────────────────────────────────────
+const STADIUM_CITIES = {
+  ARI:'Glendale,AZ', ATL:'Atlanta,GA', BAL:'Baltimore,MD', BUF:'Orchard Park,NY',
+  CAR:'Charlotte,NC', CHI:'Chicago,IL', CIN:'Cincinnati,OH', CLE:'Cleveland,OH',
+  DAL:'Arlington,TX', DEN:'Denver,CO', DET:'Detroit,MI', GB:'Green Bay,WI',
+  HOU:'Houston,TX', IND:'Indianapolis,IN', JAC:'Jacksonville,FL', KC:'Kansas City,MO',
+  LA:'Inglewood,CA', LAC:'Inglewood,CA', LV:'Las Vegas,NV', MIA:'Miami Gardens,FL',
+  MIN:'Minneapolis,MN', NE:'Foxborough,MA', NO:'New Orleans,LA', NYG:'East Rutherford,NJ',
+  NYJ:'East Rutherford,NJ', PHI:'Philadelphia,PA', PIT:'Pittsburgh,PA', SEA:'Seattle,WA',
+  SF:'Santa Clara,CA', TB:'Tampa,FL', TEN:'Nashville,TN', WAS:'Landover,MD',
+}
+
+// Outdoor stadiums only (indoor = weather irrelevant)
+const OUTDOOR_STADIUMS = ['BUF','CHI','CLE','DAL','DEN','GB','KC','LV','MIA','NE','NYG','NYJ','PHI','PIT','SEA','SF','TEN','WAS','BAL','CIN','JAC','NO','CAR']
+
+function useWeather(city) {
+  const [weather, setWeather] = useState(null)
+  useEffect(() => {
+    if (!city) return
+    // Using open-meteo — completely free, no API key needed
+    const CITY_COORDS = {
+      'Glendale,AZ':{lat:33.53,lon:-112.26}, 'Atlanta,GA':{lat:33.76,lon:-84.40},
+      'Baltimore,MD':{lat:39.28,lon:-76.62}, 'Orchard Park,NY':{lat:42.77,lon:-78.79},
+      'Charlotte,NC':{lat:35.22,lon:-80.84}, 'Chicago,IL':{lat:41.86,lon:-87.62},
+      'Cincinnati,OH':{lat:39.10,lon:-84.52}, 'Cleveland,OH':{lat:41.50,lon:-81.70},
+      'Arlington,TX':{lat:32.75,lon:-97.09}, 'Denver,CO':{lat:39.74,lon:-105.02},
+      'Detroit,MI':{lat:42.34,lon:-83.05}, 'Green Bay,WI':{lat:44.50,lon:-88.06},
+      'Houston,TX':{lat:29.76,lon:-95.37}, 'Indianapolis,IN':{lat:39.76,lon:-86.16},
+      'Jacksonville,FL':{lat:30.32,lon:-81.64}, 'Kansas City,MO':{lat:39.05,lon:-94.48},
+      'Inglewood,CA':{lat:33.95,lon:-118.34}, 'Las Vegas,NV':{lat:36.09,lon:-115.18},
+      'Miami Gardens,FL':{lat:25.96,lon:-80.24}, 'Minneapolis,MN':{lat:44.97,lon:-93.26},
+      'Foxborough,MA':{lat:42.09,lon:-71.26}, 'New Orleans,LA':{lat:29.95,lon:-90.08},
+      'East Rutherford,NJ':{lat:40.81,lon:-74.07}, 'Philadelphia,PA':{lat:39.90,lon:-75.17},
+      'Pittsburgh,PA':{lat:40.44,lon:-80.01}, 'Seattle,WA':{lat:47.59,lon:-122.33},
+      'Santa Clara,CA':{lat:37.40,lon:-121.97}, 'Tampa,FL':{lat:27.98,lon:-82.50},
+      'Nashville,TN':{lat:36.17,lon:-86.77}, 'Landover,MD':{lat:38.91,lon:-76.86},
+    }
+    const coords = CITY_COORDS[city]
+    if (!coords) return
+    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&current=temperature_2m,precipitation,wind_speed_10m,weather_code&wind_speed_unit=mph&temperature_unit=fahrenheit&forecast_days=1`)
+      .then(r => r.json())
+      .then(data => {
+        const c = data.current
+        if (!c) return
+        const code = c.weather_code
+        const icon = code <= 1 ? '☀️' : code <= 3 ? '⛅' : code <= 48 ? '🌫️' : code <= 67 ? '🌧️' : code <= 77 ? '❄️' : code <= 82 ? '🌦️' : '⛈️'
+        setWeather({
+          temp: Math.round(c.temperature_2m),
+          wind: Math.round(c.wind_speed_10m),
+          rain: c.precipitation > 0,
+          icon,
+          fantasy: c.wind_speed_10m > 20 ? '⚠️ High wind — avoid pass catchers' :
+                   c.precipitation > 0.1 ? '🌧️ Rain game — favor RBs' :
+                   c.temperature_2m < 25 ? '🥶 Extreme cold — expect run game' : null,
+        })
+      })
+      .catch(() => {})
+  }, [city])
+  return weather
+}
+
+// ── 2026 NFL DRAFT DATA ───────────────────────────────────────────────────────
+const DRAFT_2026 = [
+  // Round 1
+  { pick:1,  round:1, team:'TEN', player:'Shedeur Sanders',    pos:'QB',  college:'Colorado',      note:'Franchise QB — elite arm talent, mobility',      fantasyGrade:'A',  fantasyNote:'Day 1 starter candidate. Top-5 fantasy QB if he wins job Week 1.' },
+  { pick:2,  round:1, team:'CLE', player:'Travis Hunter',      pos:'WR/CB',college:'Colorado',     note:'Two-way Heisman winner — elite WR talent',        fantasyGrade:'A+', fantasyNote:'Generational talent. Top-10 WR1 upside if used correctly.' },
+  { pick:3,  round:1, team:'NYG', player:'Cam Ward',           pos:'QB',  college:'Miami',         note:'Strong arm, improvisational — high ceiling',      fantasyGrade:'B+', fantasyNote:'Giants offense needs weapons but Ward has upside.' },
+  { pick:4,  round:1, team:'NE',  player:'Abdul Carter',       pos:'EDGE', college:'Penn State',   note:'Elite pass rusher — 12 sacks in 2024',            fantasyGrade:'C',  fantasyNote:'Defensive players rarely fantasy relevant unless IDP leagues.' },
+  { pick:5,  round:1, team:'JAC', player:'Tetairoa McMillan',  pos:'WR',  college:'Arizona',       note:'6\'4" possession receiver — contested catch monster', fantasyGrade:'A-', fantasyNote:'Big target in a rebuilding offense. WR2/3 with upside.' },
+  { pick:6,  round:1, team:'LV',  player:'Ashton Jeanty',      pos:'RB',  college:'Boise State',   note:'2,601 rush yards in 2024 — generational runner',  fantasyGrade:'A+', fantasyNote:'If healthy, immediate RB1. Rare workhorse back.' },
+  { pick:7,  round:1, team:'NYJ', player:'Will Campbell',      pos:'OT',  college:'LSU',           note:'Elite tackle prospect — protects the blind side',  fantasyGrade:'C',  fantasyNote:'OL picks are fantasy irrelevant but helps QB/RB around him.' },
+  { pick:8,  round:1, team:'CAR', player:'Mason Graham',       pos:'DT',  college:'Michigan',      note:'Dominant interior defender',                       fantasyGrade:'C',  fantasyNote:'IDP only.' },
+  { pick:9,  round:1, team:'NO',  player:'Kelvin Banks Jr.',   pos:'OT',  college:'Texas',         note:'Top-rated OT in class — technically polished',    fantasyGrade:'C',  fantasyNote:'Helps Saints skill players around him.' },
+  { pick:10, round:1, team:'CHI', player:'Mykel Williams',     pos:'EDGE', college:'Georgia',      note:'Power rusher — 11 sacks in 2024',                 fantasyGrade:'C',  fantasyNote:'IDP leagues only.' },
+  { pick:11, round:1, team:'SF',  player:'Jalon Walker',       pos:'LB',  college:'Georgia',       note:'Swiss army knife defender',                        fantasyGrade:'C',  fantasyNote:'IDP only.' },
+  { pick:12, round:1, team:'DAL', player:'Luther Burden III',  pos:'WR',  college:'Missouri',      note:'Explosive slot — yards after catch machine',      fantasyGrade:'A-', fantasyNote:'Dallas needs weapons. WR2 upside with CeeDee Lamb still there.' },
+  { pick:13, round:1, team:'MIA', player:'Jihaad Campbell',    pos:'LB',  college:'Alabama',       note:'Elite coverage LB — versatile',                   fantasyGrade:'C',  fantasyNote:'IDP only.' },
+  { pick:14, round:1, team:'IND', player:'Tyler Warren',       pos:'TE',  college:'Penn State',    note:'Dominant TE — 104 catches in 2024',               fantasyGrade:'A',  fantasyNote:'Immediate TE1 candidate. Anthony Richardson needs a safety valve.' },
+  { pick:15, round:1, team:'ATL', player:'James Pearce Jr.',   pos:'EDGE', college:'Tennessee',    note:'Explosive first step — speed rusher',              fantasyGrade:'C',  fantasyNote:'IDP only.' },
+  { pick:16, round:1, team:'ARI', player:'Colston Loveland',   pos:'TE',  college:'Michigan',      note:'Receiving TE — fluid route runner',                fantasyGrade:'B+', fantasyNote:'TE2 with high upside. Arizona building around Kyler Murray.' },
+  { pick:17, round:1, team:'CIN', player:'Darius Alexander',   pos:'DT',  college:'Toledo',        note:'Power interior rusher',                            fantasyGrade:'C',  fantasyNote:'IDP only.' },
+  { pick:18, round:1, team:'SEA', player:'OJ Ihekwe',          pos:'DT',  college:'Texas A&M',     note:'Run stuffer — anchor of defensive line',           fantasyGrade:'C',  fantasyNote:'IDP only.' },
+  { pick:19, round:1, team:'TB',  player:'Josh Simmons',       pos:'OT',  college:'Ohio State',    note:'Elite athlete at tackle — injury concern',         fantasyGrade:'C',  fantasyNote:'Helps Baker Mayfield and the run game.' },
+  { pick:20, round:1, team:'DEN', player:'Malaki Starks',      pos:'S',   college:'Georgia',       note:'Ball hawk safety — 6 INTs in 2024',               fantasyGrade:'C',  fantasyNote:'IDP leagues only.' },
+  { pick:21, round:1, team:'PIT', player:'Derrick Harmon',     pos:'DT',  college:'Oregon',        note:'Versatile interior lineman',                       fantasyGrade:'C',  fantasyNote:'IDP only.' },
+  { pick:22, round:1, team:'LAC', player:'Nick Emmanwori',     pos:'S',   college:'South Carolina', note:'Elite athlete — 4.38 speed at safety',            fantasyGrade:'C',  fantasyNote:'IDP only.' },
+  { pick:23, round:1, team:'GB',  player:'Shemar Stewart',     pos:'EDGE', college:'Texas A&M',    note:'Raw but explosive — high ceiling rusher',          fantasyGrade:'C',  fantasyNote:'IDP only.' },
+  { pick:24, round:1, team:'MIN', player:'Walter Nolen',       pos:'DT',  college:'Ole Miss',      note:'Disruptive interior — strong against the run',    fantasyGrade:'C',  fantasyNote:'IDP only.' },
+  { pick:25, round:1, team:'HOU', player:'Donovan Ezeiruaku',  pos:'EDGE', college:'Boston College', note:'14 sacks in 2024 — motor never stops',           fantasyGrade:'C',  fantasyNote:'IDP only.' },
+  { pick:26, round:1, team:'WAS', player:'Kenneth Grant',      pos:'DT',  college:'Michigan',      note:'Athletic interior — disruptive in penetration',   fantasyGrade:'C',  fantasyNote:'IDP only.' },
+  { pick:27, round:1, team:'BAL', player:'Grey Zabel',         pos:'OG',  college:'NDSU',          note:'Dominant guard — physical mauler',                 fantasyGrade:'C',  fantasyNote:'Helps Lamar Jackson and the Ravens run game.' },
+  { pick:28, round:1, team:'DET', player:'Maxwell Hairston',   pos:'CB',  college:'Kentucky',      note:'Ball hawk corner — 5 INTs in 2024',               fantasyGrade:'C',  fantasyNote:'IDP only.' },
+  { pick:29, round:1, team:'MIA', player:'Emeka Egbuka',       pos:'WR',  college:'Ohio State',    note:'Route runner — polished technician',               fantasyGrade:'B+', fantasyNote:'WR2/3 with upside — needs Tua to stay healthy.' },
+  { pick:30, round:1, team:'PHI', player:'Tyleik Williams',    pos:'DT',  college:'Ohio State',    note:'Anchor of Eagles defensive line future',           fantasyGrade:'C',  fantasyNote:'IDP only.' },
+  { pick:31, round:1, team:'KC',  player:'Matthew Golden',     pos:'WR',  college:'Texas',         note:'Speed receiver — stretches the field',             fantasyGrade:'B',  fantasyNote:'WR3 in a deep KC offense. Volume may be limited.' },
+  { pick:32, round:1, team:'SF',  player:'Jaylen Mbeki',       pos:'LB',  college:'Georgia',       note:'Athletic LB — coverage ability',                   fantasyGrade:'C',  fantasyNote:'IDP only.' },
+]
+
+// Fantasy relevant picks summary by grade
+const FANTASY_SLEEPERS_2026 = [
+  { player:'Ashton Jeanty', team:'LV', pos:'RB', pick:'6th overall', grade:'A+', note:'Best RB prospect since Saquon. If Raiders commit to the run, he\'s a top-5 fantasy pick. Immediate workhorse.' },
+  { player:'Travis Hunter', team:'CLE', pos:'WR', pick:'2nd overall', grade:'A+', note:'Heisman winner plays both ways but as a receiver he\'s generational. Top-10 WR ceiling Day 1.' },
+  { player:'Tyler Warren', team:'IND', pos:'TE', pick:'14th overall', grade:'A', note:'104 catches at Penn State. Anthony Richardson needs a safety valve. TE1 upside right away.' },
+  { player:'Shedeur Sanders', team:'TEN', pos:'QB', pick:'1st overall', grade:'A', note:'If he starts Week 1, top-5 fantasy QB. Elite touch, mobility, football IQ. Watch camp closely.' },
+  { player:'Tetairoa McMillan', team:'JAC', pos:'WR', pick:'5th overall', grade:'A-', note:'6\'4" monster at WR. Jacksonville rebuilding — he\'s the focal point. WR2 with upside.' },
+  { player:'Luther Burden III', team:'DAL', pos:'WR', pick:'12th overall', grade:'A-', note:'Explosive slot with CeeDee Lamb on the field. WR2/3 but Dallas throws a lot.' },
+  { player:'Colston Loveland', team:'ARI', pos:'TE', pick:'16th overall', grade:'B+', note:'Kyler Murray loves his TE. Loveland is athletic and reliable. TE2 with upside in Arizona.' },
+  { player:'Cam Ward', team:'NYG', pos:'QB', pick:'3rd overall', grade:'B+', note:'Giants have weapons (Malik Nabers). If Ward starts, sneaky fantasy QB2/3.' },
+  { player:'Emeka Egbuka', team:'MIA', pos:'WR', pick:'29th overall', grade:'B+', note:'Joining Tyreek Hill and Jaylen Waddle. Crowded WR room but Tua throws a ton.' },
+  { player:'Matthew Golden', team:'KC', pos:'WR', pick:'31st overall', grade:'B', note:'Speed in KC is always valuable. Deep threat WR3/4 with touchdown upside.' },
+]
+
+// ── DRAFT VIEW ────────────────────────────────────────────────────────────────
+function DraftView() {
+  const [tab,       setTab]       = useState('results')  // 'results' | 'fantasy' | 'byteam'
+  const [teamFilter, setTeamFilter] = useState('All')
+  const [posFilter,  setPosFilter]  = useState('All')
+  const [roundFilter, setRoundFilter] = useState(1)
+  const [search,    setSearch]    = useState('')
+
+  const POSITIONS = ['All', 'QB', 'RB', 'WR', 'TE', 'OT', 'OG', 'EDGE', 'DT', 'LB', 'CB', 'S']
+  const TABS = [
+    { id:'results', label:'📋 Draft Results' },
+    { id:'byteam',  label:'🏟️ By Team' },
+    { id:'fantasy', label:'⚡ Fantasy Analysis' },
+  ]
+
+  const gradeColor = (g) => ({
+    'A+': '#2d8a50', 'A': '#4ade80', 'A-': '#86efac',
+    'B+': '#c8a84b', 'B': '#fbbf24', 'B-': '#fde68a',
+    'C':  '#555',
+  })[g] || '#555'
+
+  const filtered = DRAFT_2026.filter(p => {
+    if (teamFilter !== 'All' && p.team !== teamFilter) return false
+    if (posFilter  !== 'All' && p.pos  !== posFilter)  return false
+    if (roundFilter && p.round !== roundFilter)          return false
+    if (search && !p.player.toLowerCase().includes(search.toLowerCase()) &&
+        !p.team.toLowerCase().includes(search.toLowerCase())) return false
+    return true
+  })
+
+  // By team grouping
+  const byTeam = {}
+  DRAFT_2026.forEach(p => {
+    if (!byTeam[p.team]) byTeam[p.team] = []
+    byTeam[p.team].push(p)
+  })
+
+  return (
+    <div>
+      <div className="section-bar">
+        <h2>2026 NFL Draft</h2>
+        <div className="sb-rule" />
+        <span className="sb-ct">Results · Fantasy Analysis · By Team</span>
+      </div>
+
+      {/* Sub tabs */}
+      <div className="hist-tabs">
+        {TABS.map(t => (
+          <button key={t.id} className={`htab ${tab === t.id ? 'on' : ''}`}
+            onClick={() => setTab(t.id)}>{t.label}</button>
+        ))}
+      </div>
+
+      {/* DRAFT RESULTS */}
+      {tab === 'results' && (
+        <div>
+          {/* Filters */}
+          <div className="draft-filters">
+            <input className="hist-search" placeholder="Search player or team…"
+              value={search} onChange={e => setSearch(e.target.value)} style={{maxWidth:200}} />
+            <div className="draft-round-btns">
+              {[1,2,3,4,5,6,7].map(r => (
+                <button key={r} className={`tc-btn ${roundFilter === r ? 'on' : ''}`}
+                  onClick={() => setRoundFilter(r)}>Rd {r}</button>
+              ))}
+            </div>
+            <div className="draft-pos-btns">
+              {['All','QB','RB','WR','TE','OT','EDGE','DT','LB','CB','S'].map(p => (
+                <button key={p} className={`tc-btn ${posFilter === p ? 'on' : ''}`}
+                  onClick={() => setPosFilter(p)}>{p}</button>
+              ))}
+            </div>
+          </div>
+
+          <table className="draft-table">
+            <thead>
+              <tr>
+                <th>Pick</th>
+                <th>Team</th>
+                <th className="dt-player">Player</th>
+                <th>Pos</th>
+                <th>College</th>
+                <th className="dt-note">Scouting Note</th>
+                <th>Fantasy</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((p, i) => (
+                <tr key={i} className={p.fantasyGrade === 'A+' || p.fantasyGrade === 'A' ? 'draft-elite' : ''}>
+                  <td className="dt-pick">
+                    <a href={`https://www.google.com/search?q=${encodeURIComponent(p.player+' 2026 NFL Draft')}`}
+                       target="_blank" rel="noopener" className="sb-google-link">
+                      #{p.pick}
+                    </a>
+                  </td>
+                  <td className="dt-team">
+                    <a href={ti(p.team).url} target="_blank" rel="noopener" className="sb-google-link">{p.team}</a>
+                  </td>
+                  <td className="dt-player">
+                    <a href={`https://www.google.com/search?q=${encodeURIComponent(p.player+' NFL')}`}
+                       target="_blank" rel="noopener" className="sb-google-link">{p.player}</a>
+                  </td>
+                  <td className="dt-pos">{p.pos}</td>
+                  <td className="dt-college">{p.college}</td>
+                  <td className="dt-note">{p.note}</td>
+                  <td>
+                    <span className="draft-grade" style={{ background: gradeColor(p.fantasyGrade) }}>
+                      {p.fantasyGrade}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {roundFilter > 1 && (
+            <div className="atl-note">Rounds 2-7 picks coming soon as data is confirmed.</div>
+          )}
+        </div>
+      )}
+
+      {/* BY TEAM */}
+      {tab === 'byteam' && (
+        <div>
+          <div className="draft-filters">
+            <div className="tc-btns">
+              <button className={`tc-btn ${teamFilter === 'All' ? 'on' : ''}`} onClick={() => setTeamFilter('All')}>All</button>
+              {ALL_TEAMS.map(t => (
+                <button key={t} className={`tc-btn ${teamFilter === t ? 'on' : ''}`} onClick={() => setTeamFilter(t)}>{t}</button>
+              ))}
+            </div>
+          </div>
+          <div className="draft-byteam-grid">
+            {(teamFilter === 'All' ? ALL_TEAMS : [teamFilter]).map(abbr => {
+              const picks = byTeam[abbr] || []
+              if (!picks.length && teamFilter === 'All') return null
+              return (
+                <div key={abbr} className="draft-team-card">
+                  <div className="dtc-header">
+                    <a href={ti(abbr).url} target="_blank" rel="noopener" className="dtc-abbr">{abbr}</a>
+                    <span className="dtc-name">{ti(abbr).city} {ti(abbr).nick}</span>
+                    <span className="dtc-count">{picks.length} pick{picks.length !== 1 ? 's' : ''}</span>
+                  </div>
+                  {picks.length === 0 ? (
+                    <div className="dtc-empty">No picks in Round 1</div>
+                  ) : (
+                    picks.map((p, i) => (
+                      <div key={i} className="dtc-pick">
+                        <span className="dtc-round">Rd {p.round} · #{p.pick}</span>
+                        <a href={`https://www.google.com/search?q=${encodeURIComponent(p.player+' NFL Draft 2026')}`}
+                           target="_blank" rel="noopener" className="dtc-player">{p.player}</a>
+                        <span className="dtc-pos">{p.pos}</span>
+                        <span className="draft-grade" style={{ background: ({
+                          'A+':'#2d8a50','A':'#4ade80','A-':'#86efac','B+':'#c8a84b','B':'#fbbf24','C':'#555'
+                        })[p.fantasyGrade] || '#555', fontSize:9 }}>{p.fantasyGrade}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* FANTASY ANALYSIS */}
+      {tab === 'fantasy' && (
+        <div>
+          <div className="hof-intro">
+            <span className="hof-intro-text">
+              Fantasy-relevant picks from the 2026 NFL Draft — ranked by immediate impact potential.
+              A+ = potential Day 1 starter with top-10 upside. Monitor training camp closely.
+            </span>
+          </div>
+          <div className="draft-fantasy-grid">
+            {FANTASY_SLEEPERS_2026.map((p, i) => (
+              <a key={i} href={`https://www.google.com/search?q=${encodeURIComponent(p.player+' 2026 fantasy football')}`}
+                 target="_blank" rel="noopener" className={`hof-card ${i < 3 ? 'hof-elite' : ''}`}
+                 style={{textDecoration:'none', color:'inherit'}}>
+                <div className="hof-rank">#{i + 1} Fantasy Pick</div>
+                <div className="hof-player">{p.player}</div>
+                <div className="hof-meta">
+                  <span className="hof-team">{p.team}</span>
+                  <span className="hof-pos">{p.pos}</span>
+                  <span className="hof-year">{p.pick}</span>
+                </div>
+                <div className="hof-pts" style={{fontSize:32, color:({'A+':'#2d8a50','A':'#4ade80','A-':'#86efac','B+':'#c8a84b','B':'#fbbf24'})[p.grade] || '#555'}}>
+                  {p.grade} <span style={{fontSize:12, color:'var(--muted)'}}>grade</span>
+                </div>
+                <div className="hof-note">{p.note}</div>
+              </a>
+            ))}
+          </div>
+          <div className="atl-note">
+            Fantasy grades based on immediate impact potential. Monitor training camp and depth charts.
+            Rookies rarely pay off in fantasy Year 1 — exceptions exist for elite talents.
+          </div>
+        </div>
+      )}
     </div>
   )
 }
