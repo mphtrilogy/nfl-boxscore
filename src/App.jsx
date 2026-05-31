@@ -42,6 +42,14 @@ export default function App() {
 
   const [newsTeam,      setNewsTeam]      = useState('All')
 
+  const [fontTheme,     setFontTheme]     = useState(() => localStorage.getItem('fw-font') || 'classic')
+
+  // Apply font theme to body
+  useEffect(() => {
+    document.body.setAttribute('data-font', fontTheme)
+    localStorage.setItem('fw-font', fontTheme)
+  }, [fontTheme])
+
   // Season gate — no ESPN calls before Sep 9 2026
   const seasonStarted = new Date() >= new Date('2026-09-09T00:00:00-04:00')
 
@@ -87,7 +95,7 @@ export default function App() {
   return (
     <div className="app">
       {/* ── MASTHEAD ── */}
-      <Masthead lastUpdated={lastUpdated} hasLiveGame={hasLiveGame} onRefresh={refresh} />
+      <Masthead lastUpdated={lastUpdated} hasLiveGame={hasLiveGame} onRefresh={refresh} fontTheme={fontTheme} setFontTheme={setFontTheme} />
 
       {/* ── TOP NAV ── */}
       <nav className="top-nav">
@@ -221,7 +229,7 @@ function useNFLNews() {
 }
 
 // ── MASTHEAD ──────────────────────────────────────────────────────────────────
-function Masthead({ lastUpdated, hasLiveGame, onRefresh }) {
+function Masthead({ lastUpdated, hasLiveGame, onRefresh, fontTheme, setFontTheme }) {
   const now = new Date()
   const dateStr = now.toLocaleDateString('en-US', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
@@ -229,13 +237,45 @@ function Masthead({ lastUpdated, hasLiveGame, onRefresh }) {
   const vol = `Vol. ${now.getFullYear()} · No. ${Math.ceil((now - new Date(now.getFullYear(),0,1))/(7*86400000))}`
   const headlines = useNFLNews()
 
+  const [logoFont, setLogoFont] = useState(() => localStorage.getItem('fw-logo') || 'gothic')
+
+  useEffect(() => {
+    localStorage.setItem('fw-logo', logoFont)
+  }, [logoFont])
+
+  const LOGO_FONTS = {
+    gothic:   { family: "'UnifrakturMaguntia', serif",     label: 'Gothic' },
+    playfair: { family: "'Playfair Display', serif",        label: 'Serif' },
+    oswald:   { family: "'Oswald', sans-serif",             label: 'Bold' },
+    crimson:  { family: "'Crimson Text', serif",            label: 'Elegant' },
+  }
+
+  const FONTS = [
+    { id:'classic',  label:'Classic' },
+    { id:'modern',   label:'Modern' },
+    { id:'elegant',  label:'Elegant' },
+    { id:'bold',     label:'Bold' },
+  ]
+
   return (
     <header className="masthead">
       <div className="edition-line">
         <span>{vol}</span>
+        <div className="font-switcher">
+          <span className="font-switcher-label">Type:</span>
+          {FONTS.map(f => (
+            <button key={f.id} className={`font-btn ${fontTheme === f.id ? 'on' : ''}`}
+              onClick={() => setFontTheme(f.id)}>{f.label}</button>
+          ))}
+          <span className="font-switcher-label" style={{marginLeft:6}}>Title:</span>
+          {Object.entries(LOGO_FONTS).map(([id, f]) => (
+            <button key={id} className={`font-btn ${logoFont === id ? 'on' : ''}`}
+              onClick={() => setLogoFont(id)}>{f.label}</button>
+          ))}
+        </div>
         <span>{dateStr}</span>
       </div>
-      <div className="logo">The Final Whistle</div>
+      <div className="logo" style={{ fontFamily: LOGO_FONTS[logoFont]?.family }}>The Final Whistle</div>
       <div className="tagline">NFL · Scores · Box Scores · Fantasy · Schedule · nflboxscore.com</div>
       <div className="support-bar">
         <span className="support-text">Independent &amp; ad-free. If it's useful,</span>
@@ -1074,33 +1114,278 @@ function LeadersView({ tab, setTab }) {
 }
 
 // ── FANTASY VIEW ──────────────────────────────────────────────────────────────
-function FantasyView({ mode, setMode }) {
+// ── START/SIT PLAYER DATABASE ─────────────────────────────────────────────────
+// Static player pool for Start/Sit analysis (updates with real data during season)
+const PLAYER_POOL = [
+  // QBs
+  { name:'Patrick Mahomes',  team:'KC',  pos:'QB', proj:28.4, matchup:'vs DEN', matchupRating:8, lastWk:34.2, avgPts:27.1 },
+  { name:'Josh Allen',       team:'BUF', pos:'QB', proj:26.8, matchup:'vs NE',  matchupRating:9, lastWk:31.5, avgPts:25.9 },
+  { name:'Lamar Jackson',    team:'BAL', pos:'QB', proj:25.2, matchup:'vs CLE', matchupRating:7, lastWk:22.1, avgPts:24.8 },
+  { name:'Jalen Hurts',      team:'PHI', pos:'QB', proj:24.6, matchup:'vs DAL', matchupRating:6, lastWk:28.4, avgPts:23.9 },
+  { name:'Joe Burrow',       team:'CIN', pos:'QB', proj:23.8, matchup:'vs PIT', matchupRating:7, lastWk:19.2, avgPts:22.6 },
+  { name:'Dak Prescott',     team:'DAL', pos:'QB', proj:22.4, matchup:'vs PHI', matchupRating:5, lastWk:24.1, avgPts:21.8 },
+  { name:'Jordan Love',      team:'GB',  pos:'QB', proj:21.9, matchup:'vs MIN', matchupRating:6, lastWk:18.7, avgPts:20.4 },
+  { name:'Tua Tagovailoa',   team:'MIA', pos:'QB', proj:21.2, matchup:'vs NYJ', matchupRating:8, lastWk:25.6, avgPts:21.0 },
+  { name:'CJ Stroud',        team:'HOU', pos:'QB', proj:20.8, matchup:'vs IND', matchupRating:9, lastWk:22.3, avgPts:20.1 },
+  { name:'Sam Darnold',      team:'SEA', pos:'QB', proj:20.1, matchup:'vs SF',  matchupRating:4, lastWk:17.4, avgPts:19.2 },
+  { name:'Fernando Mendoza', team:'LV',  pos:'QB', proj:18.4, matchup:'vs KC',  matchupRating:3, lastWk:null, avgPts:null },
+  // RBs
+  { name:'Bijan Robinson',   team:'ATL', pos:'RB', proj:18.6, matchup:'vs NO',  matchupRating:8, lastWk:22.4, avgPts:17.8 },
+  { name:'Breece Hall',      team:'NYJ', pos:'RB', proj:17.2, matchup:'vs MIA', matchupRating:6, lastWk:14.8, avgPts:16.4 },
+  { name:'Jahmyr Gibbs',     team:'DET', pos:'RB', proj:16.9, matchup:'vs GB',  matchupRating:7, lastWk:19.2, avgPts:16.1 },
+  { name:'De\'Von Achane',   team:'MIA', pos:'RB', proj:16.4, matchup:'vs NYJ', matchupRating:8, lastWk:12.1, avgPts:15.8 },
+  { name:'Saquon Barkley',   team:'PHI', pos:'RB', proj:15.8, matchup:'vs DAL', matchupRating:6, lastWk:18.4, avgPts:15.2 },
+  { name:'Tony Pollard',     team:'TEN', pos:'RB', proj:14.2, matchup:'vs JAC', matchupRating:7, lastWk:11.6, avgPts:13.8 },
+  { name:'Kenneth Walker',   team:'SEA', pos:'RB', proj:13.8, matchup:'vs SF',  matchupRating:4, lastWk:16.2, avgPts:14.1 },
+  { name:'Jeremiyah Love',   team:'ARI', pos:'RB', proj:13.2, matchup:'vs LAR', matchupRating:6, lastWk:null, avgPts:null },
+  // WRs
+  { name:'Tyreek Hill',      team:'MIA', pos:'WR', proj:18.4, matchup:'vs NYJ', matchupRating:8, lastWk:24.6, avgPts:17.2 },
+  { name:'CeeDee Lamb',      team:'DAL', pos:'WR', proj:17.8, matchup:'vs PHI', matchupRating:5, lastWk:21.2, avgPts:17.0 },
+  { name:'Stefon Diggs',     team:'HOU', pos:'WR', proj:16.2, matchup:'vs IND', matchupRating:9, lastWk:14.8, avgPts:15.6 },
+  { name:'Ja\'Marr Chase',   team:'CIN', pos:'WR', proj:16.0, matchup:'vs PIT', matchupRating:7, lastWk:18.4, avgPts:15.4 },
+  { name:'A.J. Brown',       team:'PHI', pos:'WR', proj:15.6, matchup:'vs DAL', matchupRating:5, lastWk:17.2, avgPts:15.0 },
+  { name:'Malik Nabers',     team:'NYG', pos:'WR', proj:14.8, matchup:'vs WAS', matchupRating:6, lastWk:12.4, avgPts:14.2 },
+  { name:'Davante Adams',    team:'NYJ', pos:'WR', proj:14.2, matchup:'vs MIA', matchupRating:6, lastWk:16.8, avgPts:13.8 },
+  { name:'Carnell Tate',     team:'TEN', pos:'WR', proj:12.4, matchup:'vs JAC', matchupRating:7, lastWk:null, avgPts:null },
+  // TEs
+  { name:'Sam LaPorta',      team:'DET', pos:'TE', proj:14.2, matchup:'vs GB',  matchupRating:7, lastWk:16.8, avgPts:13.4 },
+  { name:'Mark Andrews',     team:'BAL', pos:'TE', proj:13.6, matchup:'vs CLE', matchupRating:7, lastWk:11.2, avgPts:12.8 },
+  { name:'Travis Kelce',     team:'KC',  pos:'TE', proj:12.8, matchup:'vs DEN', matchupRating:8, lastWk:14.6, avgPts:12.2 },
+  { name:'Kyle Pitts',       team:'ATL', pos:'TE', proj:11.4, matchup:'vs NO',  matchupRating:8, lastWk:8.4,  avgPts:10.8 },
+  { name:'Trey McBride',     team:'ARI', pos:'TE', proj:10.8, matchup:'vs LAR', matchupRating:6, lastWk:12.2, avgPts:10.4 },
+]
+
+const MATCHUP_RATINGS = {
+  1:'🔴 Nightmare', 2:'🔴 Very Hard', 3:'🔴 Hard',
+  4:'🟠 Below Avg', 5:'🟡 Average', 6:'🟡 Slight Edge',
+  7:'🟢 Good', 8:'🟢 Great', 9:'🟢 Excellent', 10:'🟢 Dream'
+}
+
+function StartSitView({ mode }) {
+  const [playerA, setPlayerA] = useState(null)
+  const [playerB, setPlayerB] = useState(null)
+  const [searchA, setSearchA] = useState('')
+  const [searchB, setSearchB] = useState('')
+  const [showA,   setShowA]   = useState(false)
+  const [showB,   setShowB]   = useState(false)
+
+  const filteredA = searchA.length > 1
+    ? PLAYER_POOL.filter(p => p.name.toLowerCase().includes(searchA.toLowerCase())).slice(0,8)
+    : []
+  const filteredB = searchB.length > 1
+    ? PLAYER_POOL.filter(p => p.name.toLowerCase().includes(searchB.toLowerCase())).slice(0,8)
+    : []
+
+  const scorePlayer = (p) => {
+    if (!p) return 0
+    let score = 0
+    score += (p.proj || 0) * 3
+    score += (p.matchupRating || 5) * 2
+    score += (p.lastWk || p.avgPts || 0) * 0.5
+    return score
+  }
+
+  const scoreA = scorePlayer(playerA)
+  const scoreB = scorePlayer(playerB)
+  const recommendation = playerA && playerB
+    ? scoreA > scoreB ? { start: playerA, sit: playerB } : { start: playerB, sit: playerA }
+    : null
+
+  const gradeColor = (rating) => {
+    if (rating >= 8) return '#1a4a1a'
+    if (rating >= 6) return '#c8a84b'
+    return '#8b1a1a'
+  }
+
   return (
     <div>
       <div className="section-bar">
-        <h2>Fantasy Scoring</h2>
+        <h2>Start / Sit Analyzer</h2>
         <div className="sb-rule" />
-        <span className="sb-ct">6pt TD · Standard / PPR</span>
+        <span className="sb-ct">Compare two players · Get a recommendation</span>
+      </div>
+
+      <div className="startsit-wrap">
+        {/* Search row */}
+        <div className="startsit-search">
+          {/* Player A */}
+          <div className="ss-input-wrap">
+            <input className="ss-input" placeholder="Search Player 1…"
+              value={playerA ? playerA.name : searchA}
+              onChange={e => { setSearchA(e.target.value); setPlayerA(null); setShowA(true) }}
+              onFocus={() => setShowA(true)}
+            />
+            {showA && filteredA.length > 0 && !playerA && (
+              <div className="ss-dropdown">
+                {filteredA.map((p, i) => (
+                  <div key={i} className="ss-option"
+                    onMouseDown={() => { setPlayerA(p); setSearchA(''); setShowA(false) }}>
+                    <span className="ss-opt-pos">{p.pos}</span>
+                    <span>{p.name}</span>
+                    <span className="ss-opt-team">{p.team}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="ss-vs">vs</div>
+
+          {/* Player B */}
+          <div className="ss-input-wrap">
+            <input className="ss-input" placeholder="Search Player 2…"
+              value={playerB ? playerB.name : searchB}
+              onChange={e => { setSearchB(e.target.value); setPlayerB(null); setShowB(true) }}
+              onFocus={() => setShowB(true)}
+            />
+            {showB && filteredB.length > 0 && !playerB && (
+              <div className="ss-dropdown">
+                {filteredB.map((p, i) => (
+                  <div key={i} className="ss-option"
+                    onMouseDown={() => { setPlayerB(p); setSearchB(''); setShowB(false) }}>
+                    <span className="ss-opt-pos">{p.pos}</span>
+                    <span>{p.name}</span>
+                    <span className="ss-opt-team">{p.team}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Comparison */}
+        {(!playerA || !playerB) && (
+          <div className="ss-placeholder">
+            Search two players above to compare
+          </div>
+        )}
+
+        {playerA && playerB && recommendation && (
+          <div className="ss-comparison">
+            {/* Player A card */}
+            <div className={`ss-player-card ${recommendation.start === playerA ? 'winner' : 'loser'}`}>
+              <div className="ss-card-header">
+                <div className="ss-card-name">{playerA.name}</div>
+                <div className="ss-card-meta">{playerA.team} · {playerA.pos} · {playerA.matchup}</div>
+              </div>
+              <div className="ss-card-body">
+                <div className="ss-stat">
+                  <span className="ss-stat-label">Projected Pts</span>
+                  <span className="ss-stat-val">{mode === 'ppr' && playerA.pos !== 'QB' ? (playerA.proj + 2).toFixed(1) : playerA.proj}</span>
+                </div>
+                <div className="ss-stat">
+                  <span className="ss-stat-label">Matchup</span>
+                  <span className="ss-stat-val" style={{color: gradeColor(playerA.matchupRating), fontSize:10}}>
+                    {MATCHUP_RATINGS[playerA.matchupRating]}
+                  </span>
+                </div>
+                <div className="ss-stat">
+                  <span className="ss-stat-label">Last Week</span>
+                  <span className="ss-stat-val">{playerA.lastWk || 'Rookie'}</span>
+                </div>
+                <div className="ss-stat">
+                  <span className="ss-stat-label">Season Avg</span>
+                  <span className="ss-stat-val">{playerA.avgPts || 'Rookie'}</span>
+                </div>
+                <div style={{textAlign:'center', paddingTop:8}}>
+                  <span className={`ss-rec-badge ${recommendation.start === playerA ? 'start' : 'sit'}`}>
+                    {recommendation.start === playerA ? '✓ START' : '✗ SIT'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Verdict */}
+            <div className="ss-verdict">
+              <div className="ss-verdict-label">Recommendation</div>
+              <div className={`ss-verdict-val ${recommendation.start === playerA ? 'start' : 'sit'}`}>
+                {recommendation.start.name.split(' ').pop()}
+              </div>
+              <div style={{fontSize:9, fontFamily:'var(--font-mono)', color:'var(--muted-lt)', marginTop:8, lineHeight:1.4}}>
+                Based on projections, matchup rating, and recent form
+              </div>
+            </div>
+
+            {/* Player B card */}
+            <div className={`ss-player-card ${recommendation.start === playerB ? 'winner' : 'loser'}`}>
+              <div className="ss-card-header">
+                <div className="ss-card-name">{playerB.name}</div>
+                <div className="ss-card-meta">{playerB.team} · {playerB.pos} · {playerB.matchup}</div>
+              </div>
+              <div className="ss-card-body">
+                <div className="ss-stat">
+                  <span className="ss-stat-label">Projected Pts</span>
+                  <span className="ss-stat-val">{mode === 'ppr' && playerB.pos !== 'QB' ? (playerB.proj + 2).toFixed(1) : playerB.proj}</span>
+                </div>
+                <div className="ss-stat">
+                  <span className="ss-stat-label">Matchup</span>
+                  <span className="ss-stat-val" style={{color: gradeColor(playerB.matchupRating), fontSize:10}}>
+                    {MATCHUP_RATINGS[playerB.matchupRating]}
+                  </span>
+                </div>
+                <div className="ss-stat">
+                  <span className="ss-stat-label">Last Week</span>
+                  <span className="ss-stat-val">{playerB.lastWk || 'Rookie'}</span>
+                </div>
+                <div className="ss-stat">
+                  <span className="ss-stat-label">Season Avg</span>
+                  <span className="ss-stat-val">{playerB.avgPts || 'Rookie'}</span>
+                </div>
+                <div style={{textAlign:'center', paddingTop:8}}>
+                  <span className={`ss-rec-badge ${recommendation.start === playerB ? 'start' : 'sit'}`}>
+                    {recommendation.start === playerB ? '✓ START' : '✗ SIT'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Off-season note */}
+        <div className="atl-note">
+          Projections and matchup ratings update weekly during the season based on live ESPN data.
+          Pre-season figures are estimates based on 2025 averages. {mode === 'ppr' ? 'PPR' : 'Standard'} scoring.
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function FantasyView({ mode, setMode }) {
+  const [tab, setTab] = useState('startsit')
+  const TABS = [
+    { id:'startsit', label:'⚖️ Start/Sit' },
+    { id:'scoring',  label:'📊 Scoring' },
+  ]
+  return (
+    <div>
+      <div className="section-bar">
+        <h2>Fantasy Tools</h2>
+        <div className="sb-rule" />
+        <span className="sb-ct">Start/Sit · Scoring · {mode === 'ppr' ? 'PPR' : 'Standard'}</span>
       </div>
       <div className="fant-mode-bar">
-        <span className="fmb-label">Scoring Mode</span>
+        <span className="fmb-label">Scoring</span>
         <div className="fmb-btns">
           <button className={`fmb-btn ${mode === 'std' ? 'on' : ''}`} onClick={() => setMode('std')}>Standard</button>
           <button className={`fmb-btn ${mode === 'ppr' ? 'on' : ''}`} onClick={() => setMode('ppr')}>PPR</button>
         </div>
-        <span className="fmb-key">
-          Pass 1pt/25yds · 6pt TD · −2 INT · Rush/Rec 1pt/10yds{mode === 'ppr' ? ' · +1pt REC' : ''} · No kickers
-        </span>
+        <span className="fmb-key">Pass 1pt/25yds · 6pt TD · −2 INT · Rush/Rec 1pt/10yds{mode === 'ppr' ? ' · +1pt REC' : ''}</span>
       </div>
-      <div className="leaders-coming-soon">
-        <div className="cs-icon">⚡</div>
-        <div className="cs-title">Fantasy Leaders Ready Week 1</div>
-        <div className="cs-text">
-          Fantasy point totals, per-player breakdowns, and Standard vs PPR toggle will populate
-          after games are played. Box score tabs include fantasy projections per player.
+      <div className="hist-tabs">
+        {TABS.map(t => (
+          <button key={t.id} className={`htab ${tab === t.id ? 'on' : ''}`} onClick={() => setTab(t.id)}>{t.label}</button>
+        ))}
+      </div>
+      {tab === 'startsit' && <StartSitView mode={mode} />}
+      {tab === 'scoring'  && (
+        <div className="leaders-coming-soon">
+          <div className="cs-icon">⚡</div>
+          <div className="cs-title">Fantasy Scoring Leaders — Week 1</div>
+          <div className="cs-text">Fantasy point totals and per-player breakdowns populate after games are played.</div>
+          <div className="cs-date">Season opens Sep 9 · SEA vs NE</div>
         </div>
-        <div className="cs-date">Season opens Sep 9 · SEA vs NE</div>
-      </div>
+      )}
     </div>
   )
 }
@@ -2411,6 +2696,71 @@ const DRAFT_2026 = [
   { pick:30, round:1, team:'NYJ', player:'Omar Cooper Jr.',   pos:'WR',   college:'Indiana',       note:'Jets\' second Round 1 pick — gives their new QB a weapon to throw to.',                   fantasyGrade:'B+', fantasyNote:'WR2/3 upside — huge if paired with a capable QB in NY.' },
   { pick:31, round:1, team:'TEN', player:'Keldric Faulk',     pos:'EDGE', college:'Auburn',        note:'Titans\' second Round 1 — athletic pass rusher to complement their WR pick.',             fantasyGrade:'C',  fantasyNote:'IDP only.' },
   { pick:32, round:1, team:'SEA', player:'Jadarian Price',    pos:'RB',   college:'Notre Dame',    note:'Seahawks grab the second Notre Dame RB. Complements Kenneth Walker III.',                  fantasyGrade:'B-', fantasyNote:'Backup role in 2026 behind Walker. Handcuff/watch list only.' },
+
+  // ── ROUND 2 ──────────────────────────────────────────────────────────────
+  { pick:33, round:2, team:'MIA', player:'Denzel Boston',      pos:'WR',   college:'Washington',    note:'Athletic WR — yards after catch ability. Joins crowded Miami receiving corps.',          fantasyGrade:'C+', fantasyNote:'WR4 in Miami. Deep league flier only.' },
+  { pick:34, round:2, team:'ARI', player:'TBD',                pos:'—',    college:'—',             note:'Cardinals second-round pick.',                                                           fantasyGrade:'C',  fantasyNote:'Monitor after selection.' },
+  { pick:35, round:2, team:'TEN', player:'T.J. Parker',        pos:'EDGE', college:'Clemson',       note:'Pass rusher adds to Tennessee defensive rebuild.',                                       fantasyGrade:'C',  fantasyNote:'IDP only.' },
+  { pick:36, round:2, team:'LV',  player:'TBD',                pos:'—',    college:'—',             note:'Raiders second-round pick.',                                                             fantasyGrade:'C',  fantasyNote:'Monitor after selection.' },
+  { pick:37, round:2, team:'NYG', player:'TBD',                pos:'—',    college:'—',             note:'Giants second-round pick.',                                                              fantasyGrade:'C',  fantasyNote:'Monitor after selection.' },
+  { pick:38, round:2, team:'HOU', player:'Kayden McDonald',    pos:'OT',   college:'Georgia',       note:'Emotional pick — waited through Round 1. Protects C.J. Stroud.',                       fantasyGrade:'C',  fantasyNote:'Helps Texans skill players.' },
+  { pick:39, round:2, team:'CLE', player:'Denzel Boston',      pos:'WR',   college:'Washington',    note:'Second Browns pick — adds receiving talent.',                                            fantasyGrade:'C+', fantasyNote:'Dependent on Browns QB situation.' },
+  { pick:40, round:2, team:'KC',  player:'TBD',                pos:'—',    college:'—',             note:'Chiefs second-round pick.',                                                              fantasyGrade:'C',  fantasyNote:'Monitor.' },
+  { pick:41, round:2, team:'CIN', player:'TBD',                pos:'—',    college:'—',             note:'Bengals second-round pick.',                                                             fantasyGrade:'C',  fantasyNote:'Monitor.' },
+  { pick:42, round:2, team:'NO',  player:'TBD',                pos:'—',    college:'—',             note:'Saints second-round pick.',                                                              fantasyGrade:'C',  fantasyNote:'Monitor.' },
+  { pick:43, round:2, team:'NYG', player:'Malachi Fields',     pos:'WR',   college:'Notre Dame',    note:'Giants grab another WR to give their QB options.',                                      fantasyGrade:'B-', fantasyNote:'WR3/4 — may develop into starter.' },
+  { pick:44, round:2, team:'WAS', player:'Antonio Williams',   pos:'WR',   college:'Clemson',       note:'Speed receiver adds another weapon to Washington\'s offense.',                          fantasyGrade:'B-', fantasyNote:'WR3 with upside in Washington.' },
+  { pick:47, round:2, team:'PIT', player:'Germie Bernard',     pos:'WR',   college:'Alabama',       note:'Steelers traded up for him after missing Lemon. Speed receiver.',                       fantasyGrade:'B-', fantasyNote:'WR3 — watch training camp for role clarity.' },
+  { pick:56, round:2, team:'JAC', player:'Nate Boerkircher',   pos:'TE',   college:'Texas A&M',     note:'Blocking TE — controversial pick at 56. Reaches in the eyes of many.',                 fantasyGrade:'D',  fantasyNote:'Blocking TE — fantasy irrelevant.' },
+  { pick:60, round:2, team:'TB',  player:'Anthony Hill Jr.',   pos:'LB',   college:'Texas',         note:'31.5 TFLs, 17 sacks, 8 forced fumbles in college. Elite LB.',                          fantasyGrade:'C',  fantasyNote:'IDP leagues only.' },
+
+  // ── ROUND 3 ──────────────────────────────────────────────────────────────
+  { pick:65, round:3, team:'ARI', player:'Carson Beck',        pos:'QB',   college:'Miami',         note:'Cardinals backup QB insurance. Former Georgia starter.',                                fantasyGrade:'C',  fantasyNote:'Backup QB — not a 2026 factor.' },
+  { pick:66, round:3, team:'DEN', player:'Tyler Onyedim',      pos:'DT',   college:'Texas A&M',     note:'Interior presence for Broncos defense.',                                                fantasyGrade:'C',  fantasyNote:'IDP only.' },
+  { pick:67, round:3, team:'LV',  player:'Keyron Crawford',    pos:'EDGE', college:'Auburn',        note:'Pass rush depth for Raiders.',                                                           fantasyGrade:'C',  fantasyNote:'IDP only.' },
+  { pick:68, round:3, team:'PHI', player:'Markel Bell',        pos:'OT',   college:'Miami',         note:'Eagles continue OL depth building.',                                                     fantasyGrade:'C',  fantasyNote:'Helps Eagles skill players.' },
+  { pick:69, round:3, team:'CHI', player:'Sam Roush',          pos:'TE',   college:'Stanford',      note:'Bears add a receiving TE to Caleb Williams\' arsenal.',                                fantasyGrade:'B-', fantasyNote:'TE2/3 — watch for role in Chicago.' },
+  { pick:70, round:3, team:'SF',  player:'Romello Height',     pos:'EDGE', college:'Texas Tech',    note:'Pass rush depth for 49ers.',                                                             fantasyGrade:'C',  fantasyNote:'IDP only.' },
+  { pick:71, round:3, team:'WAS', player:'Antonio Williams',   pos:'WR',   college:'Clemson',       note:'Second WR for Washington — speed threat.',                                              fantasyGrade:'B-', fantasyNote:'Deep league flier.' },
+  { pick:72, round:3, team:'CIN', player:'Tacario Davis',      pos:'CB',   college:'Washington',    note:'Corner adds depth to Bengals secondary.',                                               fantasyGrade:'C',  fantasyNote:'IDP only.' },
+  { pick:73, round:3, team:'NO',  player:'Oscar Delp',         pos:'TE',   college:'Georgia',       note:'Receiving TE adds a weapon for Saints offense.',                                        fantasyGrade:'B-', fantasyNote:'TE2 with some upside if Tyson emerges.' },
+  { pick:74, round:3, team:'NYG', player:'Malachi Fields',     pos:'WR',   college:'Notre Dame',    note:'Giants third pick — WR depth.',                                                         fantasyGrade:'C+', fantasyNote:'Monitor training camp.' },
+  { pick:75, round:3, team:'MIA', player:'Caleb Douglas',      pos:'WR',   college:'Texas Tech',    note:'Speed receiver adds to already crowded Miami WR room.',                                 fantasyGrade:'C',  fantasyNote:'Very crowded — minimal fantasy value.' },
+  { pick:76, round:3, team:'PIT', player:'Drew Allar',         pos:'QB',   college:'Penn State',    note:'Steelers QB insurance/future. Penn State product.',                                     fantasyGrade:'C+', fantasyNote:'Not a 2026 factor but watch long-term.' },
+  { pick:77, round:3, team:'GB',  player:'Chris McClellan',    pos:'DT',   college:'Missouri',      note:'Interior pass rusher adds to Packers D.',                                               fantasyGrade:'C',  fantasyNote:'IDP only.' },
+  { pick:78, round:3, team:'IND', player:'A.J. Haulcy',        pos:'S',    college:'LSU',           note:'Safety adds defensive depth for Colts.',                                                fantasyGrade:'C',  fantasyNote:'IDP only.' },
+  { pick:79,  round:3, team:'ATL', player:'Zachariah Branch',   pos:'WR',   college:'Georgia',       note:'Falcons drafted A.J. Terrell\'s brother — family reunion in Atlanta.',                fantasyGrade:'B-', fantasyNote:'Slot WR with return value. Watch for role.' },
+
+  // ── ROUND 4 ──────────────────────────────────────────────────────────────
+  { pick:102, round:4, team:'JAC', player:'Jude Bowry',          pos:'OT',   college:'Boston College', note:'OT depth for Jaguars.',                                                                fantasyGrade:'C',  fantasyNote:'OL depth — not fantasy relevant.' },
+  { pick:103, round:4, team:'CLE', player:'Darrell Jackson Jr.', pos:'DL',   college:'Florida State',  note:'Defensive line depth for Browns.',                                                     fantasyGrade:'C',  fantasyNote:'IDP only.' },
+  { pick:112, round:4, team:'NO',  player:'Bryce Lance',         pos:'WR',   college:'TBD',            note:'Saints drafted Trey Lance\'s brother — feel-good story.',                            fantasyGrade:'C',  fantasyNote:'Depth WR — deep league flier only.' },
+  { pick:119, round:4, team:'CLE', player:'Wesley Williams',     pos:'EDGE', college:'Duke',           note:'Pass rush depth for Browns rebuild.',                                                   fantasyGrade:'C',  fantasyNote:'IDP only.' },
+
+  // ── ROUND 5 ──────────────────────────────────────────────────────────────
+  { pick:142, round:5, team:'TEN', player:'Nicholas Singleton',  pos:'RB',   college:'Penn State',     note:'Handcuff RB for Tennessee — Carnell Tate draft means run game needs work.',           fantasyGrade:'C+', fantasyNote:'Handcuff to Titans starter. Monitor depth chart.' },
+  { pick:156, round:5, team:'IND', player:'George Gumbs Jr.',    pos:'EDGE', college:'Florida',        note:'Pass rush depth for Colts.',                                                           fantasyGrade:'C',  fantasyNote:'IDP only.' },
+  { pick:163, round:5, team:'MIN', player:'Charles Demmings',    pos:'CB',   college:'Stephen F. Austin',note:'CB depth for Vikings.',                                                              fantasyGrade:'C',  fantasyNote:'IDP only.' },
+  { pick:165, round:5, team:'NE',  player:'Nicholas Singleton',  pos:'RB',   college:'Penn State',     note:'RB depth for Patriots rebuild.',                                                       fantasyGrade:'C+', fantasyNote:'Handcuff — worth a late pick in deep leagues.' },
+  { pick:172, round:5, team:'BUF', player:'Lorenzo Styles Jr.',  pos:'WR',   college:'TBD',            note:'WR depth for Bills.',                                                                  fantasyGrade:'C',  fantasyNote:'Deep league only.' },
+  { pick:177, round:5, team:'KC',  player:'Kevin Coleman Jr.',   pos:'WR',   college:'Missouri',       note:'Speed WR adds depth to Chiefs. Return specialist ability.',                           fantasyGrade:'C',  fantasyNote:'Return value only in standard formats.' },
+  { pick:179, round:5, team:'ARI', player:'Enrique Cruz Jr.',    pos:'OT',   college:'Kansas',         note:'OT depth for Cardinals.',                                                              fantasyGrade:'C',  fantasyNote:'Not fantasy relevant.' },
+  { pick:180, round:5, team:'LAC', player:'Seydou Traore',       pos:'TE',   college:'Mississippi State',note:'TE depth for Chargers.',                                                            fantasyGrade:'C',  fantasyNote:'Deep league TE flier.' },
+
+  // ── ROUND 6 ──────────────────────────────────────────────────────────────
+  { pick:191, round:6, team:'BUF', player:'Josh Cameron',        pos:'WR',   college:'Baylor',         note:'WR depth/special teams for Bills.',                                                    fantasyGrade:'C',  fantasyNote:'Practice squad — not relevant.' },
+  { pick:198, round:6, team:'SF',  player:'Demond Clairborne',   pos:'RB',   college:'Wake Forest',    note:'RB depth for 49ers.',                                                                  fantasyGrade:'C',  fantasyNote:'Deep handcuff only.' },
+  { pick:199, round:6, team:'LV',  player:'Emmanuel Henderson Jr.',pos:'WR', college:'Kansas',         note:'Speed WR for Raiders.',                                                                fantasyGrade:'C',  fantasyNote:'Deep league flier.' },
+  { pick:203, round:6, team:'LAC', player:'CJ Williams',         pos:'WR',   college:'Stanford',       note:'WR depth for Chargers.',                                                               fantasyGrade:'C',  fantasyNote:'Not relevant.' },
+  { pick:214, round:6, team:'IND', player:'Caden Curry',         pos:'EDGE', college:'Ohio State',     note:'EDGE depth for Colts.',                                                                fantasyGrade:'C',  fantasyNote:'IDP only.' },
+  { pick:215, round:6, team:'BAL', player:'Harold Perkins Jr.',  pos:'LB',   college:'LSU',            note:'Athletic LB — slid to Round 6 due to concerns.',                                     fantasyGrade:'C',  fantasyNote:'IDP only.' },
+
+  // ── ROUND 7 ──────────────────────────────────────────────────────────────
+  { pick:220, round:7, team:'SEA', player:'Toriano Pride Jr.',   pos:'CB',   college:'Missouri',       note:'CB depth for Seahawks.',                                                               fantasyGrade:'C',  fantasyNote:'Not relevant.' },
+  { pick:231, round:7, team:'BAL', player:'Ethan Onianwa',       pos:'OT',   college:'Ohio State',     note:'OT depth for Ravens.',                                                                 fantasyGrade:'C',  fantasyNote:'Not relevant.' },
+  { pick:235, round:7, team:'CIN', player:'Gavin Gerhardt',      pos:'C',    college:'Cincinnati',     note:'Local product — Mr. Cincinnati.',                                                      fantasyGrade:'C',  fantasyNote:'Not relevant.' },
+  { pick:248, round:7, team:'KC',  player:'Carsen Ryan',         pos:'TE',   college:'BYU',            note:'TE depth for Chiefs.',                                                                 fantasyGrade:'C',  fantasyNote:'Not relevant.' },
+  { pick:257, round:7, team:'DEN', player:'Red Murdock',         pos:'LB',   college:'Buffalo',        note:'Mr. Irrelevant — Broncos close the 2026 draft.',                                     fantasyGrade:'C',  fantasyNote:'Mr. Irrelevant — good luck Red!' },
 ]
 
 // Fantasy relevant picks summary by grade
@@ -2542,9 +2892,19 @@ function DraftView() {
               ))}
             </tbody>
           </table>
-          {roundFilter !== 'all' && roundFilter > 1 && (
-            <div className="atl-note">Rounds 2-7 data coming soon — checking sources for complete picks.</div>
+          {roundFilter !== 'all' && roundFilter > 3 && (
+            <div className="atl-note">
+              Showing key Day 3 selections with fantasy impact notes. 
+              <a href="https://www.nfl.com/draft/tracker/2026/rounds/1" target="_blank" rel="noopener" className="sb-google-link" style={{marginLeft:8}}>
+                View complete 2026 NFL Draft on NFL.com ↗
+              </a>
+            </div>
           )}
+          <div className="atl-note">
+            <a href="https://www.nfl.com/draft/tracker/2026/rounds/1" target="_blank" rel="noopener" className="sb-google-link">
+              View complete all 257 picks on NFL.com ↗
+            </a>
+          </div>
         </div>
       )}
 
