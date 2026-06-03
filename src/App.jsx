@@ -2005,33 +2005,59 @@ const ESPN_TEAM_IDS = {
 // ── NEWS VIEW ─────────────────────────────────────────────────────────────────
 // ── MULTI-SOURCE NEWS HOOK ────────────────────────────────────────────────────
 const NFL_NEWS_SOURCES = [
-  { id:'espn',    label:'ESPN',            url:'/api/espn/news?limit=40',   type:'espn'   },
-  { id:'pft',     label:'ProFootballTalk', url:'/api/rss/pft',              type:'rss'    },
-  { id:'cbs',     label:'CBS Sports',      url:'/api/rss/cbs',              type:'rss'    },
-  { id:'reddit',  label:'r/nfl',           url:'nfl',                       type:'reddit' },
+  { id:'espn',    label:'ESPN',            url:'/api/espn/news?limit=40',          type:'espn'   },
+  { id:'google',  label:'Google News',     url:'/api/gnews?type=topic&q=nfl',      type:'gnews'  },
+  { id:'cbs',     label:'CBS Sports',      url:'/api/rss?source=cbs',              type:'rss'    },
+  { id:'pft',     label:'ProFootballTalk', url:'/api/rss?source=pft',              type:'rss'    },
+  { id:'si',      label:'Sports Illustrated', url:'/api/rss?source=si',            type:'rss'    },
+  { id:'usa',     label:'USA Today',       url:'/api/rss?source=usa',              type:'rss'    },
 ]
 
 const FANTASY_NEWS_SOURCES = [
-  { id:'espn',    label:'ESPN Fantasy',    url:'/api/espn/news?limit=50',   type:'espn-fantasy' },
-  { id:'reddit',  label:'r/fantasyfootball', url:'fantasyfootball',         type:'reddit' },
-  { id:'pft',     label:'ProFootballTalk', url:'/api/rss/pft',              type:'rss'    },
-  { id:'cbs',     label:'CBS Sports',      url:'/api/rss/cbs',              type:'rss'    },
+  { id:'espn',    label:'ESPN Fantasy',    url:'/api/espn/news?limit=50',          type:'espn-fantasy' },
+  { id:'google',  label:'Google News',     url:'/api/gnews?q=NFL+fantasy+football+waiver+wire+start+sit', type:'gnews' },
+  { id:'cbs',     label:'CBS Fantasy',     url:'/api/rss?source=cbs_fant',         type:'rss'    },
+  { id:'roto',    label:'Rotoworld',       url:'/api/rss?source=rotoworld',        type:'rss'    },
+  { id:'pft',     label:'ProFootballTalk', url:'/api/rss?source=pft',              type:'rss'    },
 ]
 
 function parseRSS(xml) {
   try {
     const parser = new DOMParser()
     const doc = parser.parseFromString(xml, 'text/xml')
-    return Array.from(doc.querySelectorAll('item')).map(item => ({
-      headline: item.querySelector('title')?.textContent?.trim() || '',
-      desc:     item.querySelector('description')?.textContent?.replace(/<[^>]+>/g,'').trim() || '',
-      link:     item.querySelector('link')?.textContent?.trim() || '#',
-      image:    item.querySelector('enclosure')?.getAttribute('url') ||
-                item.querySelector('media\\:content, content')?.getAttribute('url') || null,
-      time:     item.querySelector('pubDate') ? new Date(item.querySelector('pubDate').textContent) : null,
-      byline:   item.querySelector('source')?.textContent || item.querySelector('author')?.textContent || '',
-      team:     '',
-    }))
+    if (doc.querySelector('parsererror')) throw new Error('XML parse error')
+    return Array.from(doc.querySelectorAll('item')).map(item => {
+      // Google News wraps source in <source url="...">Publisher Name</source>
+      const sourceEl = item.querySelector('source')
+      const byline = sourceEl?.textContent?.trim() ||
+                     item.querySelector('author')?.textContent?.trim() || ''
+
+      // Link — Google News uses <link> as text node after a comment
+      const linkEl = item.querySelector('link')
+      let link = linkEl?.textContent?.trim() ||
+                 linkEl?.getAttribute('href') ||
+                 item.querySelector('guid')?.textContent?.trim() || '#'
+
+      // Images — try multiple locations
+      const image = item.querySelector('enclosure[type^="image"]')?.getAttribute('url') ||
+                    item.querySelector('media\\:content')?.getAttribute('url') ||
+                    item.querySelector('media\\:thumbnail')?.getAttribute('url') ||
+                    item.querySelector('[medium="image"]')?.getAttribute('url') || null
+
+      const title = item.querySelector('title')?.textContent?.trim() || ''
+      const desc  = item.querySelector('description')?.textContent?.replace(/<[^>]+>/g,'').trim() || ''
+      const pub   = item.querySelector('pubDate')?.textContent?.trim() || ''
+
+      return {
+        headline: title,
+        desc:     desc.slice(0, 300),
+        link,
+        image,
+        time:     pub ? new Date(pub) : null,
+        byline,
+        team:     '',
+      }
+    }).filter(a => a.headline)
   } catch(e) { return [] }
 }
 
@@ -2061,7 +2087,7 @@ function useMultiSourceNews(sourceId, sources, fantasyFilter = false) {
             team:     a.categories?.find(c => c.type === 'team')?.description || '',
           }))
           if (fantasyFilter) {
-            const kws = ['fantasy','injury','questionable','doubtful',' out ','snap count','target','waiver','start','sit','projection','handcuff','touchdown','red zone','practice','limited']
+            const kws = ['fantasy','injury','questionable','doubtful',' out ','snap count','target','waiver','start','sit','projection','handcuff','touchdown','red zone','practice','limited','ir ','placed on']
             items = items.filter(a => kws.some(k => (a.headline+a.desc).toLowerCase().includes(k)))
           }
           setArticles(items)
@@ -2069,54 +2095,25 @@ function useMultiSourceNews(sourceId, sources, fantasyFilter = false) {
         })
         .catch(() => { setError('ESPN unavailable'); setLoading(false) })
 
-    } else if (src.type === 'reddit') {
-      const sub = src.url
-      const SKIP = ['game thread','post-game','weekly thread','daily discussion','pre-game','megathread','live updates','power rankings','official']
-      Promise.all([
-        fetch(`https://www.reddit.com/r/${sub}/hot.json?limit=25&raw_json=1`, { headers:{'User-Agent':'NFLBoxScore/1.0'} })
-          .then(r => r.ok ? r.json() : null).catch(() => null),
-        fetch(`https://www.reddit.com/r/${sub}/new.json?limit=15&raw_json=1`, { headers:{'User-Agent':'NFLBoxScore/1.0'} })
-          .then(r => r.ok ? r.json() : null).catch(() => null),
-      ]).then(([hot, newPosts]) => {
-        const seen = new Set()
-        const posts = [...(hot?.data?.children || []), ...(newPosts?.data?.children || [])]
-        const items = posts.map(p => p.data)
-          .filter(p => {
-            if (!p || p.stickied || p.over_18 || p.score < 5) return false
-            const lower = p.title.toLowerCase()
-            if (SKIP.some(s => lower.includes(s))) return false
-            if (seen.has(p.id)) return false
-            seen.add(p.id)
-            return true
-          })
-          .map(p => ({
-            headline: p.title,
-            desc:     p.selftext ? p.selftext.slice(0,200) : `${(p.ups||0).toLocaleString()} upvotes`,
-            link:     `https://reddit.com${p.permalink}`,
-            image:    p.thumbnail?.startsWith('http') && !p.thumbnail.includes('reddit') ? p.thumbnail : null,
-            time:     new Date(p.created_utc * 1000),
-            byline:   `u/${p.author} · r/${sub}`,
-            team:     '',
-          }))
-        if (items.length === 0) setError(`r/${sub} returned no posts — may be rate limited`)
-        setArticles(items)
-        setLoading(false)
-      }).catch(() => { setError(`r/${sub} unavailable`); setLoading(false) })
-
-    } else {
-      fetch(src.url, { headers:{'Accept':'application/rss+xml, application/xml, text/xml, */*'} })
+    } else if (src.type === 'gnews' || src.type === 'rss') {
+      // Both gnews and rss return XML — same parser
+      fetch(src.url)
         .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text() })
         .then(xml => {
-          if (!xml || xml.length < 100) throw new Error('Empty')
+          if (!xml || xml.trim().startsWith('{')) throw new Error('Feed blocked')
           const parsed = parseRSS(xml)
-          if (!parsed.length) throw new Error('No items')
+          if (!parsed.length) throw new Error('No articles returned')
           setArticles(parsed)
           setLoading(false)
         })
-        .catch(() => {
-          setError(`${src.label} unavailable — try ESPN or r/nfl`)
+        .catch(e => {
+          setError(`${src.label} unavailable`)
           setLoading(false)
         })
+
+    } else {
+      setError('Unknown source type')
+      setLoading(false)
     }
   }, [sourceId])
 
