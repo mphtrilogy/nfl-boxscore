@@ -687,7 +687,7 @@ body::before {
 .font-btn.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
 
 /* Apply font variables throughout */
-.logo{font-family:var(--font-display) !important}
+.logo{font-family:var(--font-logo, 'UnifrakturMaguntia', serif)}
 .news-headline{font-family:var(--font-display) !important}
 .hof-player{font-family:var(--font-display) !important}
 .sb-winner,.sb-loser,.atl-name,.dt-player,.dtc-player{font-family:var(--font-body) !important}
@@ -727,3 +727,35 @@ body::before {
 .ss-rec-badge.sit{background:#fef2f2;color:var(--accent);border:1px solid var(--accent)}
 .ss-placeholder{display:flex;align-items:center;justify-content:center;height:200px;border:2px dashed var(--rule);border-radius:var(--r);font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-lt)}
 .font-switcher-label{font-family:var(--font-mono);font-size:7px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-lt);padding:0 2px}
+
+/* ── FANTASY NEWS CONTROLS ────────────────────────────────────────────────── */
+.fn-controls{display:flex;flex-direction:column;gap:0;border-bottom:1px solid var(--rule);background:var(--paper-mid)}
+.fn-source-btns{display:flex;align-items:center;gap:6px;padding:8px 16px;border-bottom:1px solid rgba(42,31,14,.06);flex-wrap:wrap}
+.fn-source-btns:last-child{border-bottom:none}
+
+/* ── WAIVER WIRE ──────────────────────────────────────────────────────────── */
+.ww-intro{padding:10px 16px;border-bottom:1px solid var(--rule);background:var(--paper-mid)}
+.ww-controls{border-bottom:1px solid var(--rule);background:var(--paper-mid)}
+.ww-card{display:flex;align-items:flex-start;gap:12px;padding:12px 16px;border-bottom:1px solid rgba(42,31,14,.06);text-decoration:none;color:inherit;transition:background .12s}
+.ww-card:hover{background:var(--paper-dark)}
+.ww-priority{font-family:var(--font-mono);font-size:7px;font-weight:700;letter-spacing:.14em;color:#fff;padding:3px 6px;border-radius:2px;flex-shrink:0;margin-top:2px}
+.ww-info{flex:1;min-width:0}
+.ww-player{font-family:var(--font-display);font-size:16px;font-weight:700;color:var(--ink);margin-bottom:4px}
+.ww-meta{display:flex;gap:8px;margin-bottom:6px;align-items:center}
+.ww-team{font-family:var(--font-mono);font-size:8px;font-weight:700;color:var(--accent);letter-spacing:.08em}
+.ww-pos{font-family:var(--font-mono);font-size:8px;color:var(--muted-lt);background:var(--paper-dark);padding:1px 5px;border-radius:2px}
+.ww-owned{font-family:var(--font-mono);font-size:8px;color:var(--muted-lt)}
+.ww-reason{font-family:var(--font-body);font-size:12px;color:var(--muted);line-height:1.5}
+.ww-arrow{font-size:16px;color:var(--muted-lt);flex-shrink:0;align-self:center}
+
+/* ── MATCHUP RATER ────────────────────────────────────────────────────────── */
+.matchup-intro{padding:10px 16px;border-bottom:1px solid var(--rule);background:var(--paper-mid)}
+.matchup-table{width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:10px}
+.matchup-table th{font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-lt);padding:6px 14px;text-align:left;border-bottom:2px solid var(--rule-hvy);background:var(--paper-dark);font-weight:500}
+.matchup-table td{padding:10px 14px;border-bottom:1px solid rgba(42,31,14,.05);vertical-align:middle}
+.matchup-table tr:hover td{background:var(--paper-dark)}
+.matchup-table tr:last-child td{border-bottom:none}
+.mt-game{font-family:var(--font-display);font-size:13px;font-weight:700;color:var(--ink)}
+.mt-time{color:var(--muted-lt);font-size:9px;white-space:nowrap}
+.mt-rating{font-family:var(--font-mono);font-size:11px;font-weight:700;display:block}
+.mt-sub{font-family:var(--font-mono);font-size:8px;color:var(--muted-lt);display:block;margin-top:2px}
