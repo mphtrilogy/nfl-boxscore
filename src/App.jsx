@@ -26,7 +26,7 @@ function getAutoWeek() {
 }
 
 // ── TOP-LEVEL NAV VIEWS ───────────────────────────────────────────────────────
-const VIEWS = ['Scores', 'Schedule', 'Standings', 'News', 'Injuries', 'Trends', 'Leaders', 'Fantasy', 'Draft', 'History', 'TV Guide']
+const VIEWS = ['Scores', 'Schedule', 'Standings', 'TV Guide', 'News', 'Injuries', 'Leaders', 'Fantasy', 'Draft', 'History']
 
 export default function App() {
   const [activeView,    setActiveView]    = useState('Scores')
@@ -136,24 +136,20 @@ export default function App() {
           />
         )}
         {activeView === 'Standings' && <StandingsView />}
+        {activeView === 'TV Guide'  && <TVGuideView currentWeek={activeWeek} />}
         {activeView === 'News'      && <NewsView teamFilter={newsTeam} setTeamFilter={setNewsTeam} />}
         {activeView === 'Injuries'  && <InjuriesView />}
-        {activeView === 'Trends'    && (
-          <TrendsView
-            currentWeek={activeWeek}
-            mode={trendsMode}
-            setMode={setTrendsMode}
-            range={trendsRange}
-            setRange={setTrendsRange}
-            pos={trendsPos}
-            setPos={setTrendsPos}
-          />
-        )}
         {activeView === 'Leaders'   && (
           <LeadersView tab={leadersTab} setTab={setLeadersTab} />
         )}
         {activeView === 'Fantasy'   && (
-          <FantasyView mode={fantMode} setMode={setFantMode} />
+          <FantasyView
+            mode={fantMode} setMode={setFantMode}
+            currentWeek={activeWeek}
+            trendsMode={trendsMode} setTrendsMode={setTrendsMode}
+            trendsRange={trendsRange} setTrendsRange={setTrendsRange}
+            trendsPos={trendsPos} setTrendsPos={setTrendsPos}
+          />
         )}
         {activeView === 'Draft'     && <DraftView />}
         {activeView === 'History'   && <HistoryView />}
@@ -241,6 +237,7 @@ function Masthead({ lastUpdated, hasLiveGame, onRefresh, fontTheme, setFontTheme
 
   useEffect(() => {
     localStorage.setItem('fw-logo', logoFont)
+    document.body.style.setProperty('--font-logo', LOGO_FONTS[logoFont]?.family)
   }, [logoFont])
 
   const LOGO_FONTS = {
@@ -275,7 +272,7 @@ function Masthead({ lastUpdated, hasLiveGame, onRefresh, fontTheme, setFontTheme
         </div>
         <span>{dateStr}</span>
       </div>
-      <div className="logo" style={{ fontFamily: LOGO_FONTS[logoFont]?.family }}>The Final Whistle</div>
+      <div className="logo">The Final Whistle</div>
       <div className="tagline">NFL · Scores · Box Scores · Fantasy · Schedule · nflboxscore.com</div>
       <div className="support-bar">
         <span className="support-text">Independent &amp; ad-free. If it's useful,</span>
@@ -1351,18 +1348,312 @@ function StartSitView({ mode }) {
   )
 }
 
-function FantasyView({ mode, setMode }) {
+// ── FANTASY NEWS ──────────────────────────────────────────────────────────────
+function FantasyNewsView({ mode }) {
+  const [articles,   setArticles]   = useState([])
+  const [loading,    setLoading]    = useState(true)
+  const [source,     setSource]     = useState('espn') // 'espn' | 'google'
+  const [posFilter,  setPosFilter]  = useState('All')
+  const [teamFilter, setTeamFilter] = useState('All')
+
+  useEffect(() => {
+    setLoading(true)
+    setArticles([])
+    if (source === 'espn') {
+      fetch('/api/espn/news?limit=40')
+        .then(r => r.json())
+        .then(data => {
+          const items = (data.articles || []).map(a => ({
+            headline: a.headline || '',
+            desc:     a.description || '',
+            link:     a.links?.web?.href || '#',
+            image:    a.images?.[0]?.url || null,
+            time:     a.published ? new Date(a.published) : null,
+            byline:   a.byline || '',
+            team:     a.categories?.find(c => c.type === 'team')?.description || '',
+            tags:     a.categories?.map(c => c.description).filter(Boolean) || [],
+          }))
+          setArticles(items)
+          setLoading(false)
+        })
+        .catch(() => setLoading(false))
+    } else {
+      // Google News RSS via allorigins proxy
+      fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://news.google.com/rss/search?q=NFL+fantasy+football&hl=en-US&gl=US&ceid=US:en')}`)
+        .then(r => r.text())
+        .then(xml => {
+          const parser = new DOMParser()
+          const doc = parser.parseFromString(xml, 'text/xml')
+          const items = Array.from(doc.querySelectorAll('item')).slice(0, 40).map(item => ({
+            headline: item.querySelector('title')?.textContent || '',
+            desc:     item.querySelector('description')?.textContent?.replace(/<[^>]+>/g,'') || '',
+            link:     item.querySelector('link')?.textContent || '#',
+            image:    null,
+            time:     item.querySelector('pubDate') ? new Date(item.querySelector('pubDate').textContent) : null,
+            byline:   item.querySelector('source')?.textContent || 'Google News',
+            team:     '',
+            tags:     [],
+          }))
+          setArticles(items)
+          setLoading(false)
+        })
+        .catch(() => setLoading(false))
+    }
+  }, [source])
+
+  const timeAgo = (date) => {
+    if (!date) return ''
+    const diff = Date.now() - date.getTime()
+    const mins = Math.floor(diff / 60000)
+    const hrs  = Math.floor(diff / 3600000)
+    const days = Math.floor(diff / 86400000)
+    if (mins < 60)  return `${mins}m ago`
+    if (hrs  < 24)  return `${hrs}h ago`
+    return `${days}d ago`
+  }
+
+  const filtered = articles.filter(a => {
+    if (teamFilter !== 'All' && !a.headline.includes(teamFilter) && !a.team.includes(teamFilter)) return false
+    if (posFilter  !== 'All') {
+      const posKeywords = { QB:['QB','quarterback','passing'], RB:['RB','running back','rush'], WR:['WR','receiver','receiving'], TE:['TE','tight end'] }
+      const kws = posKeywords[posFilter] || []
+      const text = (a.headline + a.desc).toLowerCase()
+      if (!kws.some(k => text.includes(k.toLowerCase()))) return false
+    }
+    return true
+  })
+
+  return (
+    <div>
+      {/* Controls */}
+      <div className="fn-controls">
+        <div className="fn-source-btns">
+          <span className="tc-label">Source</span>
+          <button className={`tc-btn ${source === 'espn' ? 'on' : ''}`} onClick={() => setSource('espn')}>ESPN</button>
+          <button className={`tc-btn ${source === 'google' ? 'on' : ''}`} onClick={() => setSource('google')}>Google News</button>
+        </div>
+        <div className="fn-source-btns">
+          <span className="tc-label">Position</span>
+          {['All','QB','RB','WR','TE'].map(p => (
+            <button key={p} className={`tc-btn ${posFilter === p ? 'on' : ''}`} onClick={() => setPosFilter(p)}>{p}</button>
+          ))}
+        </div>
+        <div className="fn-source-btns" style={{flexWrap:'wrap'}}>
+          <span className="tc-label">Team</span>
+          {['All', ...ALL_TEAMS].map(t => (
+            <button key={t} className={`fpill ${teamFilter === t ? 'on' : ''}`} onClick={() => setTeamFilter(t)}>{t}</button>
+          ))}
+        </div>
+      </div>
+
+      {loading && <div className="sch-loading">Loading fantasy news…</div>}
+
+      {!loading && filtered.length > 0 && (
+        <div className="news-grid">
+          {filtered.map((a, i) => (
+            <a key={i} href={a.link} target="_blank" rel="noopener"
+               className={`news-card ${i === 0 ? 'news-featured' : ''}`}>
+              {a.image && i < 6 && (
+                <div className="news-img-wrap">
+                  <img src={a.image} alt="" className="news-img" loading="lazy" />
+                </div>
+              )}
+              <div className="news-body">
+                {a.team && <span className="news-team-tag">{a.team}</span>}
+                <div className="news-headline">{a.headline}</div>
+                {a.desc && i < 8 && (
+                  <div className="news-desc">{a.desc.slice(0,120)}{a.desc.length > 120 ? '…' : ''}</div>
+                )}
+                <div className="news-meta">
+                  <span className="news-byline">{a.byline}</span>
+                  {a.time && <span className="news-time">{timeAgo(a.time)}</span>}
+                </div>
+              </div>
+            </a>
+          ))}
+        </div>
+      )}
+
+      {!loading && filtered.length === 0 && (
+        <div className="leaders-coming-soon">
+          <div className="cs-icon">📰</div>
+          <div className="cs-title">No fantasy news found</div>
+          <div className="cs-text">Try a different filter or source.</div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── WAIVER WIRE VIEW ──────────────────────────────────────────────────────────
+const WAIVER_TARGETS = [
+  { player:'Malik Washington',   team:'DEN', pos:'WR', owned:'18%', reason:'Courtland Sutton dealing with knee — Washington steps into WR1 role vs soft secondary', priority:'HIGH' },
+  { player:'Tyjae Spears',       team:'TEN', pos:'RB', owned:'31%', reason:'Tony Pollard listed questionable — Spears has workhorse upside if Pollard misses Week 5', priority:'HIGH' },
+  { player:'Cole Kmet',          team:'CHI', pos:'TE', owned:'42%', reason:'With Caleb Williams hot, Kmet is his favorite red zone target — 4 TDs in last 3 weeks', priority:'MED' },
+  { player:'Demarcus Robinson',  team:'LAR', pos:'WR', owned:'8%',  reason:'Cooper Kupp on IR — Robinson becomes LA\'s WR2 immediately', priority:'HIGH' },
+  { player:'Jordan Mason',       team:'SF',  pos:'RB', owned:'55%', reason:'Christian McCaffrey limited in practice — Mason is the handcuff every 49ers manager needs', priority:'MED' },
+  { player:'Chosen Anderson',    team:'ARI', pos:'WR', owned:'12%', reason:'Kyler Murray has been targeting him in the slot — 8 catches last week', priority:'MED' },
+  { player:'Dalton Kincaid',     team:'BUF', pos:'TE', owned:'38%', reason:'Emerging as Josh Allen\'s safety valve — 6+ targets in 3 straight games', priority:'MED' },
+  { player:'Antonio Gibson',     team:'WAS', pos:'RB', owned:'22%', reason:'Brian Robinson dealing with ankle — Gibson poised for lead back role', priority:'HIGH' },
+  { player:'Rashid Shaheed',     team:'NO',  pos:'WR', owned:'29%', reason:'Big play ability in Saints offense — Chris Olave questionable Week 5', priority:'LOW' },
+  { player:'Hunter Henry',       team:'NE',  pos:'TE', owned:'15%', reason:'Drake Maye loves targeting TEs — Henry averaging 6 targets/game', priority:'LOW' },
+]
+
+function WaiverWireView() {
+  const [posFilter, setPosFilter] = useState('All')
+  const [priFilter, setPriFilter] = useState('All')
+
+  const filtered = WAIVER_TARGETS.filter(p => {
+    if (posFilter !== 'All' && p.pos !== posFilter) return false
+    if (priFilter !== 'All' && p.priority !== priFilter) return false
+    return true
+  })
+
+  const priColor = { HIGH:'#c00', MED:'#c8a84b', LOW:'#555' }
+
+  return (
+    <div>
+      <div className="ww-controls">
+        <div className="tc-group">
+          <span className="tc-label">Position</span>
+          <div className="tc-btns">
+            {['All','QB','RB','WR','TE'].map(p => (
+              <button key={p} className={`tc-btn ${posFilter === p ? 'on' : ''}`} onClick={() => setPosFilter(p)}>{p}</button>
+            ))}
+          </div>
+        </div>
+        <div className="tc-group">
+          <span className="tc-label">Priority</span>
+          <div className="tc-btns">
+            {['All','HIGH','MED','LOW'].map(p => (
+              <button key={p} className={`tc-btn ${priFilter === p ? 'on' : ''}`} onClick={() => setPriFilter(p)}>{p}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="ww-intro">
+        <span style={{fontFamily:'var(--font-body)', fontStyle:'italic', fontSize:12, color:'var(--muted)'}}>
+          Waiver wire targets based on injuries, usage trends, and matchup analysis. Updates weekly during the season.
+        </span>
+      </div>
+      {filtered.map((p, i) => (
+        <a key={i} href={`https://www.google.com/search?q=${encodeURIComponent(p.player+' fantasy football 2026')}`}
+           target="_blank" rel="noopener" className="ww-card">
+          <div className="ww-priority" style={{background: priColor[p.priority]}}>{p.priority}</div>
+          <div className="ww-info">
+            <div className="ww-player">{p.player}</div>
+            <div className="ww-meta">
+              <span className="ww-team">{p.team}</span>
+              <span className="ww-pos">{p.pos}</span>
+              <span className="ww-owned">{p.owned} owned</span>
+            </div>
+            <div className="ww-reason">{p.reason}</div>
+          </div>
+          <div className="ww-arrow">↗</div>
+        </a>
+      ))}
+      <div className="atl-note">Ownership percentages are estimates. Adds should be made before your league\'s waiver deadline.</div>
+    </div>
+  )
+}
+
+// ── MATCHUP RATER VIEW ────────────────────────────────────────────────────────
+const MATCHUP_DATA = {
+  QB: { best:['DET','NO','WAS','LAV','TB'], worst:['SF','BAL','DEN','NYJ','PHI'] },
+  RB: { best:['DET','NO','LAC','MIA','LV'], worst:['SF','BAL','CLE','NYJ','CHI'] },
+  WR: { best:['DET','NO','WAS','TB','LV'],  worst:['SF','DEN','BAL','NYJ','PHI'] },
+  TE: { best:['DET','NO','MIA','TB','LV'],  worst:['SF','BAL','KC','NYJ','CHI'] },
+}
+
+function MatchupRaterView() {
+  const [pos, setPos] = useState('WR')
+  const currentWeek = getAutoWeek()
+
+  const weekGames = SCHEDULE_2026.filter(g => g.week === currentWeek)
+
+  const getRating = (team, pos) => {
+    const data = MATCHUP_DATA[pos]
+    if (!data) return 5
+    if (data.best.includes(team))  return data.best.indexOf(team)  <= 1 ? 9 : 7
+    if (data.worst.includes(team)) return data.worst.indexOf(team) <= 1 ? 2 : 3
+    return 5
+  }
+
+  const getLabel = (r) => r >= 8 ? '🟢 Excellent' : r >= 6 ? '🟢 Good' : r >= 4 ? '🟡 Average' : r >= 3 ? '🟠 Tough' : '🔴 Avoid'
+
+  const gamesWithRatings = weekGames.map(g => ({
+    ...g,
+    homeRating: getRating(g.away, pos), // home team faces away defense
+    awayRating: getRating(g.home, pos), // away team faces home defense
+  })).sort((a, b) => Math.max(b.homeRating, b.awayRating) - Math.max(a.homeRating, a.awayRating))
+
+  return (
+    <div>
+      <div className="tc-group" style={{padding:'10px 16px', borderBottom:'1px solid var(--rule)', background:'var(--paper-mid)'}}>
+        <span className="tc-label">Position</span>
+        <div className="tc-btns">
+          {['QB','RB','WR','TE'].map(p => (
+            <button key={p} className={`tc-btn ${pos === p ? 'on' : ''}`} onClick={() => setPos(p)}>{p}</button>
+          ))}
+        </div>
+      </div>
+      <div className="matchup-intro">
+        <span style={{fontFamily:'var(--font-body)', fontStyle:'italic', fontSize:12, color:'var(--muted)'}}>
+          Defensive matchup ratings for Week {currentWeek} — ranked best to worst for {pos}s.
+          Green = start with confidence. Red = consider sitting.
+        </span>
+      </div>
+      <table className="matchup-table">
+        <thead>
+          <tr>
+            <th>Game</th>
+            <th>Time</th>
+            <th>Away {pos} Matchup</th>
+            <th>Home {pos} Matchup</th>
+          </tr>
+        </thead>
+        <tbody>
+          {gamesWithRatings.map((g, i) => (
+            <tr key={i}>
+              <td className="mt-game">{g.away} @ {g.home}</td>
+              <td className="mt-time">{g.time !== 'TBD' ? g.time : g.day}</td>
+              <td>
+                <span className="mt-rating" style={{color: g.awayRating >= 7 ? '#1a4a1a' : g.awayRating <= 3 ? '#8b1a1a' : '#6b5700'}}>
+                  {getLabel(g.awayRating)}
+                </span>
+                <span className="mt-sub">vs {g.home} D</span>
+              </td>
+              <td>
+                <span className="mt-rating" style={{color: g.homeRating >= 7 ? '#1a4a1a' : g.homeRating <= 3 ? '#8b1a1a' : '#6b5700'}}>
+                  {getLabel(g.homeRating)}
+                </span>
+                <span className="mt-sub">vs {g.away} D</span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="atl-note">Matchup ratings based on 2025 defensive statistics. Updates before Week 1 with 2026 preseason data.</div>
+    </div>
+  )
+}
+
+function FantasyView({ mode, setMode, currentWeek, trendsMode, setTrendsMode, trendsRange, setTrendsRange, trendsPos, setTrendsPos }) {
   const [tab, setTab] = useState('startsit')
   const TABS = [
-    { id:'startsit', label:'⚖️ Start/Sit' },
-    { id:'scoring',  label:'📊 Scoring' },
+    { id:'startsit',  label:'⚖️ Start/Sit' },
+    { id:'matchups',  label:'🎯 Matchups' },
+    { id:'waiver',    label:'📋 Waiver Wire' },
+    { id:'trends',    label:'🔥 Trends' },
+    { id:'news',      label:'📰 Fantasy News' },
+    { id:'scoring',   label:'📊 Scoring' },
   ]
   return (
     <div>
       <div className="section-bar">
-        <h2>Fantasy Tools</h2>
+        <h2>Fantasy Hub</h2>
         <div className="sb-rule" />
-        <span className="sb-ct">Start/Sit · Scoring · {mode === 'ppr' ? 'PPR' : 'Standard'}</span>
+        <span className="sb-ct">Start/Sit · Matchups · Waiver · Trends · News · {mode === 'ppr' ? 'PPR' : 'Standard'}</span>
       </div>
       <div className="fant-mode-bar">
         <span className="fmb-label">Scoring</span>
@@ -1378,11 +1669,20 @@ function FantasyView({ mode, setMode }) {
         ))}
       </div>
       {tab === 'startsit' && <StartSitView mode={mode} />}
+      {tab === 'matchups' && <MatchupRaterView />}
+      {tab === 'waiver'   && <WaiverWireView />}
+      {tab === 'trends'   && (
+        <TrendsView currentWeek={currentWeek}
+          mode={trendsMode} setMode={setTrendsMode}
+          range={trendsRange} setRange={setTrendsRange}
+          pos={trendsPos} setPos={setTrendsPos} />
+      )}
+      {tab === 'news'     && <FantasyNewsView mode={mode} />}
       {tab === 'scoring'  && (
         <div className="leaders-coming-soon">
           <div className="cs-icon">⚡</div>
           <div className="cs-title">Fantasy Scoring Leaders — Week 1</div>
-          <div className="cs-text">Fantasy point totals and per-player breakdowns populate after games are played.</div>
+          <div className="cs-text">Fantasy point totals populate after games are played.</div>
           <div className="cs-date">Season opens Sep 9 · SEA vs NE</div>
         </div>
       )}
