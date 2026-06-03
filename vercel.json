@@ -21,24 +21,37 @@
       "destination": "https://www.cbssports.com/rss/headlines/nfl/"
     },
     {
-      "source": "/api/rss/nfl",
-      "destination": "https://www.nfl.com/rss/rsslanding?searchString=news"
+      "source": "/api/rss/si",
+      "destination": "https://www.si.com/rss/si_nfl.rss"
     },
     {
-      "source": "/api/rss/yahoo",
-      "destination": "https://sports.yahoo.com/nfl/rss.xml"
+      "source": "/api/rss/ringer",
+      "destination": "https://www.theringer.com/rss/nfl.xml"
     },
     {
       "source": "/api/rss/rotoworld",
-      "destination": "https://www.nbcsports.com/fantasy/football/rss"
+      "destination": "https://www.rotowire.com/football/rss-news.php"
     },
     {
-      "source": "/api/rss/fantasy-espn",
-      "destination": "https://www.espn.com/espn/rss/fantasy/football/news"
+      "source": "/api/rss/fantasypros",
+      "destination": "https://www.fantasypros.com/nfl/news/feed.xml"
     },
     {
-      "source": "/api/rss/fantasy-yahoo",
-      "destination": "https://sports.yahoo.com/fantasy/football/news/rss.xml"
+      "source": "/api/rss/overthecap",
+      "destination": "https://overthecap.com/feed/"
+    },
+    {
+      "source": "/api/rss/theringer",
+      "destination": "https://www.theringer.com/rss/nfl.xml"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/rss/(.*)",
+      "headers": [
+        { "key": "User-Agent", "value": "Mozilla/5.0 (compatible; RSS Reader)" },
+        { "key": "Accept", "value": "application/rss+xml, application/xml, text/xml" }
+      ]
     }
   ]
 }
