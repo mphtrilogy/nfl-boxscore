@@ -1350,63 +1350,10 @@ function StartSitView({ mode }) {
 
 // ── FANTASY NEWS ──────────────────────────────────────────────────────────────
 function FantasyNewsView({ mode }) {
-  const [articles,   setArticles]   = useState([])
-  const [loading,    setLoading]    = useState(true)
   const [source,     setSource]     = useState('espn')
   const [posFilter,  setPosFilter]  = useState('All')
   const [teamFilter, setTeamFilter] = useState('All')
-
-  useEffect(() => {
-    setLoading(true)
-    setArticles([])
-
-    if (source === 'espn') {
-      // ESPN fantasy news — fetch general NFL news and filter for fantasy keywords
-      fetch('/api/espn/news?limit=50')
-        .then(r => r.json())
-        .then(data => {
-          const fantasyKeywords = ['fantasy','injury','questionable','doubtful','out','snap','target','touchdown','red zone','waiver','start','sit','week','points','projection','handcuff']
-          const items = (data.articles || [])
-            .filter(a => {
-              const text = ((a.headline || '') + (a.description || '')).toLowerCase()
-              return fantasyKeywords.some(k => text.includes(k))
-            })
-            .map(a => ({
-              headline: a.headline || '',
-              desc:     a.description || '',
-              link:     a.links?.web?.href || 'https://www.espn.com/fantasy/football',
-              image:    a.images?.[0]?.url || null,
-              time:     a.published ? new Date(a.published) : null,
-              byline:   a.byline || 'ESPN',
-              team:     a.categories?.find(c => c.type === 'team')?.description || '',
-            }))
-          setArticles(items)
-          setLoading(false)
-        })
-        .catch(() => setLoading(false))
-    } else {
-      // Google News RSS — fantasy football specific
-      const query = teamFilter !== 'All'
-        ? `${ti(teamFilter).city} ${ti(teamFilter).nick} fantasy football`
-        : 'NFL fantasy football start sit waiver wire'
-      const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`
-      fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}&count=40`)
-        .then(r => r.json())
-        .then(data => {
-          setArticles((data.items || []).map(a => ({
-            headline: a.title || '',
-            desc:     a.description?.replace(/<[^>]+>/g,'') || '',
-            link:     a.link || '#',
-            image:    a.thumbnail || null,
-            time:     a.pubDate ? new Date(a.pubDate) : null,
-            byline:   a.author || a.source || 'Google News',
-            team:     '',
-          })))
-          setLoading(false)
-        })
-        .catch(() => setLoading(false))
-    }
-  }, [source, teamFilter])
+  const { articles, loading } = useMultiSourceNews(source, FANTASY_NEWS_SOURCES, source === 'espn')
 
   const timeAgo = (date) => {
     if (!date) return ''
@@ -1419,37 +1366,55 @@ function FantasyNewsView({ mode }) {
     return `${days}d ago`
   }
 
-  // Position filter for Google News results
-  const filtered = posFilter === 'All' ? articles : articles.filter(a => {
-    const posWords = { QB:['quarterback','qb','passing'], RB:['running back','rb','rushing'], WR:['receiver','wr','receiving','wide'], TE:['tight end','te'] }
+  const POS_WORDS = {
+    QB: ['quarterback','qb',' passing '],
+    RB: ['running back','rb',' rushing ','carries'],
+    WR: ['receiver','wr',' receiving ','wide receiver'],
+    TE: ['tight end','te'],
+  }
+
+  const filtered = articles.filter(a => {
     const text = (a.headline + a.desc).toLowerCase()
-    return (posWords[posFilter] || []).some(k => text.includes(k))
+    if (teamFilter !== 'All') {
+      const teamInfo = ti(teamFilter)
+      if (!text.includes(teamInfo.city.toLowerCase()) &&
+          !text.includes(teamInfo.nick.toLowerCase()) &&
+          !a.team.includes(teamFilter)) return false
+    }
+    if (posFilter !== 'All') {
+      const kws = POS_WORDS[posFilter] || []
+      if (!kws.some(k => text.includes(k))) return false
+    }
+    return true
   })
 
   return (
     <div>
-      {/* Controls */}
       <div className="fn-controls">
         <div className="fn-source-btns">
           <span className="tc-label">Source</span>
-          <button className={`tc-btn ${source === 'espn' ? 'on' : ''}`} onClick={() => setSource('espn')}>ESPN</button>
-          <button className={`tc-btn ${source === 'google' ? 'on' : ''}`} onClick={() => setSource('google')}>Google News</button>
+          {FANTASY_NEWS_SOURCES.map(s => (
+            <button key={s.id} className={`tc-btn ${source === s.id ? 'on' : ''}`}
+              onClick={() => setSource(s.id)}>{s.label}</button>
+          ))}
         </div>
         <div className="fn-source-btns">
           <span className="tc-label">Position</span>
           {['All','QB','RB','WR','TE'].map(p => (
-            <button key={p} className={`tc-btn ${posFilter === p ? 'on' : ''}`} onClick={() => setPosFilter(p)}>{p}</button>
+            <button key={p} className={`tc-btn ${posFilter === p ? 'on' : ''}`}
+              onClick={() => setPosFilter(p)}>{p}</button>
           ))}
         </div>
         <div className="fn-source-btns" style={{flexWrap:'wrap'}}>
           <span className="tc-label">Team</span>
           {['All', ...ALL_TEAMS].map(t => (
-            <button key={t} className={`fpill ${teamFilter === t ? 'on' : ''}`} onClick={() => setTeamFilter(t)}>{t}</button>
+            <button key={t} className={`fpill ${teamFilter === t ? 'on' : ''}`}
+              onClick={() => setTeamFilter(t)}>{t}</button>
           ))}
         </div>
       </div>
 
-      {loading && <div className="sch-loading">Loading fantasy news…</div>}
+      {loading && <div className="sch-loading">Loading from {FANTASY_NEWS_SOURCES.find(s=>s.id===source)?.label}…</div>}
 
       {!loading && filtered.length > 0 && (
         <div className="news-grid">
@@ -1465,10 +1430,10 @@ function FantasyNewsView({ mode }) {
                 {a.team && <span className="news-team-tag">{a.team}</span>}
                 <div className="news-headline">{a.headline}</div>
                 {a.desc && i < 8 && (
-                  <div className="news-desc">{a.desc.slice(0,120)}{a.desc.length > 120 ? '…' : ''}</div>
+                  <div className="news-desc">{a.desc.slice(0,140)}{a.desc.length > 140 ? '…' : ''}</div>
                 )}
                 <div className="news-meta">
-                  <span className="news-byline">{a.byline}</span>
+                  <span className="news-byline">{a.byline || FANTASY_NEWS_SOURCES.find(s=>s.id===source)?.label}</span>
                   {a.time && <span className="news-time">{timeAgo(a.time)}</span>}
                 </div>
               </div>
@@ -1481,7 +1446,7 @@ function FantasyNewsView({ mode }) {
         <div className="leaders-coming-soon">
           <div className="cs-icon">📰</div>
           <div className="cs-title">No fantasy news found</div>
-          <div className="cs-text">Try Google News or remove position filter.</div>
+          <div className="cs-text">Try Rotoworld or ProFootballTalk for injury and waiver news.</div>
         </div>
       )}
     </div>
@@ -2035,62 +2000,91 @@ const ESPN_TEAM_IDS = {
 }
 
 // ── NEWS VIEW ─────────────────────────────────────────────────────────────────
-function NewsView({ teamFilter, setTeamFilter }) {
-  const [articles,  setArticles]  = useState([])
-  const [loading,   setLoading]   = useState(true)
-  const [source,    setSource]    = useState('espn') // 'espn' | 'google'
+// ── MULTI-SOURCE NEWS HOOK ────────────────────────────────────────────────────
+const NFL_NEWS_SOURCES = [
+  { id:'espn',    label:'ESPN',              url:'/api/espn/news?limit=40',   type:'espn' },
+  { id:'pft',     label:'ProFootballTalk',   url:'/api/rss/pft',              type:'rss'  },
+  { id:'cbs',     label:'CBS Sports',        url:'/api/rss/cbs',              type:'rss'  },
+  { id:'yahoo',   label:'Yahoo Sports',      url:'/api/rss/yahoo',            type:'rss'  },
+  { id:'nfl',     label:'NFL.com',           url:'/api/rss/nfl',              type:'rss'  },
+]
 
-  const ESPN_TEAM_NEWS_IDS = {
-    ARI:22, ATL:1,  BAL:33, BUF:2,  CAR:29, CHI:3,  CIN:4,  CLE:5,
-    DAL:6,  DEN:7,  DET:8,  GB:9,   HOU:34, IND:11, JAC:30, KC:12,
-    LA:14,  LAC:24, LV:13,  MIA:15, MIN:16, NE:17,  NO:18,  NYG:19,
-    NYJ:20, PHI:21, PIT:23, SEA:26, SF:25,  TB:27,  TEN:10, WAS:28,
-  }
+const FANTASY_NEWS_SOURCES = [
+  { id:'espn',    label:'ESPN Fantasy',      url:'/api/espn/news?limit=50',   type:'espn-fantasy' },
+  { id:'rotoworld',label:'Rotoworld',        url:'/api/rss/rotoworld',        type:'rss'  },
+  { id:'yahoo',   label:'Yahoo Fantasy',     url:'/api/rss/fantasy-yahoo',    type:'rss'  },
+  { id:'pft',     label:'ProFootballTalk',   url:'/api/rss/pft',              type:'rss'  },
+]
+
+function parseRSS(xml) {
+  try {
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(xml, 'text/xml')
+    return Array.from(doc.querySelectorAll('item')).map(item => ({
+      headline: item.querySelector('title')?.textContent?.trim() || '',
+      desc:     item.querySelector('description')?.textContent?.replace(/<[^>]+>/g,'').trim() || '',
+      link:     item.querySelector('link')?.textContent?.trim() || '#',
+      image:    item.querySelector('enclosure')?.getAttribute('url') ||
+                item.querySelector('media\\:content, content')?.getAttribute('url') || null,
+      time:     item.querySelector('pubDate') ? new Date(item.querySelector('pubDate').textContent) : null,
+      byline:   item.querySelector('source')?.textContent || item.querySelector('author')?.textContent || '',
+      team:     '',
+    }))
+  } catch(e) { return [] }
+}
+
+function useMultiSourceNews(sourceId, sources, fantasyFilter = false) {
+  const [articles, setArticles] = useState([])
+  const [loading,  setLoading]  = useState(true)
 
   useEffect(() => {
     setLoading(true)
     setArticles([])
+    const src = sources.find(s => s.id === sourceId)
+    if (!src) return
 
-    if (source === 'espn') {
-      const url = teamFilter !== 'All' && ESPN_TEAM_NEWS_IDS[teamFilter]
-        ? `/api/espn/news?team=${ESPN_TEAM_NEWS_IDS[teamFilter]}&limit=30`
-        : `/api/espn/news?limit=40`
-      fetch(url)
+    if (src.type === 'espn' || src.type === 'espn-fantasy') {
+      fetch(src.url)
         .then(r => r.json())
         .then(data => {
-          setArticles((data.articles || []).map(a => ({
-            headline:  a.headline || '',
-            desc:      a.description || '',
-            link:      a.links?.web?.href || 'https://www.espn.com/nfl',
-            image:     a.images?.[0]?.url || null,
-            time:      a.published ? new Date(a.published) : null,
-            byline:    a.byline || 'ESPN',
-            team:      a.categories?.find(c => c.type === 'team')?.description || '',
-          })))
+          let items = (data.articles || []).map(a => ({
+            headline: a.headline || '',
+            desc:     a.description || '',
+            link:     a.links?.web?.href || 'https://www.espn.com/nfl',
+            image:    a.images?.[0]?.url || null,
+            time:     a.published ? new Date(a.published) : null,
+            byline:   a.byline || 'ESPN',
+            team:     a.categories?.find(c => c.type === 'team')?.description || '',
+          }))
+          if (fantasyFilter) {
+            const kws = ['fantasy','injury','questionable','doubtful','out ','snap','target','waiver','start','sit','week','projection','handcuff','touchdown','red zone']
+            items = items.filter(a => kws.some(k => (a.headline+a.desc).toLowerCase().includes(k)))
+          }
+          setArticles(items)
           setLoading(false)
         })
         .catch(() => setLoading(false))
     } else {
-      // Google News RSS — NFL news
-      const teamQuery = teamFilter !== 'All' ? `${ti(teamFilter).city} ${ti(teamFilter).nick} NFL` : 'NFL football'
-      const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(teamQuery)}&hl=en-US&gl=US&ceid=US:en`
-      fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}&count=40`)
-        .then(r => r.json())
-        .then(data => {
-          setArticles((data.items || []).map(a => ({
-            headline: a.title || '',
-            desc:     a.description?.replace(/<[^>]+>/g, '') || '',
-            link:     a.link || '#',
-            image:    a.thumbnail || null,
-            time:     a.pubDate ? new Date(a.pubDate) : null,
-            byline:   a.author || a.source || 'Google News',
-            team:     '',
-          })))
+      fetch(src.url)
+        .then(r => r.text())
+        .then(xml => {
+          setArticles(parseRSS(xml))
           setLoading(false)
         })
-        .catch(() => setLoading(false))
+        .catch(() => {
+          setArticles([])
+          setLoading(false)
+        })
     }
-  }, [source, teamFilter])
+  }, [sourceId])
+
+  return { articles, loading }
+}
+
+function NewsView({ teamFilter, setTeamFilter }) {
+  const [source, setSource] = useState('espn')
+  const [fantasyOnly, setFantasyOnly] = useState(false)
+  const { articles, loading } = useMultiSourceNews(source, NFL_NEWS_SOURCES, false)
 
   const timeAgo = (date) => {
     if (!date) return ''
@@ -2103,25 +2097,48 @@ function NewsView({ teamFilter, setTeamFilter }) {
     return `${days}d ago`
   }
 
+  // Filter by team and optional fantasy toggle
+  const FANTASY_KWS = ['fantasy','waiver','start','sit','projection','handcuff']
+  const filtered = articles.filter(a => {
+    const text = (a.headline + a.desc).toLowerCase()
+    if (teamFilter !== 'All') {
+      const teamInfo = ti(teamFilter)
+      if (!text.includes(teamInfo.city.toLowerCase()) &&
+          !text.includes(teamInfo.nick.toLowerCase()) &&
+          !a.team.includes(teamFilter)) return false
+    }
+    if (fantasyOnly && !FANTASY_KWS.some(k => text.includes(k))) return false
+    return true
+  })
+
   return (
     <div>
       <div className="section-bar">
         <h2>NFL News</h2>
         <div className="sb-rule" />
         <span className="sb-ct">
-          {source === 'espn' ? 'ESPN' : 'Google News'} ·
-          {teamFilter === 'All' ? ' League-Wide' : ` ${ti(teamFilter).city} ${ti(teamFilter).nick}`}
-          {!loading && ` · ${articles.length} stories`}
+          {NFL_NEWS_SOURCES.find(s => s.id === source)?.label}
+          {teamFilter !== 'All' ? ` · ${ti(teamFilter).city}` : ' · All Teams'}
+          {!loading && ` · ${filtered.length} stories`}
         </span>
       </div>
 
-      {/* Source + Team filters */}
+      {/* Filters */}
       <div className="sch-filters">
         <div className="filter-group">
           <span className="filter-label">Source</span>
           <div className="filter-pills">
-            <button className={`fpill ${source === 'espn' ? 'on' : ''}`} onClick={() => setSource('espn')}>ESPN</button>
-            <button className={`fpill ${source === 'google' ? 'on' : ''}`} onClick={() => setSource('google')}>Google News</button>
+            {NFL_NEWS_SOURCES.map(s => (
+              <button key={s.id} className={`fpill ${source === s.id ? 'on' : ''}`}
+                onClick={() => setSource(s.id)}>{s.label}</button>
+            ))}
+          </div>
+        </div>
+        <div className="filter-group">
+          <span className="filter-label">Filter</span>
+          <div className="filter-pills">
+            <button className={`fpill ${!fantasyOnly ? 'on' : ''}`} onClick={() => setFantasyOnly(false)}>All NFL</button>
+            <button className={`fpill ${fantasyOnly ? 'on' : ''}`} onClick={() => setFantasyOnly(true)}>Fantasy Only</button>
           </div>
         </div>
         <div className="filter-group">
@@ -2135,11 +2152,15 @@ function NewsView({ teamFilter, setTeamFilter }) {
         </div>
       </div>
 
-      {loading && <div className="sch-loading">Loading {source === 'espn' ? 'ESPN' : 'Google'} NFL news…</div>}
+      {loading && (
+        <div className="sch-loading">
+          Loading from {NFL_NEWS_SOURCES.find(s => s.id === source)?.label}…
+        </div>
+      )}
 
-      {!loading && articles.length > 0 && (
+      {!loading && filtered.length > 0 && (
         <div className="news-grid">
-          {articles.map((a, i) => (
+          {filtered.map((a, i) => (
             <a key={i} href={a.link} target="_blank" rel="noopener"
                className={`news-card ${i === 0 ? 'news-featured' : ''}`}>
               {a.image && i < 6 && (
@@ -2151,10 +2172,10 @@ function NewsView({ teamFilter, setTeamFilter }) {
                 {a.team && <span className="news-team-tag">{a.team}</span>}
                 <div className="news-headline">{a.headline}</div>
                 {a.desc && i < 10 && (
-                  <div className="news-desc">{a.desc.slice(0,120)}{a.desc.length > 120 ? '…' : ''}</div>
+                  <div className="news-desc">{a.desc.slice(0,140)}{a.desc.length > 140 ? '…' : ''}</div>
                 )}
                 <div className="news-meta">
-                  {a.byline && <span className="news-byline">{a.byline}</span>}
+                  <span className="news-byline">{a.byline || NFL_NEWS_SOURCES.find(s=>s.id===source)?.label}</span>
                   {a.time && <span className="news-time">{timeAgo(a.time)}</span>}
                 </div>
               </div>
@@ -2163,11 +2184,11 @@ function NewsView({ teamFilter, setTeamFilter }) {
         </div>
       )}
 
-      {!loading && articles.length === 0 && (
+      {!loading && filtered.length === 0 && (
         <div className="leaders-coming-soon">
           <div className="cs-icon">📰</div>
-          <div className="cs-title">No news found</div>
-          <div className="cs-text">Try switching sources or selecting a different team.</div>
+          <div className="cs-title">No articles found</div>
+          <div className="cs-text">Try a different source or remove team filter.</div>
         </div>
       )}
     </div>
