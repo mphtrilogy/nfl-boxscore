@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useScoreboard, useBoxScore, useTeamSchedule, useWeekSchedule, parseESPNGame } from './hooks/useESPN'
 import { SCHEDULE_2026, WEEK_META, ALL_TEAMS } from './data/schedule2026'
-import { ti, networkColor, fmt } from './utils/teams'
+import { ti, networkColor, fmt, TEAMS } from './utils/teams'
 
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
 const ROUND_ORDER = ['Super Bowl','Conf Champs','Divisional','Wild Card']
@@ -1403,7 +1403,7 @@ function useFWFantasyScores(currentWeek, mode) {
       console.error('FW Engine error:', e)
       setLoading(false)
     })
-  }, [currentWeek, mode, defRankings])
+  }, [currentWeek, mode]) // defRankings intentionally omitted — causes infinite loop
 
   return { players, loading }
 }
@@ -2174,22 +2174,22 @@ function FantasyLeadersView({ mode }) {
         </thead>
         <tbody>
           {sorted.map((p, i) => (
-            <a key={i} href={`https://www.google.com/search?q=${encodeURIComponent(p.name+' fantasy football stats 2026')}`}
-               target="_blank" rel="noopener" style={{display:'contents', textDecoration:'none'}}>
-              <tr className={`fl-row ${i < 12 ? 'fl-starter' : ''}`}>
-                <td className="fl-rank" style={{color: getColor(p.rank)}}>
-                  {p.rank === 1 ? '🥇' : p.rank === 2 ? '🥈' : p.rank === 3 ? '🥉' : `#${p.rank}`}
-                </td>
-                <td className="fl-name">{p.name}</td>
-                <td className="fl-team">
-                  <a href={TEAMS[p.team]?.url || '#'} target="_blank" rel="noopener"
-                     className="sb-google-link" onClick={e => e.stopPropagation()}>{p.team}</a>
-                </td>
-                <td className="fl-gp">{p.gp}</td>
-                <td className="fl-pts" style={{color: getColor(p.rank)}}>{p[scoreKey].toFixed(1)}</td>
-                <td className="fl-avg">{(p[scoreKey] / p.gp).toFixed(1)}</td>
-              </tr>
-            </a>
+            <tr key={i}
+              className={`fl-row ${i < 12 ? 'fl-starter' : ''}`}
+              onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(p.name+' fantasy football stats 2026')}`, '_blank')}
+              style={{cursor:'pointer'}}>
+              <td className="fl-rank" style={{color: getColor(p.rank)}}>
+                {p.rank === 1 ? '🥇' : p.rank === 2 ? '🥈' : p.rank === 3 ? '🥉' : `#${p.rank}`}
+              </td>
+              <td className="fl-name">{p.name}</td>
+              <td className="fl-team">
+                <a href={TEAMS[p.team]?.url || '#'} target="_blank" rel="noopener"
+                   className="sb-google-link" onClick={e => e.stopPropagation()}>{p.team}</a>
+              </td>
+              <td className="fl-gp">{p.gp}</td>
+              <td className="fl-pts" style={{color: getColor(p.rank)}}>{p[scoreKey].toFixed(1)}</td>
+              <td className="fl-avg">{(p[scoreKey] / p.gp).toFixed(1)}</td>
+            </tr>
           ))}
         </tbody>
       </table>
@@ -2235,6 +2235,29 @@ function useWaiverTargets() {
   return { targets, loading }
 }
 
+// ── ERROR BOUNDARY ────────────────────────────────────────────────────────────
+class TabErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { hasError: false, error: null } }
+  static getDerivedStateFromError(error) { return { hasError: true, error } }
+  componentDidCatch(error, info) { console.error('Tab crash:', error, info) }
+  render() {
+    if (this.state.hasError) return (
+      <div style={{padding:24, textAlign:'center'}}>
+        <div style={{fontSize:32, marginBottom:12}}>⚠️</div>
+        <div style={{fontFamily:'var(--font-mono)', fontSize:11, color:'var(--accent)', marginBottom:8}}>
+          This tab encountered an error
+        </div>
+        <div style={{fontFamily:'var(--font-mono)', fontSize:9, color:'var(--muted-lt)', marginBottom:16}}>
+          {this.state.error?.message || 'Unknown error'}
+        </div>
+        <button onClick={() => this.setState({ hasError: false, error: null })}
+          className="tc-btn on">Try Again</button>
+      </div>
+    )
+    return this.props.children
+  }
+}
+
 function FantasyView({ mode, setMode, currentWeek, trendsMode, setTrendsMode, trendsRange, setTrendsRange, trendsPos, setTrendsPos }) {
   const [tab, setTab] = useState('leaders')
   const TABS = [
@@ -2266,18 +2289,20 @@ function FantasyView({ mode, setMode, currentWeek, trendsMode, setTrendsMode, tr
           <button key={t.id} className={`htab ${tab === t.id ? 'on' : ''}`} onClick={() => setTab(t.id)}>{t.label}</button>
         ))}
       </div>
-      {tab === 'leaders'  && <FantasyLeadersView mode={mode} />}
-      {tab === 'fw'       && <FWFormulaView currentWeek={currentWeek} mode={mode} />}
-      {tab === 'startsit' && <StartSitView mode={mode} />}
-      {tab === 'matchups' && <MatchupRaterView />}
-      {tab === 'waiver'   && <WaiverWireView />}
+      {tab === 'leaders'  && <TabErrorBoundary><FantasyLeadersView mode={mode} /></TabErrorBoundary>}
+      {tab === 'fw'       && <TabErrorBoundary><FWFormulaView currentWeek={currentWeek} mode={mode} /></TabErrorBoundary>}
+      {tab === 'startsit' && <TabErrorBoundary><StartSitView mode={mode} /></TabErrorBoundary>}
+      {tab === 'matchups' && <TabErrorBoundary><MatchupRaterView /></TabErrorBoundary>}
+      {tab === 'waiver'   && <TabErrorBoundary><WaiverWireView /></TabErrorBoundary>}
       {tab === 'trends'   && (
-        <TrendsView currentWeek={currentWeek}
-          mode={trendsMode} setMode={setTrendsMode}
-          range={trendsRange} setRange={setTrendsRange}
-          pos={trendsPos} setPos={setTrendsPos} />
+        <TabErrorBoundary>
+          <TrendsView currentWeek={currentWeek}
+            mode={trendsMode} setMode={setTrendsMode}
+            range={trendsRange} setRange={setTrendsRange}
+            pos={trendsPos} setPos={setTrendsPos} />
+        </TabErrorBoundary>
       )}
-      {tab === 'news'     && <FantasyNewsView mode={mode} />}
+      {tab === 'news'     && <TabErrorBoundary><FantasyNewsView mode={mode} /></TabErrorBoundary>}
     </div>
   )
 }
@@ -2656,8 +2681,8 @@ function buildNewsUrl(src, teamFilter, isFantasy) {
   }
   if (src.type === 'gnews') {
     if (teamFilter !== 'All') {
-      const t = TEAMS[teamFilter]
-      const q = t
+      const t = ti(teamFilter)
+      const q = (t && t.city !== teamFilter)
         ? `${t.city} ${t.nick} ${isFantasy ? 'fantasy football' : 'NFL'}`
         : 'NFL football'
       return `/api/gnews?q=${encodeURIComponent(q)}`
