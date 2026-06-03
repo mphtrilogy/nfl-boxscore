@@ -1353,7 +1353,7 @@ function FantasyNewsView({ mode }) {
   const [source,     setSource]     = useState('espn')
   const [posFilter,  setPosFilter]  = useState('All')
   const [teamFilter, setTeamFilter] = useState('All')
-  const { articles, loading } = useMultiSourceNews(source, FANTASY_NEWS_SOURCES, source === 'espn')
+  const { articles, loading, error } = useMultiSourceNews(source, FANTASY_NEWS_SOURCES, source === 'espn')
 
   const timeAgo = (date) => {
     if (!date) return ''
@@ -1415,6 +1415,9 @@ function FantasyNewsView({ mode }) {
       </div>
 
       {loading && <div className="sch-loading">Loading from {FANTASY_NEWS_SOURCES.find(s=>s.id===source)?.label}…</div>}
+      {!loading && error && (
+        <div className="sch-error">⚠️ {error}</div>
+      )}
 
       {!loading && filtered.length > 0 && (
         <div className="news-grid">
@@ -2002,18 +2005,17 @@ const ESPN_TEAM_IDS = {
 // ── NEWS VIEW ─────────────────────────────────────────────────────────────────
 // ── MULTI-SOURCE NEWS HOOK ────────────────────────────────────────────────────
 const NFL_NEWS_SOURCES = [
-  { id:'espn',    label:'ESPN',              url:'/api/espn/news?limit=40',   type:'espn' },
-  { id:'pft',     label:'ProFootballTalk',   url:'/api/rss/pft',              type:'rss'  },
-  { id:'cbs',     label:'CBS Sports',        url:'/api/rss/cbs',              type:'rss'  },
-  { id:'yahoo',   label:'Yahoo Sports',      url:'/api/rss/yahoo',            type:'rss'  },
-  { id:'nfl',     label:'NFL.com',           url:'/api/rss/nfl',              type:'rss'  },
+  { id:'espn',    label:'ESPN',            url:'/api/espn/news?limit=40',   type:'espn'   },
+  { id:'pft',     label:'ProFootballTalk', url:'/api/rss/pft',              type:'rss'    },
+  { id:'cbs',     label:'CBS Sports',      url:'/api/rss/cbs',              type:'rss'    },
+  { id:'reddit',  label:'r/nfl',           url:'nfl',                       type:'reddit' },
 ]
 
 const FANTASY_NEWS_SOURCES = [
-  { id:'espn',    label:'ESPN Fantasy',      url:'/api/espn/news?limit=50',   type:'espn-fantasy' },
-  { id:'rotoworld',label:'Rotoworld',        url:'/api/rss/rotoworld',        type:'rss'  },
-  { id:'yahoo',   label:'Yahoo Fantasy',     url:'/api/rss/fantasy-yahoo',    type:'rss'  },
-  { id:'pft',     label:'ProFootballTalk',   url:'/api/rss/pft',              type:'rss'  },
+  { id:'espn',    label:'ESPN Fantasy',    url:'/api/espn/news?limit=50',   type:'espn-fantasy' },
+  { id:'reddit',  label:'r/fantasyfootball', url:'fantasyfootball',         type:'reddit' },
+  { id:'pft',     label:'ProFootballTalk', url:'/api/rss/pft',              type:'rss'    },
+  { id:'cbs',     label:'CBS Sports',      url:'/api/rss/cbs',              type:'rss'    },
 ]
 
 function parseRSS(xml) {
@@ -2036,12 +2038,14 @@ function parseRSS(xml) {
 function useMultiSourceNews(sourceId, sources, fantasyFilter = false) {
   const [articles, setArticles] = useState([])
   const [loading,  setLoading]  = useState(true)
+  const [error,    setError]    = useState(null)
 
   useEffect(() => {
     setLoading(true)
     setArticles([])
+    setError(null)
     const src = sources.find(s => s.id === sourceId)
-    if (!src) return
+    if (!src) { setLoading(false); return }
 
     if (src.type === 'espn' || src.type === 'espn-fantasy') {
       fetch(src.url)
@@ -2057,34 +2061,72 @@ function useMultiSourceNews(sourceId, sources, fantasyFilter = false) {
             team:     a.categories?.find(c => c.type === 'team')?.description || '',
           }))
           if (fantasyFilter) {
-            const kws = ['fantasy','injury','questionable','doubtful','out ','snap','target','waiver','start','sit','week','projection','handcuff','touchdown','red zone']
+            const kws = ['fantasy','injury','questionable','doubtful',' out ','snap count','target','waiver','start','sit','projection','handcuff','touchdown','red zone','practice','limited']
             items = items.filter(a => kws.some(k => (a.headline+a.desc).toLowerCase().includes(k)))
           }
           setArticles(items)
           setLoading(false)
         })
-        .catch(() => setLoading(false))
+        .catch(() => { setError('ESPN unavailable'); setLoading(false) })
+
+    } else if (src.type === 'reddit') {
+      const sub = src.url
+      const SKIP = ['game thread','post-game','weekly thread','daily discussion','pre-game','megathread','live updates','power rankings','official']
+      Promise.all([
+        fetch(`https://www.reddit.com/r/${sub}/hot.json?limit=25&raw_json=1`, { headers:{'User-Agent':'NFLBoxScore/1.0'} })
+          .then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch(`https://www.reddit.com/r/${sub}/new.json?limit=15&raw_json=1`, { headers:{'User-Agent':'NFLBoxScore/1.0'} })
+          .then(r => r.ok ? r.json() : null).catch(() => null),
+      ]).then(([hot, newPosts]) => {
+        const seen = new Set()
+        const posts = [...(hot?.data?.children || []), ...(newPosts?.data?.children || [])]
+        const items = posts.map(p => p.data)
+          .filter(p => {
+            if (!p || p.stickied || p.over_18 || p.score < 5) return false
+            const lower = p.title.toLowerCase()
+            if (SKIP.some(s => lower.includes(s))) return false
+            if (seen.has(p.id)) return false
+            seen.add(p.id)
+            return true
+          })
+          .map(p => ({
+            headline: p.title,
+            desc:     p.selftext ? p.selftext.slice(0,200) : `${(p.ups||0).toLocaleString()} upvotes`,
+            link:     `https://reddit.com${p.permalink}`,
+            image:    p.thumbnail?.startsWith('http') && !p.thumbnail.includes('reddit') ? p.thumbnail : null,
+            time:     new Date(p.created_utc * 1000),
+            byline:   `u/${p.author} · r/${sub}`,
+            team:     '',
+          }))
+        if (items.length === 0) setError(`r/${sub} returned no posts — may be rate limited`)
+        setArticles(items)
+        setLoading(false)
+      }).catch(() => { setError(`r/${sub} unavailable`); setLoading(false) })
+
     } else {
-      fetch(src.url)
-        .then(r => r.text())
+      fetch(src.url, { headers:{'Accept':'application/rss+xml, application/xml, text/xml, */*'} })
+        .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text() })
         .then(xml => {
-          setArticles(parseRSS(xml))
+          if (!xml || xml.length < 100) throw new Error('Empty')
+          const parsed = parseRSS(xml)
+          if (!parsed.length) throw new Error('No items')
+          setArticles(parsed)
           setLoading(false)
         })
         .catch(() => {
-          setArticles([])
+          setError(`${src.label} unavailable — try ESPN or r/nfl`)
           setLoading(false)
         })
     }
   }, [sourceId])
 
-  return { articles, loading }
+  return { articles, loading, error }
 }
 
 function NewsView({ teamFilter, setTeamFilter }) {
   const [source, setSource] = useState('espn')
   const [fantasyOnly, setFantasyOnly] = useState(false)
-  const { articles, loading } = useMultiSourceNews(source, NFL_NEWS_SOURCES, false)
+  const { articles, loading, error } = useMultiSourceNews(source, NFL_NEWS_SOURCES, false)
 
   const timeAgo = (date) => {
     if (!date) return ''
@@ -2155,6 +2197,11 @@ function NewsView({ teamFilter, setTeamFilter }) {
       {loading && (
         <div className="sch-loading">
           Loading from {NFL_NEWS_SOURCES.find(s => s.id === source)?.label}…
+        </div>
+      )}
+      {!loading && error && (
+        <div className="sch-error">
+          ⚠️ {error} — <button className="sb-google-link" style={{background:'none',border:'none',cursor:'pointer'}} onClick={() => setSource('espn')}>Switch to ESPN</button>
         </div>
       )}
 
