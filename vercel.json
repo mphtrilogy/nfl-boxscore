@@ -1,12 +1,44 @@
 {
   "rewrites": [
     {
+      "source": "/api/espn/teams/:team/schedule",
+      "destination": "https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/:team/schedule"
+    },
+    {
       "source": "/api/espn/:path*",
       "destination": "https://site.api.espn.com/apis/site/v2/sports/football/nfl/:path*"
     },
     {
       "source": "/api/espn-core/:path*",
       "destination": "https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/:path*"
+    },
+    {
+      "source": "/api/rss/pft",
+      "destination": "https://profootballtalk.nbcsports.com/feed/"
+    },
+    {
+      "source": "/api/rss/cbs",
+      "destination": "https://www.cbssports.com/rss/headlines/nfl/"
+    },
+    {
+      "source": "/api/rss/nfl",
+      "destination": "https://www.nfl.com/rss/rsslanding?searchString=news"
+    },
+    {
+      "source": "/api/rss/yahoo",
+      "destination": "https://sports.yahoo.com/nfl/rss.xml"
+    },
+    {
+      "source": "/api/rss/rotoworld",
+      "destination": "https://www.nbcsports.com/fantasy/football/rss"
+    },
+    {
+      "source": "/api/rss/fantasy-espn",
+      "destination": "https://www.espn.com/espn/rss/fantasy/football/news"
+    },
+    {
+      "source": "/api/rss/fantasy-yahoo",
+      "destination": "https://sports.yahoo.com/fantasy/football/news/rss.xml"
     }
   ]
 }
