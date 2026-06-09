@@ -498,6 +498,15 @@ function SquadModal({ squad, onSave, onClose }) {
 
 // ── SCORES VIEW ───────────────────────────────────────────────────────────────
 function ScoresView({ week, games, loading, error, openCardId, setOpenCardId, activeWeek, setActiveWeek, squad }) {
+  // Sort squad games to top if squad is on
+  const displayGames = (squad?.on && squad?.teams?.length)
+    ? [...games].sort((a,b) => {
+        const am = squad.teams.includes(a.home)||squad.teams.includes(a.away)
+        const bm = squad.teams.includes(b.home)||squad.teams.includes(b.away)
+        return (bm?1:0)-(am?1:0)
+      })
+    : games
+
   return (
     <div>
       <WeekSelector active={activeWeek} onChange={setActiveWeek} />
