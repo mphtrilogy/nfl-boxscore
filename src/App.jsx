@@ -352,22 +352,110 @@ function WeekSelector({ active, onChange }) {
 }
 
 // ── MY FANTASY SQUAD COMPONENTS ──────────────────────────────────────────────
+// ── COMPREHENSIVE PLAYER LIST — all fantasy-relevant starters + key backups ──
 const ALL_SQUAD_PLAYERS = [
-  {name:'Lamar Jackson',    pos:'QB',team:'BAL'},{name:'Josh Allen',         pos:'QB',team:'BUF'},
-  {name:'Patrick Mahomes',  pos:'QB',team:'KC'}, {name:'Jalen Hurts',        pos:'QB',team:'PHI'},
-  {name:'Joe Burrow',       pos:'QB',team:'CIN'},{name:'Jayden Daniels',     pos:'QB',team:'WAS'},
-  {name:"Ja'Marr Chase",    pos:'WR',team:'CIN'},{name:'CeeDee Lamb',        pos:'WR',team:'DAL'},
-  {name:'Tyreek Hill',      pos:'WR',team:'MIA'},{name:'Justin Jefferson',   pos:'WR',team:'MIN'},
-  {name:'A.J. Brown',       pos:'WR',team:'PHI'},{name:'Davante Adams',      pos:'WR',team:'NYJ'},
-  {name:'Malik Nabers',     pos:'WR',team:'NYG'},{name:'DK Metcalf',         pos:'WR',team:'SEA'},
-  {name:'Saquon Barkley',   pos:'RB',team:'PHI'},{name:"De'Von Achane",      pos:'RB',team:'MIA'},
-  {name:'Bijan Robinson',   pos:'RB',team:'ATL'},{name:'Jahmyr Gibbs',       pos:'RB',team:'DET'},
-  {name:'Tony Pollard',     pos:'RB',team:'TEN'},{name:'Kenneth Walker',     pos:'RB',team:'SEA'},
-  {name:'Travis Kelce',     pos:'TE',team:'KC'}, {name:'Sam LaPorta',        pos:'TE',team:'DET'},
-  {name:'Mark Andrews',     pos:'TE',team:'BAL'},{name:'Trey McBride',       pos:'TE',team:'ARI'},
-  {name:'Brock Bowers',     pos:'TE',team:'LV'}, {name:'Kyle Pitts',         pos:'TE',team:'ATL'},
-  {name:'Jeremiyah Love',   pos:'RB',team:'ARI'},{name:'Carnell Tate',       pos:'WR',team:'TEN'},
-  {name:'Fernando Mendoza', pos:'QB',team:'LV'}, {name:'Travis Hunter',      pos:'WR',team:'CLE'},
+  // ── QBs ────────────────────────────────────────────────────────────────────
+  {name:'Lamar Jackson',      pos:'QB',team:'BAL'},{name:'Josh Allen',           pos:'QB',team:'BUF'},
+  {name:'Patrick Mahomes',    pos:'QB',team:'KC'}, {name:'Jalen Hurts',          pos:'QB',team:'PHI'},
+  {name:'Joe Burrow',         pos:'QB',team:'CIN'},{name:'Jayden Daniels',       pos:'QB',team:'WAS'},
+  {name:'Sam Darnold',        pos:'QB',team:'SEA'},{name:'Geno Smith',           pos:'QB',team:'SEA'},
+  {name:'Brock Purdy',        pos:'QB',team:'SF'}, {name:'C.J. Stroud',          pos:'QB',team:'HOU'},
+  {name:'Tua Tagovailoa',     pos:'QB',team:'MIA'},{name:'Jordan Love',          pos:'QB',team:'GB'},
+  {name:'Dak Prescott',       pos:'QB',team:'DAL'},{name:'Anthony Richardson',   pos:'QB',team:'IND'},
+  {name:'Caleb Williams',     pos:'QB',team:'CHI'},{name:'Drake Maye',           pos:'QB',team:'NE'},
+  {name:'Bo Nix',             pos:'QB',team:'DEN'},{name:'Baker Mayfield',       pos:'QB',team:'TB'},
+  {name:'Kirk Cousins',       pos:'QB',team:'ATL'},{name:'Justin Herbert',       pos:'QB',team:'LAC'},
+  {name:'Justin Fields',      pos:'QB',team:'PIT'},{name:'Matthew Stafford',     pos:'QB',team:'LA'},
+  {name:'Deshaun Watson',     pos:'QB',team:'CLE'},{name:'Trevor Lawrence',      pos:'QB',team:'JAC'},
+  {name:'Will Levis',         pos:'QB',team:'TEN'},{name:'Daniel Jones',         pos:'QB',team:'NYG'},
+  {name:'Aaron Rodgers',      pos:'QB',team:'NYJ'},{name:'Derek Carr',           pos:'QB',team:'NO'},
+  {name:'Bryce Young',        pos:'QB',team:'CAR'},{name:'Aidan O\'Connell',     pos:'QB',team:'LV'},
+  {name:'Fernando Mendoza',   pos:'QB',team:'LV'}, {name:'Kyler Murray',         pos:'QB',team:'ARI'},
+  {name:'Sam Howell',         pos:'QB',team:'WAS'},{name:'Malik Willis',         pos:'QB',team:'TEN'},
+  {name:'Jacoby Brissett',    pos:'QB',team:'NE'}, {name:'Carson Wentz',         pos:'QB',team:'LA'},
+  // ── RBs ────────────────────────────────────────────────────────────────────
+  {name:'Saquon Barkley',     pos:'RB',team:'PHI'},{name:"De'Von Achane",        pos:'RB',team:'MIA'},
+  {name:'Bijan Robinson',     pos:'RB',team:'ATL'},{name:'Jahmyr Gibbs',         pos:'RB',team:'DET'},
+  {name:'Derrick Henry',      pos:'RB',team:'BAL'},{name:'Jonathan Taylor',      pos:'RB',team:'IND'},
+  {name:'James Cook',         pos:'RB',team:'BUF'},{name:'Tony Pollard',         pos:'RB',team:'TEN'},
+  {name:'Josh Jacobs',        pos:'RB',team:'GB'}, {name:'Joe Mixon',            pos:'RB',team:'HOU'},
+  {name:'Breece Hall',        pos:'RB',team:'NYJ'},{name:'Kenneth Walker III',   pos:'RB',team:'SEA'},
+  {name:'David Montgomery',   pos:'RB',team:'DET'},{name:'Rachaad White',        pos:'RB',team:'TB'},
+  {name:'Travis Etienne',     pos:'RB',team:'JAC'},{name:'Chuba Hubbard',        pos:'RB',team:'CAR'},
+  {name:'Isiah Pacheco',      pos:'RB',team:'KC'}, {name:'Kyren Williams',       pos:'RB',team:'LA'},
+  {name:'Aaron Jones',        pos:'RB',team:'MIN'},{name:'Alvin Kamara',         pos:'RB',team:'NO'},
+  {name:"D'Andre Swift",      pos:'RB',team:'CHI'},{name:'Javonte Williams',     pos:'RB',team:'DEN'},
+  {name:'Brian Robinson',     pos:'RB',team:'WAS'},{name:'Rhamondre Stevenson',  pos:'RB',team:'NE'},
+  {name:'Zack Moss',          pos:'RB',team:'CIN'},{name:'James Conner',         pos:'RB',team:'ARI'},
+  {name:'Cam Akers',          pos:'RB',team:'MIN'},{name:'Tank Bigsby',          pos:'RB',team:'JAC'},
+  {name:'Gus Edwards',        pos:'RB',team:'LAC'},{name:'Jerome Ford',          pos:'RB',team:'CLE'},
+  {name:'Miles Sanders',      pos:'RB',team:'CAR'},{name:'Roschon Johnson',      pos:'RB',team:'CHI'},
+  {name:'Tyjae Spears',       pos:'RB',team:'TEN'},{name:'Dameon Pierce',        pos:'RB',team:'HOU'},
+  {name:'Jaleel McLaughlin',  pos:'RB',team:'DEN'},{name:'Rico Dowdle',          pos:'RB',team:'DAL'},
+  {name:'Jeremiyah Love',     pos:'RB',team:'ARI'},{name:'Jadarian Price',       pos:'RB',team:'SEA'},
+  {name:'Kareem Hunt',        pos:'RB',team:'KC'}, {name:'Antonio Gibson',       pos:'RB',team:'WAS'},
+  {name:'Ezekiel Elliott',    pos:'RB',team:'NE'}, {name:'Raheem Mostert',       pos:'RB',team:'MIA'},
+  {name:'De\'Veon Smith',     pos:'RB',team:'PHI'},{name:'Jordan Mason',         pos:'RB',team:'SF'},
+  // ── WRs ────────────────────────────────────────────────────────────────────
+  {name:"Ja'Marr Chase",      pos:'WR',team:'CIN'},{name:'CeeDee Lamb',          pos:'WR',team:'DAL'},
+  {name:'Tyreek Hill',        pos:'WR',team:'MIA'},{name:'Justin Jefferson',     pos:'WR',team:'MIN'},
+  {name:'A.J. Brown',         pos:'WR',team:'PHI'},{name:'Davante Adams',        pos:'WR',team:'NYJ'},
+  {name:'Malik Nabers',       pos:'WR',team:'NYG'},{name:'DK Metcalf',           pos:'WR',team:'SEA'},
+  {name:'Stefon Diggs',       pos:'WR',team:'HOU'},{name:'Puka Nacua',           pos:'WR',team:'LA'},
+  {name:'Drake London',       pos:'WR',team:'ATL'},{name:'Amon-Ra St. Brown',    pos:'WR',team:'DET'},
+  {name:'DeVonta Smith',      pos:'WR',team:'PHI'},{name:'Brandon Aiyuk',        pos:'WR',team:'SF'},
+  {name:'Jaylen Waddle',      pos:'WR',team:'MIA'},{name:'Terry McLaurin',       pos:'WR',team:'WAS'},
+  {name:'Mike Evans',         pos:'WR',team:'TB'}, {name:'Chris Olave',          pos:'WR',team:'NO'},
+  {name:'Hollywood Brown',    pos:'WR',team:'KC'}, {name:'Rashee Rice',          pos:'WR',team:'KC'},
+  {name:'George Pickens',     pos:'WR',team:'PIT'},{name:'Keenan Allen',         pos:'WR',team:'CHI'},
+  {name:'Tee Higgins',        pos:'WR',team:'CIN'},{name:'Courtland Sutton',     pos:'WR',team:'DEN'},
+  {name:'Jaxon Smith-Njigba', pos:'WR',team:'SEA'},{name:'Gabe Davis',           pos:'WR',team:'JAC'},
+  {name:'DJ Moore',           pos:'WR',team:'CHI'},{name:'Amari Cooper',         pos:'WR',team:'BUF'},
+  {name:'Zay Flowers',        pos:'WR',team:'BAL'},{name:'Romeo Doubs',          pos:'WR',team:'GB'},
+  {name:'Marvin Harrison Jr.',pos:'WR',team:'ARI'},{name:'Calvin Ridley',        pos:'WR',team:'TEN'},
+  {name:'Diontae Johnson',    pos:'WR',team:'CAR'},{name:'Odell Beckham Jr.',    pos:'WR',team:'MIA'},
+  {name:'Brandin Cooks',      pos:'WR',team:'DAL'},{name:'Tyler Lockett',        pos:'WR',team:'SEA'},
+  {name:'Josh Downs',         pos:'WR',team:'IND'},{name:'Adam Thielen',         pos:'WR',team:'CAR'},
+  {name:'Rashid Shaheed',     pos:'WR',team:'NO'}, {name:'Wan\'Dale Robinson',   pos:'WR',team:'NYG'},
+  {name:'Nathanael Dell',     pos:'WR',team:'HOU'},{name:'Tank Dell',            pos:'WR',team:'HOU'},
+  {name:'Quentin Johnston',   pos:'WR',team:'LAC'},{name:'Rome Odunze',          pos:'WR',team:'CHI'},
+  {name:'Jakobi Meyers',      pos:'WR',team:'LV'}, {name:'Hunter Renfrow',       pos:'WR',team:'LV'},
+  {name:'Michael Pittman',    pos:'WR',team:'IND'},{name:'Alec Pierce',          pos:'WR',team:'IND'},
+  {name:'Darnell Mooney',     pos:'WR',team:'ATL'},{name:'Christian Kirk',       pos:'WR',team:'JAC'},
+  {name:'Curtis Samuel',      pos:'WR',team:'BUF'},{name:'Elijah Moore',         pos:'WR',team:'CLE'},
+  {name:'Carnell Tate',       pos:'WR',team:'TEN'},{name:'Travis Hunter',        pos:'WR',team:'CLE'},
+  {name:'Emeka Egbuka',       pos:'WR',team:'MIA'},{name:'Makai Lemon',          pos:'WR',team:'PHI'},
+  {name:'Omar Cooper Jr.',    pos:'WR',team:'NYJ'},{name:'Jordyn Tyson',         pos:'WR',team:'NO'},
+  {name:'Demarcus Robinson',  pos:'WR',team:'LA'}, {name:'Van Jefferson',        pos:'WR',team:'ATL'},
+  {name:'Davante Adams',      pos:'WR',team:'NYJ'},{name:'Kendrick Bourne',      pos:'WR',team:'NE'},
+  {name:'Jerry Jeudy',        pos:'WR',team:'CLE'},{name:'Cedric Tillman',       pos:'WR',team:'CLE'},
+  // ── TEs ────────────────────────────────────────────────────────────────────
+  {name:'Travis Kelce',       pos:'TE',team:'KC'}, {name:'Sam LaPorta',          pos:'TE',team:'DET'},
+  {name:'Mark Andrews',       pos:'TE',team:'BAL'},{name:'Trey McBride',         pos:'TE',team:'ARI'},
+  {name:'Brock Bowers',       pos:'TE',team:'LV'}, {name:'Kyle Pitts',           pos:'TE',team:'ATL'},
+  {name:'George Kittle',      pos:'TE',team:'SF'}, {name:'Dallas Goedert',       pos:'TE',team:'PHI'},
+  {name:'David Njoku',        pos:'TE',team:'CLE'},{name:'Evan Engram',          pos:'TE',team:'JAC'},
+  {name:'Cole Kmet',          pos:'TE',team:'CHI'},{name:'T.J. Hockenson',       pos:'TE',team:'MIN'},
+  {name:'Jake Ferguson',      pos:'TE',team:'DAL'},{name:'Dalton Kincaid',       pos:'TE',team:'BUF'},
+  {name:'Chigoziem Okonkwo',  pos:'TE',team:'TEN'},{name:'Hunter Henry',         pos:'TE',team:'NE'},
+  {name:'Mike Gesicki',       pos:'TE',team:'CIN'},{name:'Logan Thomas',         pos:'TE',team:'WAS'},
+  {name:'Isaiah Likely',      pos:'TE',team:'BAL'},{name:'Tucker Kraft',         pos:'TE',team:'GB'},
+  {name:'Cade Otton',         pos:'TE',team:'TB'}, {name:'Jonnu Smith',          pos:'TE',team:'MIA'},
+  {name:'Tyler Conklin',      pos:'TE',team:'NYJ'},{name:'Gerald Everett',       pos:'TE',team:'LAC'},
+  {name:'Juwan Johnson',      pos:'TE',team:'NO'}, {name:'Austin Hooper',        pos:'TE',team:'TEN'},
+  {name:'Dawson Knox',        pos:'TE',team:'BUF'},{name:'Noah Fant',            pos:'TE',team:'SEA'},
+  {name:'Tyler Higbee',       pos:'TE',team:'LA'}, {name:'Foster Moreau',        pos:'TE',team:'NO'},
+  {name:'Kenyon Sadiq',       pos:'TE',team:'NYJ'},{name:'Tyler Warren',         pos:'TE',team:'IND'},
+  {name:'Colston Loveland',   pos:'TE',team:'ARI'},{name:'Oscar Delp',           pos:'TE',team:'NO'},
+  // ── Ks ─────────────────────────────────────────────────────────────────────
+  {name:'Justin Tucker',      pos:'K', team:'BAL'},{name:'Harrison Butker',      pos:'K', team:'KC'},
+  {name:'Evan McPherson',     pos:'K', team:'CIN'},{name:'Tyler Bass',           pos:'K', team:'BUF'},
+  {name:'Brandon Aubrey',     pos:'K', team:'DAL'},{name:'Jake Elliott',         pos:'K', team:'PHI'},
+  {name:"Ka'imi Fairbairn",   pos:'K', team:'HOU'},{name:'Younghoe Koo',         pos:'K', team:'ATL'},
+  {name:'Cairo Santos',       pos:'K', team:'CHI'},{name:'Jason Sanders',        pos:'K', team:'MIA'},
+  {name:'Greg Zuerlein',      pos:'K', team:'NYJ'},{name:'Matt Gay',             pos:'K', team:'IND'},
+  {name:'Wil Lutz',           pos:'K', team:'DEN'},{name:'Matt Ammendola',       pos:'K', team:'NO'},
+  {name:'Cameron Dicker',     pos:'K', team:'LAC'},{name:'Chris Boswell',        pos:'K', team:'PIT'},
 ]
 
 const SQUAD_DIVISIONS = [
@@ -412,15 +500,59 @@ function SquadModal({ squad, onSave, onClose }) {
   const [pendingTeams,   setPendingTeams]   = useState([...(squad.teams  ||[])])
   const [pendingPlayers, setPendingPlayers] = useState([...(squad.players||[])])
   const [playerSearch,   setPlayerSearch]   = useState('')
+  const [espnResults,    setEspnResults]    = useState([])
+  const [searching,      setSearching]      = useState(false)
+  const [posFilter,      setPosFilter]      = useState('ALL')
+
+  // Live ESPN player search for names not in static list
+  useEffect(() => {
+    if (playerSearch.length < 3) { setEspnResults([]); return }
+    // Check if we have enough static results first
+    const staticMatches = ALL_SQUAD_PLAYERS.filter(p =>
+      p.name.toLowerCase().includes(playerSearch.toLowerCase()) ||
+      p.team.toLowerCase().includes(playerSearch.toLowerCase())
+    )
+    if (staticMatches.length >= 3) { setEspnResults([]); return }
+
+    // Hit ESPN athlete search API for unlisted players
+    setSearching(true)
+    fetch(`/api/espn/athletes?limit=10&search=${encodeURIComponent(playerSearch)}`)
+      .then(r => r.json())
+      .then(data => {
+        const results = (data.items || data.athletes || [])
+          .map(a => ({
+            name: a.displayName || a.fullName || '',
+            pos:  a.position?.abbreviation || '?',
+            team: a.team?.abbreviation || '?',
+          }))
+          .filter(p => p.name && !ALL_SQUAD_PLAYERS.some(sp => sp.name === p.name))
+          .slice(0, 6)
+        setEspnResults(results)
+        setSearching(false)
+      })
+      .catch(() => setSearching(false))
+  }, [playerSearch])
 
   const toggleTeam = (t) =>
     setPendingTeams(prev => prev.includes(t) ? prev.filter(x=>x!==t) : [...prev,t])
   const togglePlayer = (p) =>
     setPendingPlayers(prev => prev.includes(p) ? prev.filter(x=>x!==p) : [...prev,p])
 
-  const visiblePlayers = ALL_SQUAD_PLAYERS.filter(p =>
-    !playerSearch || p.name.toLowerCase().includes(playerSearch.toLowerCase()) || p.team.toLowerCase().includes(playerSearch.toLowerCase())
-  )
+  // Filter static list
+  const lowerSearch = playerSearch.toLowerCase()
+  const staticVisible = ALL_SQUAD_PLAYERS.filter(p => {
+    const matchesSearch = !playerSearch ||
+      p.name.toLowerCase().includes(lowerSearch) ||
+      p.team.toLowerCase().includes(lowerSearch)
+    const matchesPos = posFilter === 'ALL' || p.pos === posFilter
+    return matchesSearch && matchesPos
+  })
+
+  // Combined results — static first, ESPN additions after
+  const allVisible = [
+    ...staticVisible,
+    ...espnResults.filter(r => !staticVisible.some(s => s.name === r.name))
+  ]
 
   const handleSave = () => {
     const on = pendingTeams.length > 0 || pendingPlayers.length > 0
@@ -469,11 +601,24 @@ function SquadModal({ squad, onSave, onClose }) {
 
           {/* PLAYERS */}
           <div className="squad-section">
-            <div className="squad-section-title">🏈 My Fantasy Players</div>
-            <input className="squad-player-search" placeholder="Search players…"
+            <div className="squad-section-title">
+              🏈 My Fantasy Players
+              <span style={{fontWeight:400,color:'var(--muted-lt)',marginLeft:8}}>{ALL_SQUAD_PLAYERS.length}+ players</span>
+            </div>
+            {/* Position filter */}
+            <div style={{display:'flex',gap:4,marginBottom:8,flexWrap:'wrap'}}>
+              {['ALL','QB','RB','WR','TE','K'].map(p => (
+                <button key={p}
+                  className={`squad-team-btn ${posFilter === p ? 'on' : ''}`}
+                  style={{padding:'3px 8px',fontSize:9}}
+                  onClick={() => setPosFilter(p)}>{p}</button>
+              ))}
+            </div>
+            <input className="squad-player-search" placeholder="Search by name or team (e.g. Geno, SEA, Chiefs)…"
               value={playerSearch} onChange={e => setPlayerSearch(e.target.value)} />
+            {searching && <div style={{fontFamily:'var(--font-mono)',fontSize:9,color:'var(--muted-lt)',padding:'4px 0'}}>Searching ESPN…</div>}
             <div className="squad-player-grid">
-              {visiblePlayers.map((p,i) => (
+              {allVisible.map((p,i) => (
                 <button key={i}
                   className={`squad-player-btn ${pendingPlayers.includes(p.name)?'on':''}`}
                   onClick={() => togglePlayer(p.name)}>
@@ -482,7 +627,17 @@ function SquadModal({ squad, onSave, onClose }) {
                   <span className="squad-pteam">{p.team}</span>
                 </button>
               ))}
+              {allVisible.length === 0 && playerSearch.length >= 3 && !searching && (
+                <div style={{fontFamily:'var(--font-mono)',fontSize:9,color:'var(--muted-lt)',padding:8,gridColumn:'1/-1'}}>
+                  No players found for "{playerSearch}"
+                </div>
+              )}
             </div>
+            {pendingPlayers.length > 0 && (
+              <div style={{marginTop:8,padding:'6px 8px',background:'rgba(200,168,75,.08)',borderRadius:2,fontFamily:'var(--font-mono)',fontSize:9,color:'var(--gold)'}}>
+                ⚡ {pendingPlayers.length} player{pendingPlayers.length!==1?'s':''} selected: {pendingPlayers.slice(0,5).join(', ')}{pendingPlayers.length>5?` +${pendingPlayers.length-5} more`:''}
+              </div>
+            )}
           </div>
         </div>
 
