@@ -50,6 +50,17 @@ export default function App() {
     localStorage.setItem('fw-font', fontTheme)
   }, [fontTheme])
 
+  // ── MY FANTASY SQUAD ──────────────────────────────────────────────────────
+  const [squad, setSquad] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('fw_squad_v1')) || {teams:[],players:[],on:false} }
+    catch(e) { return {teams:[],players:[],on:false} }
+  })
+  const saveSquad = (sq) => {
+    localStorage.setItem('fw_squad_v1', JSON.stringify({...sq}))
+    setSquad({...sq})
+  }
+  const [squadModalOpen, setSquadModalOpen] = useState(false)
+
   // Season gate — no ESPN calls before Sep 9 2026
   const seasonStarted = new Date() >= new Date('2026-09-09T00:00:00-04:00')
 
@@ -96,6 +107,8 @@ export default function App() {
     <div className="app">
       {/* ── MASTHEAD ── */}
       <Masthead lastUpdated={lastUpdated} hasLiveGame={hasLiveGame} onRefresh={refresh} fontTheme={fontTheme} setFontTheme={setFontTheme} />
+      <SquadBar squad={squad} onOpen={() => setSquadModalOpen(true)} onToggle={(on) => saveSquad({...squad,on})} />
+      {squadModalOpen && <SquadModal squad={squad} onSave={(sq) => { saveSquad(sq); setSquadModalOpen(false) }} onClose={() => setSquadModalOpen(false)} />}
 
       {/* ── TOP NAV ── */}
       <nav className="top-nav">
@@ -120,6 +133,7 @@ export default function App() {
             setOpenCardId={setOpenCardId}
             activeWeek={activeWeek}
             setActiveWeek={setActiveWeek}
+            squad={squad}
           />
         )}
         {activeView === 'Schedule'  && (
@@ -146,6 +160,7 @@ export default function App() {
           <FantasyView
             mode={fantMode} setMode={setFantMode}
             currentWeek={activeWeek}
+            squad={squad}
             trendsMode={trendsMode} setTrendsMode={setTrendsMode}
             trendsRange={trendsRange} setTrendsRange={setTrendsRange}
             trendsPos={trendsPos} setTrendsPos={setTrendsPos}
@@ -153,7 +168,6 @@ export default function App() {
         )}
         {activeView === 'Draft'     && <DraftView />}
         {activeView === 'History'   && <HistoryView />}
-        {activeView === 'TV Guide'  && <TVGuideView currentWeek={activeWeek} />}
       </main>
 
       <Footer />
@@ -337,8 +351,153 @@ function WeekSelector({ active, onChange }) {
   )
 }
 
+// ── MY FANTASY SQUAD COMPONENTS ──────────────────────────────────────────────
+const ALL_SQUAD_PLAYERS = [
+  {name:'Lamar Jackson',    pos:'QB',team:'BAL'},{name:'Josh Allen',         pos:'QB',team:'BUF'},
+  {name:'Patrick Mahomes',  pos:'QB',team:'KC'}, {name:'Jalen Hurts',        pos:'QB',team:'PHI'},
+  {name:'Joe Burrow',       pos:'QB',team:'CIN'},{name:'Jayden Daniels',     pos:'QB',team:'WAS'},
+  {name:"Ja'Marr Chase",    pos:'WR',team:'CIN'},{name:'CeeDee Lamb',        pos:'WR',team:'DAL'},
+  {name:'Tyreek Hill',      pos:'WR',team:'MIA'},{name:'Justin Jefferson',   pos:'WR',team:'MIN'},
+  {name:'A.J. Brown',       pos:'WR',team:'PHI'},{name:'Davante Adams',      pos:'WR',team:'NYJ'},
+  {name:'Malik Nabers',     pos:'WR',team:'NYG'},{name:'DK Metcalf',         pos:'WR',team:'SEA'},
+  {name:'Saquon Barkley',   pos:'RB',team:'PHI'},{name:"De'Von Achane",      pos:'RB',team:'MIA'},
+  {name:'Bijan Robinson',   pos:'RB',team:'ATL'},{name:'Jahmyr Gibbs',       pos:'RB',team:'DET'},
+  {name:'Tony Pollard',     pos:'RB',team:'TEN'},{name:'Kenneth Walker',     pos:'RB',team:'SEA'},
+  {name:'Travis Kelce',     pos:'TE',team:'KC'}, {name:'Sam LaPorta',        pos:'TE',team:'DET'},
+  {name:'Mark Andrews',     pos:'TE',team:'BAL'},{name:'Trey McBride',       pos:'TE',team:'ARI'},
+  {name:'Brock Bowers',     pos:'TE',team:'LV'}, {name:'Kyle Pitts',         pos:'TE',team:'ATL'},
+  {name:'Jeremiyah Love',   pos:'RB',team:'ARI'},{name:'Carnell Tate',       pos:'WR',team:'TEN'},
+  {name:'Fernando Mendoza', pos:'QB',team:'LV'}, {name:'Travis Hunter',      pos:'WR',team:'CLE'},
+]
+
+const SQUAD_DIVISIONS = [
+  {conf:'AFC',div:'AFC East', teams:['BUF','MIA','NE','NYJ']},
+  {conf:'AFC',div:'AFC North',teams:['BAL','CIN','CLE','PIT']},
+  {conf:'AFC',div:'AFC South',teams:['HOU','IND','JAC','TEN']},
+  {conf:'AFC',div:'AFC West', teams:['DEN','KC','LV','LAC']},
+  {conf:'NFC',div:'NFC East', teams:['DAL','NYG','PHI','WAS']},
+  {conf:'NFC',div:'NFC North',teams:['CHI','DET','GB','MIN']},
+  {conf:'NFC',div:'NFC South',teams:['ATL','CAR','NO','TB']},
+  {conf:'NFC',div:'NFC West', teams:['ARI','LA','LAC','SEA','SF']},
+]
+
+function SquadBar({ squad, onOpen, onToggle }) {
+  const total = (squad.teams?.length||0) + (squad.players?.length||0)
+  return (
+    <div className="squad-bar">
+      <button className="squad-btn" onClick={onOpen}>
+        ⚡ My Fantasy Squad
+        {total > 0 && <span className="squad-btn-count">{total}</span>}
+      </button>
+      {squad.on && total > 0 && (
+        <div className="squad-pills">
+          {[...(squad.teams||[]),...(squad.players||[])].slice(0,5).map((t,i) => (
+            <span key={i} className="squad-pill">{t}</span>
+          ))}
+          {total > 5 && <span className="squad-pill">+{total-5}</span>}
+        </div>
+      )}
+      <div className="squad-toggle-wrap">
+        <span className="squad-toggle-lbl">Highlight Squad</span>
+        <label className="squad-toggle">
+          <input type="checkbox" checked={!!squad.on} onChange={e => onToggle(e.target.checked)} />
+          <span className="squad-track" />
+        </label>
+      </div>
+    </div>
+  )
+}
+
+function SquadModal({ squad, onSave, onClose }) {
+  const [pendingTeams,   setPendingTeams]   = useState([...(squad.teams  ||[])])
+  const [pendingPlayers, setPendingPlayers] = useState([...(squad.players||[])])
+  const [playerSearch,   setPlayerSearch]   = useState('')
+
+  const toggleTeam = (t) =>
+    setPendingTeams(prev => prev.includes(t) ? prev.filter(x=>x!==t) : [...prev,t])
+  const togglePlayer = (p) =>
+    setPendingPlayers(prev => prev.includes(p) ? prev.filter(x=>x!==p) : [...prev,p])
+
+  const visiblePlayers = ALL_SQUAD_PLAYERS.filter(p =>
+    !playerSearch || p.name.toLowerCase().includes(playerSearch.toLowerCase()) || p.team.toLowerCase().includes(playerSearch.toLowerCase())
+  )
+
+  const handleSave = () => {
+    const on = pendingTeams.length > 0 || pendingPlayers.length > 0
+    onSave({ teams:pendingTeams, players:pendingPlayers, on })
+  }
+
+  return (
+    <div className="squad-overlay" onClick={e => e.target.className==='squad-overlay' && onClose()}>
+      <div className="squad-modal">
+        <div className="squad-modal-head">
+          <div>
+            <div className="squad-modal-title">⚡ My Fantasy Squad</div>
+            <div className="squad-modal-sub">Select teams & players · Saved locally · Never shared</div>
+          </div>
+          <button className="squad-modal-close" onClick={onClose}>✕</button>
+        </div>
+
+        <div className="squad-modal-body">
+          {/* TEAMS */}
+          <div className="squad-section">
+            <div className="squad-section-title">📋 My Teams</div>
+            <div className="squad-conf-grid">
+              {['AFC','NFC'].map(conf => (
+                <div key={conf}>
+                  <div className="squad-conf-label">{conf}</div>
+                  <div className="squad-div-grid">
+                    {SQUAD_DIVISIONS.filter(d=>d.conf===conf).map(d => (
+                      <div key={d.div}>
+                        <div className="squad-div-label">{d.div}</div>
+                        <div className="squad-team-row">
+                          {d.teams.map(t => (
+                            <button key={t}
+                              className={`squad-team-btn ${pendingTeams.includes(t)?'on':''}`}
+                              onClick={() => toggleTeam(t)}>
+                              {t}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* PLAYERS */}
+          <div className="squad-section">
+            <div className="squad-section-title">🏈 My Fantasy Players</div>
+            <input className="squad-player-search" placeholder="Search players…"
+              value={playerSearch} onChange={e => setPlayerSearch(e.target.value)} />
+            <div className="squad-player-grid">
+              {visiblePlayers.map((p,i) => (
+                <button key={i}
+                  className={`squad-player-btn ${pendingPlayers.includes(p.name)?'on':''}`}
+                  onClick={() => togglePlayer(p.name)}>
+                  <span className="squad-pos">{p.pos}</span>
+                  <span className="squad-pname">{p.name}</span>
+                  <span className="squad-pteam">{p.team}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="squad-modal-foot">
+          <button className="squad-foot-btn danger" onClick={() => { setPendingTeams([]); setPendingPlayers([]) }}>Clear All</button>
+          <button className="squad-foot-btn secondary" onClick={onClose}>Cancel</button>
+          <button className="squad-foot-btn primary" onClick={handleSave}>Save Squad ✓</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── SCORES VIEW ───────────────────────────────────────────────────────────────
-function ScoresView({ week, games, loading, error, openCardId, setOpenCardId, activeWeek, setActiveWeek }) {
+function ScoresView({ week, games, loading, error, openCardId, setOpenCardId, activeWeek, setActiveWeek, squad }) {
   return (
     <div>
       <WeekSelector active={activeWeek} onChange={setActiveWeek} />
@@ -351,7 +510,7 @@ function ScoresView({ week, games, loading, error, openCardId, setOpenCardId, ac
       </div>
       {error && <div className="error-bar">⚠ Could not reach ESPN — showing scheduled games. <button onClick={() => window.location.reload()}>Retry</button></div>}
       <div className="games-grid">
-        {games.map((g, i) => (
+        {displayGames.map((g, i) => (
           <GameCard
             key={`${g.home}-${g.away}-${g.date}`}
             game={g}
@@ -360,6 +519,7 @@ function ScoresView({ week, games, loading, error, openCardId, setOpenCardId, ac
               openCardId === `${g.home}-${g.away}` ? null : `${g.home}-${g.away}`
             )}
             index={i}
+            squad={squad}
           />
         ))}
       </div>
@@ -368,7 +528,7 @@ function ScoresView({ week, games, loading, error, openCardId, setOpenCardId, ac
 }
 
 // ── GAME CARD ─────────────────────────────────────────────────────────────────
-function GameCard({ game: g, isOpen, onToggle, index }) {
+function GameCard({ game: g, isOpen, onToggle, index, squad }) {
   const { data: boxData, loading: boxLoading } = useBoxScore(isOpen ? g.espnId : null)
 
   const isFinal    = g.status === 'final'
@@ -388,7 +548,7 @@ function GameCard({ game: g, isOpen, onToggle, index }) {
 
   return (
     <div
-      className={`game-card ${isOpen ? 'open' : ''} ${isFeat ? 'featured' : ''}`}
+      className={`game-card ${isOpen ? 'open' : ''} ${isFeat ? 'featured' : ''} ${squad?.on && squad?.teams?.length && (squad.teams.includes(g.home)||squad.teams.includes(g.away)) ? 'squad-match' : ''}`}
       style={{ animationDelay: `${index * 0.04}s` }}
     >
       {/* HEADER — always visible, click to toggle */}
@@ -2120,7 +2280,7 @@ const FANTASY_LEADERS_2025 = {
   ],
 }
 
-function FantasyLeadersView({ mode }) {
+function FantasyLeadersView({ mode, squad }) {
   const [pos, setPos] = useState('QB')
   const seasonStarted = new Date() >= new Date('2026-09-09T00:00:00-04:00')
   const data = FANTASY_LEADERS_2025[pos] || []
@@ -2175,7 +2335,7 @@ function FantasyLeadersView({ mode }) {
         <tbody>
           {sorted.map((p, i) => (
             <tr key={i}
-              className={`fl-row ${i < 12 ? 'fl-starter' : ''}`}
+              className={`fl-row ${i < 12 ? 'fl-starter' : ''} ${squad?.on && (squad?.players?.includes(p.name) || squad?.teams?.includes(p.team)) ? 'squad-match' : ''}`}
               onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(p.name+' fantasy football stats 2026')}`, '_blank')}
               style={{cursor:'pointer'}}>
               <td className="fl-rank" style={{color: getColor(p.rank)}}>
@@ -2258,7 +2418,7 @@ class TabErrorBoundary extends React.Component {
   }
 }
 
-function FantasyView({ mode, setMode, currentWeek, trendsMode, setTrendsMode, trendsRange, setTrendsRange, trendsPos, setTrendsPos }) {
+function FantasyView({ mode, setMode, currentWeek, squad, trendsMode, setTrendsMode, trendsRange, setTrendsRange, trendsPos, setTrendsPos }) {
   const [tab, setTab] = useState('leaders')
   const TABS = [
     { id:'leaders',   label:'📊 Leaders' },
@@ -2289,8 +2449,8 @@ function FantasyView({ mode, setMode, currentWeek, trendsMode, setTrendsMode, tr
           <button key={t.id} className={`htab ${tab === t.id ? 'on' : ''}`} onClick={() => setTab(t.id)}>{t.label}</button>
         ))}
       </div>
-      {tab === 'leaders'  && <TabErrorBoundary><FantasyLeadersView mode={mode} /></TabErrorBoundary>}
-      {tab === 'fw'       && <TabErrorBoundary><FWFormulaView currentWeek={currentWeek} mode={mode} /></TabErrorBoundary>}
+      {tab === 'leaders'  && <TabErrorBoundary><FantasyLeadersView mode={mode} squad={squad} /></TabErrorBoundary>}
+      {tab === 'fw'       && <TabErrorBoundary><FWFormulaView currentWeek={currentWeek} mode={mode} squad={squad} /></TabErrorBoundary>}
       {tab === 'startsit' && <TabErrorBoundary><StartSitView mode={mode} /></TabErrorBoundary>}
       {tab === 'matchups' && <TabErrorBoundary><MatchupRaterView /></TabErrorBoundary>}
       {tab === 'waiver'   && <TabErrorBoundary><WaiverWireView /></TabErrorBoundary>}
