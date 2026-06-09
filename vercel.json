@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/api/espn/athletes",
+      "destination": "https://site.api.espn.com/apis/common/v3/sports/football/nfl/athletes"
+    },
+    {
       "source": "/api/espn/teams/:team/schedule",
       "destination": "https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/:team/schedule"
     },
