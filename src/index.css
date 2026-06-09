@@ -812,3 +812,61 @@ body::before {
 .fw-trend{font-size:10px;white-space:nowrap}
 .fw-mini-bar{height:6px;background:rgba(42,31,14,.1);border-radius:3px;overflow:hidden;width:60px}
 .fw-mini-bar div{height:100%;border-radius:3px;transition:width .3s}
+
+/* ── MY FANTASY SQUAD ────────────────────────────────────────────────────── */
+.squad-bar{display:flex;align-items:center;gap:10px;padding:8px 16px;background:var(--ink);border-bottom:2px solid var(--gold);flex-wrap:wrap}
+.squad-btn{display:flex;align-items:center;gap:7px;padding:5px 13px;background:var(--gold);color:var(--ink);border:none;border-radius:var(--r);cursor:pointer;font-family:var(--font-mono);font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;transition:opacity .12s;white-space:nowrap}
+.squad-btn:hover{opacity:.85}
+.squad-btn-count{background:var(--ink);color:var(--gold);border-radius:10px;padding:1px 6px;font-size:8px;font-weight:700}
+.squad-pills{display:flex;gap:4px;flex-wrap:wrap;flex:1}
+.squad-pill{background:rgba(200,168,75,.2);color:var(--gold);border:1px solid rgba(200,168,75,.4);padding:1px 7px;border-radius:10px;font-family:var(--font-mono);font-size:8px;font-weight:700;letter-spacing:.06em}
+.squad-toggle-wrap{display:flex;align-items:center;gap:8px;margin-left:auto}
+.squad-toggle-lbl{font-family:var(--font-mono);font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:rgba(245,240,232,.5)}
+.squad-toggle{position:relative;width:38px;height:20px;cursor:pointer;flex-shrink:0}
+.squad-toggle input{opacity:0;width:0;height:0;position:absolute}
+.squad-track{position:absolute;inset:0;background:rgba(255,255,255,.2);border-radius:10px;transition:.2s}
+.squad-track:before{content:'';position:absolute;width:14px;height:14px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+.squad-toggle input:checked + .squad-track{background:var(--gold)}
+.squad-toggle input:checked + .squad-track:before{transform:translateX(18px)}
+
+/* Squad highlights throughout site */
+.squad-match{border-color:var(--gold) !important;border-width:2px !important;background:rgba(200,168,75,.06) !important}
+.fl-row.squad-match td{background:rgba(200,168,75,.08)}
+.fw-row.squad-match td{background:rgba(200,168,75,.08)}
+.squad-badge{display:inline-block;background:var(--gold);color:var(--ink);font-family:var(--font-mono);font-size:7px;font-weight:700;letter-spacing:.1em;padding:1px 5px;border-radius:2px;margin-top:2px;text-transform:uppercase}
+
+/* Squad Modal */
+.squad-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto}
+.squad-modal{background:var(--paper);border:2px solid var(--ink);border-radius:4px;width:100%;max-width:680px;max-height:88vh;display:flex;flex-direction:column;margin:auto}
+.squad-modal-head{display:flex;align-items:flex-start;justify-content:space-between;padding:14px 18px;background:var(--ink);color:var(--paper);flex-shrink:0}
+.squad-modal-title{font-family:var(--font-display);font-size:20px;font-weight:700;color:var(--gold)}
+.squad-modal-sub{font-family:var(--font-mono);font-size:8px;color:rgba(245,240,232,.45);letter-spacing:.08em;margin-top:3px}
+.squad-modal-close{background:none;border:none;color:rgba(245,240,232,.6);font-size:20px;cursor:pointer;padding:0 4px;line-height:1;transition:color .12s}
+.squad-modal-close:hover{color:var(--gold)}
+.squad-modal-body{overflow-y:auto;padding:16px 18px;flex:1}
+.squad-modal-foot{padding:10px 18px;border-top:1px solid var(--rule);display:flex;gap:8px;justify-content:flex-end;background:var(--paper-mid);flex-shrink:0}
+.squad-foot-btn{padding:6px 14px;border-radius:var(--r);cursor:pointer;font-family:var(--font-mono);font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;transition:background .12s;border:none}
+.squad-foot-btn.primary{background:var(--ink);color:var(--paper)}
+.squad-foot-btn.secondary{background:none;border:1px solid var(--rule-hvy);color:var(--muted)}
+.squad-foot-btn.danger{background:none;border:1px solid var(--accent);color:var(--accent)}
+
+.squad-section{margin-bottom:18px}
+.squad-section-title{font-family:var(--font-mono);font-size:9px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;padding-bottom:4px;border-bottom:1px solid var(--rule)}
+.squad-conf-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.squad-conf-label{font-family:var(--font-mono);font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:8px}
+.squad-div-grid{display:flex;flex-direction:column;gap:10px}
+.squad-div-label{font-family:var(--font-mono);font-size:7px;color:var(--muted-lt);letter-spacing:.1em;margin-bottom:4px}
+.squad-team-row{display:flex;gap:4px;flex-wrap:wrap}
+.squad-team-btn{padding:4px 9px;border:1px solid var(--rule-hvy);background:none;color:var(--ink);font-family:var(--font-mono);font-size:10px;font-weight:700;border-radius:var(--r);cursor:pointer;transition:all .1s;letter-spacing:.04em}
+.squad-team-btn:hover{background:var(--paper-dark);border-color:var(--muted)}
+.squad-team-btn.on{background:var(--gold);border-color:var(--gold);color:var(--ink)}
+
+.squad-player-search{width:100%;padding:7px 10px;border:1px solid var(--rule-hvy);background:var(--paper);color:var(--ink);font-family:var(--font-mono);font-size:11px;border-radius:var(--r);margin-bottom:8px}
+.squad-player-search:focus{outline:none;border-color:var(--gold)}
+.squad-player-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:3px;max-height:220px;overflow-y:auto}
+.squad-player-btn{display:flex;align-items:center;gap:6px;padding:5px 8px;border:1px solid var(--rule);background:none;border-radius:var(--r);cursor:pointer;text-align:left;transition:all .1s;font-size:11px}
+.squad-player-btn:hover{background:var(--paper-dark)}
+.squad-player-btn.on{background:rgba(200,168,75,.12);border-color:var(--gold)}
+.squad-pos{font-family:var(--font-mono);font-size:8px;font-weight:700;color:var(--accent);min-width:22px}
+.squad-pname{font-family:var(--font-body);font-size:11px;color:var(--ink);flex:1}
+.squad-pteam{font-family:var(--font-mono);font-size:8px;color:var(--muted-lt)}
