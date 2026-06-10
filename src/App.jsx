@@ -1817,39 +1817,64 @@ function useFWFantasyScores(currentWeek, mode) {
 }
 
 // ── FW FORMULA VIEW ────────────────────────────────────────────────────────────
-function FWFormulaView({ currentWeek, mode }) {
-  const [pos, setPos]           = useState('ALL')
-  const [showBreakdown, setShowBreakdown] = useState(false)
+// ── FW FORMULA VIEW ────────────────────────────────────────────────────────────
+// FW (Fantasy Worth) = Trend(35%) + Matchup(30%) + Usage(20%) + Weather(10%) + Momentum(5%)
+// All data live from ESPN box scores — no manual updates ever.
+function FWFormulaView({ currentWeek, mode, squad }) {
+  const [pos,      setPos]      = useState('ALL')
+  const [showInfo, setShowInfo] = useState(false)
   const seasonStarted = new Date() >= new Date('2026-09-09T00:00:00-04:00')
-  const { players, loading }    = useFWFantasyScores(currentWeek, mode)
+  const { players, loading } = useFWFantasyScores(currentWeek, mode)
 
   const POSITIONS = ['ALL','QB','RB','WR','TE','K']
-  const filtered = pos === 'ALL'
-    ? players.slice(0, 40)
-    : players.filter(p => p.pos === pos).slice(0, 25)
+
+  // Squad helpers
+  const isSquadPlayer = (p) =>
+    squad?.on && (
+      squad?.players?.includes(p.name) ||
+      squad?.teams?.includes(p.team)
+    )
+
+  // Float squad players to top, then sort by fwScore
+  const base = pos === 'ALL'
+    ? players.slice(0, 50)
+    : players.filter(p => p.pos === pos).slice(0, 30)
+
+  const squadPlayers = squad?.on ? base.filter(p => isSquadPlayer(p)) : []
+  const restPlayers  = squad?.on ? base.filter(p => !isSquadPlayer(p)) : base
 
   const scoreColor = (s) =>
     s >= 7.5 ? '#1a5c1a' : s >= 6.5 ? '#4ade80' : s >= 5.5 ? '#c8a84b' :
     s >= 4   ? '#d97706' : '#8b1a1a'
 
   const scoreLabel = (s) =>
-    s >= 7.5 ? '🟢 STRONG START' : s >= 6.5 ? '🟢 START' :
-    s >= 5.5 ? '🟡 FLEX' : s >= 4 ? '🟠 RISKY' : '🔴 SIT'
+    s >= 7.5 ? 'STRONG START' : s >= 6.5 ? 'START' :
+    s >= 5.5 ? 'FLEX' : s >= 4 ? 'RISKY' : 'SIT'
 
+  // Direction arrow based on last3avg vs seasonAvg
+  const dirArrow = (p) => {
+    if (!p.seasonAvg || p.seasonAvg === 0) return { symbol: '→', cls: 'fw-dir-flat', delta: '' }
+    const delta = p.last3avg - p.seasonAvg
+    if (delta >  1.5) return { symbol: '↑', cls: 'fw-dir-up',   delta: `+${delta.toFixed(1)}` }
+    if (delta < -1.5) return { symbol: '↓', cls: 'fw-dir-dn',   delta:  delta.toFixed(1) }
+    return { symbol: '→', cls: 'fw-dir-flat', delta: '' }
+  }
+
+  // Off-season placeholder
   if (!seasonStarted) return (
     <div className="leaders-coming-soon">
       <div className="cs-icon">⚡</div>
       <div className="cs-title">FW Formula — Live Sep 9</div>
       <div className="cs-text">
-        The Final Whistle Fantasy Score pulls live from ESPN box scores,
-        defensive matchup data, and weather to rank every player automatically.
-        No manual updates needed — ever.
+        FW (Fantasy Worth) scores every rostered player automatically using
+        recent performance, opponent difficulty, usage, weather, and momentum.
+        No manual updates — ever.
       </div>
       <div style={{margin:'16px auto',maxWidth:500,textAlign:'left',padding:'0 20px'}}>
         <div className="fl-offseason-banner" style={{borderRadius:4}}>
-          🧮 Formula: Trend (35%) + Matchup (30%) + Usage (20%) + Weather (10%) + Momentum (5%)<br/>
-          📡 Data: ESPN box scores · Defensive rankings · Open-Meteo weather · Live weekly<br/>
-          🔄 Updates: Every time you load the page — zero manual work
+          🧮 Trend (35%) + Matchup (30%) + Usage (20%) + Weather (10%) + Momentum (5%)<br/>
+          📡 Live ESPN box scores · Defensive rankings · Open-Meteo weather<br/>
+          🔄 Recalculates every page load — zero manual work
         </div>
       </div>
       <div className="cs-date">Season opens Sep 9 · SEA vs NE</div>
@@ -1858,26 +1883,60 @@ function FWFormulaView({ currentWeek, mode }) {
 
   return (
     <div>
-      {/* Header */}
+      {/* ── HEADER BAR ── */}
       <div className="fw-formula-header">
         <div className="fw-formula-title">
           <span>⚡ FW Fantasy Score</span>
-          <button className="fw-breakdown-btn" onClick={() => setShowBreakdown(!showBreakdown)}>
-            {showBreakdown ? 'Hide' : 'Show'} Formula
+          {/* Info chip — click to expand formula explanation */}
+          <button
+            className={`fw-info-chip ${showInfo ? 'on' : ''}`}
+            onClick={() => setShowInfo(!showInfo)}
+            title="What is the FW Score?"
+          >
+            ⓘ How it works
           </button>
         </div>
-        {showBreakdown && (
-          <div className="fw-breakdown-panel">
-            <div className="fw-bd-row"><span>📈 Trend (35%)</span><span>Last 3 wks avg vs season avg</span></div>
-            <div className="fw-bd-row"><span>🛡️ Matchup (30%)</span><span>Pts allowed by opp vs position</span></div>
-            <div className="fw-bd-row"><span>📊 Usage (20%)</span><span>Target share + carries per game</span></div>
-            <div className="fw-bd-row"><span>🌤️ Weather (10%)</span><span>Wind/rain/cold penalty (outdoor)</span></div>
-            <div className="fw-bd-row"><span>⚡ Momentum (5%)</span><span>Last game vs last-3 trend</span></div>
+
+        {/* Expandable formula explainer */}
+        {showInfo && (
+          <div className="fw-info-panel">
+            <div className="fw-info-intro">
+              <strong>FW (Fantasy Worth)</strong> is a 0–10 composite score that ranks every
+              player by how likely they are to produce this week — based purely on
+              numbers, not gut feel.
+            </div>
+            <div className="fw-formula-bars">
+              {[
+                { label:'📈 Recent Trend',    pct:35, desc:'Last 3 wks avg vs season avg — are they getting better?' },
+                { label:'🛡️ Matchup',         pct:30, desc:'Pts allowed by the opponent to this position historically' },
+                { label:'📊 Usage',           pct:20, desc:'Target share + carries per game — are they being used?' },
+                { label:'🌤️ Weather',         pct:10, desc:'Wind / rain / cold penalty for outdoor stadiums' },
+                { label:'⚡ Momentum',         pct:5,  desc:'Last game vs their rolling 3-week average' },
+              ].map(f => (
+                <div key={f.label} className="fw-formula-row">
+                  <div className="fw-formula-row-top">
+                    <span className="fw-formula-label">{f.label}</span>
+                    <span className="fw-formula-pct">{f.pct}%</span>
+                  </div>
+                  <div className="fw-formula-track">
+                    <div className="fw-formula-fill" style={{width:`${f.pct * 2.86}%`}} />
+                  </div>
+                  <div className="fw-formula-desc">{f.desc}</div>
+                </div>
+              ))}
+            </div>
+            <div className="fw-info-key">
+              <span className="fw-key-chip" style={{background:'#1a5c1a'}}>7.5–10 · Strong Start</span>
+              <span className="fw-key-chip" style={{background:'#4ade80',color:'#000'}}>6.5–7.4 · Start</span>
+              <span className="fw-key-chip" style={{background:'#c8a84b',color:'#000'}}>5.5–6.4 · Flex</span>
+              <span className="fw-key-chip" style={{background:'#d97706'}}>4–5.4 · Risky</span>
+              <span className="fw-key-chip" style={{background:'#8b1a1a'}}>0–3.9 · Sit</span>
+            </div>
           </div>
         )}
       </div>
 
-      {/* Position filter */}
+      {/* ── POSITION FILTER ── */}
       <div className="fw-pos-bar">
         {POSITIONS.map(p => (
           <button key={p} className={`tc-btn ${pos === p ? 'on' : ''}`} onClick={() => setPos(p)}>{p}</button>
@@ -1891,57 +1950,100 @@ function FWFormulaView({ currentWeek, mode }) {
         </div>
       )}
 
-      {!loading && filtered.length > 0 && (
-        <table className="fw-table">
-          <thead>
-            <tr>
-              <th>FW Score</th>
-              <th>Player</th>
-              <th>Pos</th>
-              <th>Team</th>
-              <th>vs</th>
-              <th>Proj</th>
-              <th>L1</th>
-              <th>L3 Avg</th>
-              <th>Trend</th>
-              <th>Matchup</th>
-              <th>Usage</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((p, i) => (
-              <tr key={i} className="fw-row">
-                <td>
-                  <div className="fw-score-cell" style={{background: scoreColor(p.fwScore)}}>
-                    <div className="fw-score-num">{p.fwScore}</div>
-                    <div className="fw-score-lbl">{scoreLabel(p.fwScore)}</div>
-                  </div>
-                </td>
-                <td className="fw-name">{p.name}</td>
-                <td className="fw-pos">{p.pos}</td>
-                <td className="fw-team">{p.team}</td>
-                <td className="fw-opp">{p.opp || '—'}</td>
-                <td className="fw-proj">{p.projPts}</td>
-                <td className={`fw-last ${p.last1 > p.seasonAvg ? 'fw-up' : 'fw-dn'}`}>{p.last1}</td>
-                <td className="fw-avg">{p.last3avg}</td>
-                <td className="fw-trend">{p.trend}</td>
-                <td>
-                  <div className="fw-mini-bar">
-                    <div style={{width:`${p.matchupScore * 10}%`, background: scoreColor(p.matchupScore)}} />
-                  </div>
-                </td>
-                <td>
-                  <div className="fw-mini-bar">
-                    <div style={{width:`${p.usageScore * 10}%`, background:'#4a90d9'}} />
-                  </div>
-                </td>
+      {/* ── TABLE ── */}
+      {!loading && (squadPlayers.length > 0 || restPlayers.length > 0) && (
+        <div className="fw-table-wrap">
+          <table className="fw-table">
+            <thead>
+              <tr>
+                <th className="fw-th-score">FW</th>
+                <th className="fw-th-name">Player</th>
+                <th className="fw-th-pos">Pos</th>
+                <th className="fw-th-team">Tm</th>
+                <th className="fw-th-opp">vs</th>
+                <th className="fw-th-proj">Proj</th>
+                <th className="fw-th-last">L1</th>
+                <th className="fw-th-avg">L3 Avg</th>
+                <th className="fw-th-dir">Dir</th>
+                <th className="fw-th-mb fw-hide-mobile">Matchup</th>
+                <th className="fw-th-mb fw-hide-mobile">Usage</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {/* ── MY SQUAD section ── */}
+              {squadPlayers.length > 0 && (<>
+                <tr className="fw-squad-divider">
+                  <td colSpan={11}>⚡ MY FANTASY SQUAD</td>
+                </tr>
+                {squadPlayers.map((p, i) => {
+                  const dir = dirArrow(p)
+                  return (
+                    <tr key={`sq-${i}`} className="fw-row fw-squad-row">
+                      <td>
+                        <div className="fw-score-cell" style={{background: scoreColor(p.fwScore)}}>
+                          <div className="fw-score-num">{p.fwScore}</div>
+                          <div className="fw-score-lbl">{scoreLabel(p.fwScore)}</div>
+                        </div>
+                      </td>
+                      <td className="fw-name">
+                        {p.name}
+                        <span className="squad-badge">MY SQUAD</span>
+                      </td>
+                      <td className="fw-pos">{p.pos}</td>
+                      <td className="fw-team">{p.team}</td>
+                      <td className="fw-opp">{p.opp || '—'}</td>
+                      <td className="fw-proj">{p.projPts}</td>
+                      <td className={`fw-last ${p.last1 > p.seasonAvg ? 'fw-up' : 'fw-dn'}`}>{p.last1}</td>
+                      <td className="fw-avg">{p.last3avg}</td>
+                      <td className={`fw-dir ${dir.cls}`}>{dir.symbol}{dir.delta && <span className="fw-dir-delta">{dir.delta}</span>}</td>
+                      <td className="fw-hide-mobile">
+                        <div className="fw-mini-bar"><div style={{width:`${p.matchupScore * 10}%`, background: scoreColor(p.matchupScore)}} /></div>
+                      </td>
+                      <td className="fw-hide-mobile">
+                        <div className="fw-mini-bar"><div style={{width:`${p.usageScore * 10}%`, background:'#4a90d9'}} /></div>
+                      </td>
+                    </tr>
+                  )
+                })}
+                <tr className="fw-squad-divider fw-squad-divider-end">
+                  <td colSpan={11}>ALL PLAYERS</td>
+                </tr>
+              </>)}
+
+              {/* ── Main player list ── */}
+              {restPlayers.map((p, i) => {
+                const dir = dirArrow(p)
+                return (
+                  <tr key={i} className="fw-row">
+                    <td>
+                      <div className="fw-score-cell" style={{background: scoreColor(p.fwScore)}}>
+                        <div className="fw-score-num">{p.fwScore}</div>
+                        <div className="fw-score-lbl">{scoreLabel(p.fwScore)}</div>
+                      </div>
+                    </td>
+                    <td className="fw-name">{p.name}</td>
+                    <td className="fw-pos">{p.pos}</td>
+                    <td className="fw-team">{p.team}</td>
+                    <td className="fw-opp">{p.opp || '—'}</td>
+                    <td className="fw-proj">{p.projPts}</td>
+                    <td className={`fw-last ${p.last1 > p.seasonAvg ? 'fw-up' : 'fw-dn'}`}>{p.last1}</td>
+                    <td className="fw-avg">{p.last3avg}</td>
+                    <td className={`fw-dir ${dir.cls}`}>{dir.symbol}{dir.delta && <span className="fw-dir-delta">{dir.delta}</span>}</td>
+                    <td className="fw-hide-mobile">
+                      <div className="fw-mini-bar"><div style={{width:`${p.matchupScore * 10}%`, background: scoreColor(p.matchupScore)}} /></div>
+                    </td>
+                    <td className="fw-hide-mobile">
+                      <div className="fw-mini-bar"><div style={{width:`${p.usageScore * 10}%`, background:'#4a90d9'}} /></div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
 
-      {!loading && filtered.length === 0 && (
+      {!loading && squadPlayers.length === 0 && restPlayers.length === 0 && (
         <div className="leaders-coming-soon">
           <div className="cs-icon">📊</div>
           <div className="cs-title">No data yet</div>
@@ -1951,6 +2053,7 @@ function FWFormulaView({ currentWeek, mode }) {
     </div>
   )
 }
+
 
 function StartSitView({ mode }) {
   const [playerA, setPlayerA] = useState(null)
@@ -2736,7 +2839,8 @@ function FantasyView({ mode, setMode, currentWeek, squad, trendsMode, setTrendsM
           <TrendsView currentWeek={currentWeek}
             mode={trendsMode} setMode={setTrendsMode}
             range={trendsRange} setRange={setTrendsRange}
-            pos={trendsPos} setPos={setTrendsPos} />
+            pos={trendsPos} setPos={setTrendsPos}
+            squad={squad} />
         </TabErrorBoundary>
       )}
       {tab === 'news'     && <TabErrorBoundary><FantasyNewsView mode={mode} /></TabErrorBoundary>}
@@ -2810,11 +2914,12 @@ const CAT_TO_POS = {
 }
 
 // ── TRENDS VIEW ───────────────────────────────────────────────────────────────
-function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos }) {
-  const [players, setPlayers]   = useState([])
-  const [loading, setLoading]   = useState(false)
-  const [error,   setError]     = useState(null)
-  const [fetched, setFetched]   = useState(false)
+// ── TRENDS VIEW ───────────────────────────────────────────────────────────────
+function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos, squad }) {
+  const [players, setPlayers] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [error,   setError]   = useState(null)
+  const [fetched, setFetched] = useState(false)
 
   const POSITIONS = ['ALL', 'QB', 'RB', 'WR', 'TE', 'K', 'DEF']
   const RANGES    = [
@@ -2826,6 +2931,12 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos }
 
   const seasonStarted = currentWeek > 1 || new Date() >= new Date('2026-09-09')
 
+  const isSquadPlayer = (p) =>
+    squad?.on && (
+      squad?.players?.includes(p.name) ||
+      squad?.teams?.includes(p.team)
+    )
+
   useEffect(() => {
     if (!seasonStarted) return
     fetchTrends()
@@ -2835,7 +2946,6 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos }
     setLoading(true)
     setError(null)
     try {
-      // Determine which weeks to fetch
       const weeksToFetch = []
       if (range === 'season') {
         for (let w = 1; w <= currentWeek; w++) weeksToFetch.push(w)
@@ -2844,7 +2954,6 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos }
         for (let w = start; w <= currentWeek; w++) weeksToFetch.push(w)
       }
 
-      // Fetch all scoreboards in parallel
       const scoreboards = await Promise.all(
         weeksToFetch.map(w =>
           fetch(`/api/espn/scoreboard?week=${w}&seasontype=2&limit=20`)
@@ -2853,16 +2962,12 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos }
         )
       )
 
-      // Get all game IDs
       const gameIds = []
       scoreboards.forEach((sb, idx) => {
         if (!sb?.events) return
-        sb.events.forEach(ev => {
-          gameIds.push({ id: ev.id, week: weeksToFetch[idx] })
-        })
+        sb.events.forEach(ev => gameIds.push({ id: ev.id, week: weeksToFetch[idx] }))
       })
 
-      // Fetch all box scores in parallel (cap at 20 to avoid rate limits)
       const capped = gameIds.slice(0, 20)
       const boxScores = await Promise.all(
         capped.map(g =>
@@ -2873,8 +2978,7 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos }
         )
       )
 
-      // Aggregate player stats across all box scores
-      const playerMap = {} // key: name+team
+      const playerMap = {}
 
       boxScores.forEach(bs => {
         if (!bs?.boxscore?.players) return
@@ -2888,45 +2992,40 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos }
               if (!name) return
               const key = `${name}|${tm}`
               const vals = {}
-              statGroup.labels?.forEach((lbl, i) => {
-                vals[lbl] = a.stats?.[i] || '0'
-              })
+              statGroup.labels?.forEach((lbl, i) => { vals[lbl] = a.stats?.[i] || '0' })
               const weekPts = calcFantasyPts(vals, mode, detectedPos)
               if (!playerMap[key]) {
-                playerMap[key] = {
-                  name, team: tm, pos: detectedPos,
-                  weeks: {}, totalPts: 0, weekCount: 0,
-                }
+                playerMap[key] = { name, team: tm, pos: detectedPos, weeks: {} }
               }
-              if (!playerMap[key].weeks[bs.week]) {
-                playerMap[key].weeks[bs.week] = 0
-              }
+              if (!playerMap[key].weeks[bs.week]) playerMap[key].weeks[bs.week] = 0
               playerMap[key].weeks[bs.week] += weekPts
             })
           })
         })
       })
 
-      // Calculate totals, averages, and trend
       const allPlayers = Object.values(playerMap).map(p => {
         const weekPts = Object.values(p.weeks)
         const total   = weekPts.reduce((a, b) => a + b, 0)
         const avg     = weekPts.length > 0 ? total / weekPts.length : 0
         const lastWk  = p.weeks[currentWeek] || 0
+        const prevWks = weekPts.slice(0, -1)
+        const prevAvg = prevWks.length > 0 ? prevWks.reduce((a,b) => a+b,0) / prevWks.length : avg
+        const delta   = lastWk - prevAvg
         const trend   = weekPts.length > 1
-          ? lastWk >= avg ? 'hot' : 'cold'
+          ? (delta >  1.5 ? 'up' : delta < -1.5 ? 'down' : 'flat')
           : 'new'
         return {
           ...p,
-          totalPts:  Math.round(total * 10) / 10,
-          avgPts:    Math.round(avg   * 10) / 10,
+          totalPts:  Math.round(total  * 10) / 10,
+          avgPts:    Math.round(avg    * 10) / 10,
           lastWkPts: Math.round(lastWk * 10) / 10,
+          delta:     Math.round(delta  * 10) / 10,
           trend,
           weekCount: weekPts.length,
         }
       })
 
-      // Sort by total points descending
       allPlayers.sort((a, b) => b.totalPts - a.totalPts)
       setPlayers(allPlayers)
       setFetched(true)
@@ -2937,12 +3036,46 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos }
     }
   }
 
-  // Filter by position
-  const filtered = pos === 'ALL'
-    ? players.slice(0, 30)
-    : players.filter(p => p.pos === pos).slice(0, 15)
+  // Filter by position, then split squad / rest
+  const base = pos === 'ALL'
+    ? players.slice(0, 40)
+    : players.filter(p => p.pos === pos).slice(0, 20)
+
+  const squadPlayers = squad?.on ? base.filter(p => isSquadPlayer(p)) : []
+  const restPlayers  = squad?.on ? base.filter(p => !isSquadPlayer(p)) : base
 
   const rangeLabel = RANGES.find(r => r.value === range)?.label || 'Last 3'
+
+  // Direction indicator component
+  const TrendIndicator = ({ p }) => {
+    if (p.trend === 'up')   return <span className="tt-dir tt-dir-up">↑ <span className="tt-delta">+{p.delta}</span></span>
+    if (p.trend === 'down') return <span className="tt-dir tt-dir-dn">↓ <span className="tt-delta">{p.delta}</span></span>
+    if (p.trend === 'flat') return <span className="tt-dir tt-dir-flat">→</span>
+    return <span className="tt-dir tt-dir-new">★ NEW</span>
+  }
+
+  // Reusable row renderer
+  const renderRow = (p, i, isSquad = false) => (
+    <tr
+      key={`${p.name}-${p.team}-${i}`}
+      className={[
+        i < 3 && !isSquad ? 'tt-top3' : '',
+        isSquad ? 'tt-squad' : '',
+      ].filter(Boolean).join(' ')}
+    >
+      <td className="tt-rank">{isSquad ? '⚡' : i + 1}</td>
+      <td className="tt-name">
+        {p.name}
+        {isSquad && <span className="squad-badge" style={{marginLeft:5}}>MY SQUAD</span>}
+      </td>
+      <td className="tt-team">{p.team}</td>
+      <td className="tt-pos">{p.pos}</td>
+      <td className="tt-pts">{p.totalPts}</td>
+      <td className="tt-avg">{p.avgPts}</td>
+      <td className={`tt-last ${p.lastWkPts >= p.avgPts ? 'tt-last-up' : 'tt-last-dn'}`}>{p.lastWkPts}</td>
+      <td className="tt-delta-cell"><TrendIndicator p={p} /></td>
+    </tr>
+  )
 
   return (
     <div>
@@ -2954,21 +3087,15 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos }
 
       {/* Controls */}
       <div className="trends-controls">
-        {/* Week range */}
         <div className="tc-group">
           <span className="tc-label">Range</span>
           <div className="tc-btns">
             {RANGES.map(r => (
-              <button
-                key={r.value}
-                className={`tc-btn ${range === r.value ? 'on' : ''}`}
-                onClick={() => setRange(r.value)}
-              >{r.label}</button>
+              <button key={r.value} className={`tc-btn ${range === r.value ? 'on' : ''}`}
+                onClick={() => setRange(r.value)}>{r.label}</button>
             ))}
           </div>
         </div>
-
-        {/* Scoring mode */}
         <div className="tc-group">
           <span className="tc-label">Scoring</span>
           <div className="tc-btns">
@@ -2976,17 +3103,12 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos }
             <button className={`tc-btn ${mode === 'ppr' ? 'on' : ''}`} onClick={() => setMode('ppr')}>PPR</button>
           </div>
         </div>
-
-        {/* Position filter */}
         <div className="tc-group">
           <span className="tc-label">Position</span>
           <div className="tc-btns">
             {POSITIONS.map(p => (
-              <button
-                key={p}
-                className={`tc-btn ${pos === p ? 'on' : ''}`}
-                onClick={() => setPos(p)}
-              >{p}</button>
+              <button key={p} className={`tc-btn ${pos === p ? 'on' : ''}`}
+                onClick={() => setPos(p)}>{p}</button>
             ))}
           </div>
         </div>
@@ -2998,9 +3120,9 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos }
           <div className="cs-icon">🔥</div>
           <div className="cs-title">Trends Available Week 3</div>
           <div className="cs-text">
-            Fantasy trending stats — hottest players over the last 1, 3, or 5 weeks —
-            will populate automatically once the season gets rolling. Standard and PPR
-            scoring, all positions including K and DEF, top 10+ per position.
+            Fantasy trending stats — hottest players over last 1, 3, or 5 weeks —
+            populate automatically once the season gets rolling. ↑ / ↓ arrows show
+            whether each player is trending up or down vs their own average.
           </div>
           <div className="cs-date">Season opens Sep 9 · SEA vs NE · Need 3 weeks for full trends</div>
         </div>
@@ -3014,52 +3136,45 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos }
         </div>
       )}
 
-      {/* Error */}
       {error && <div className="sch-error">{error}</div>}
 
       {/* Player table */}
-      {seasonStarted && !loading && fetched && filtered.length > 0 && (
+      {seasonStarted && !loading && fetched && (squadPlayers.length > 0 || restPlayers.length > 0) && (
         <div className="trends-table-wrap">
           <table className="trends-table">
             <thead>
               <tr>
                 <th className="tt-rank">#</th>
                 <th className="tt-name">Player</th>
-                <th className="tt-team">TM</th>
-                <th className="tt-pos">POS</th>
+                <th className="tt-team">Tm</th>
+                <th className="tt-pos">Pos</th>
                 <th className="tt-pts">Total</th>
                 <th className="tt-avg">Avg/Wk</th>
                 <th className="tt-last">Last Wk</th>
-                <th className="tt-trend">Trend</th>
+                <th className="tt-delta-cell">vs Avg</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((p, i) => (
-                <tr key={`${p.name}-${p.team}`} className={i < 3 ? 'tt-top3' : ''}>
-                  <td className="tt-rank">{i + 1}</td>
-                  <td className="tt-name">{p.name}</td>
-                  <td className="tt-team">{p.team}</td>
-                  <td className="tt-pos">{p.pos}</td>
-                  <td className="tt-pts">{p.totalPts}</td>
-                  <td className="tt-avg">{p.avgPts}</td>
-                  <td className="tt-last">{p.lastWkPts}</td>
-                  <td className="tt-trend">
-                    {p.trend === 'hot'  && <span className="trend-hot">🔥</span>}
-                    {p.trend === 'cold' && <span className="trend-cold">❄️</span>}
-                    {p.trend === 'new'  && <span className="trend-new">⚡</span>}
-                  </td>
+              {squadPlayers.length > 0 && (<>
+                <tr>
+                  <td colSpan={8} className="squad-table-divider">⚡ MY FANTASY SQUAD</td>
                 </tr>
-              ))}
+                {squadPlayers.map((p, i) => renderRow(p, i, true))}
+                <tr>
+                  <td colSpan={8} className="squad-table-divider" style={{background:'var(--paper-mid)',color:'var(--muted-lt)'}}>ALL PLAYERS</td>
+                </tr>
+              </>)}
+              {restPlayers.map((p, i) => renderRow(p, i))}
             </tbody>
           </table>
           <div className="trends-footer">
-            {mode === 'ppr' ? 'PPR' : 'Standard'} · Pass 1pt/25yds · 6pt TD · −2 INT · Rush/Rec 1pt/10yds{mode === 'ppr' ? ' · +1pt REC' : ''}
+            ↑↓ vs Avg = last week pts vs prior average · {mode === 'ppr' ? 'PPR' : 'Standard'} · Pass 1pt/25yds · 6pt TD · −2 INT · Rush/Rec 1pt/10yds{mode === 'ppr' ? ' · +1pt REC' : ''}
           </div>
         </div>
       )}
 
       {/* Empty state */}
-      {seasonStarted && !loading && fetched && filtered.length === 0 && (
+      {seasonStarted && !loading && fetched && squadPlayers.length === 0 && restPlayers.length === 0 && (
         <div className="leaders-coming-soon">
           <div className="cs-icon">📊</div>
           <div className="cs-title">No data for this filter yet</div>
