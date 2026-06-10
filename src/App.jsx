@@ -679,7 +679,7 @@ function SquadModal({ squad, onSave, onClose }) {
               {rosterLoading
                 ? <span style={{fontWeight:400,color:'var(--gold)',marginLeft:8}}>Loading live rosters from ESPN…</span>
                 : pendingTeams.length > 0 && espnPlayers.length > 0
-                  ? <span style={{fontWeight:400,color:'var(--muted-lt)',marginLeft:8}}>Live ESPN rosters · {espnPlayers.length} players</span>
+                  ? <span style={{fontWeight:400,color:'var(--muted-lt)',marginLeft:8}}>ESPN rosters · {espnPlayers.length} players · May lag 1-3 days on recent moves</span>
                   : <span style={{fontWeight:400,color:'var(--muted-lt)',marginLeft:8}}>{ALL_SQUAD_PLAYERS.length}+ players — select teams above for live rosters</span>
               }
             </div>
