@@ -891,3 +891,80 @@ body::before {
 .squad-pos{font-family:var(--font-mono);font-size:8px;font-weight:700;color:var(--accent);min-width:22px}
 .squad-pname{font-family:var(--font-body);font-size:11px;color:var(--ink);flex:1}
 .squad-pteam{font-family:var(--font-mono);font-size:8px;color:var(--muted-lt)}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   FW FORMULA — INFO CHIP, EXPLAINER PANEL, DIRECTION ARROWS, SQUAD
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Info chip (replaces old "Show Formula" button) */
+.fw-info-chip{font-family:var(--font-mono);font-size:8px;letter-spacing:.1em;text-transform:uppercase;padding:4px 10px;border:1px solid rgba(255,255,255,.35);background:none;color:rgba(255,255,255,.75);border-radius:var(--r);cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:4px}
+.fw-info-chip:hover,.fw-info-chip.on{background:rgba(200,168,75,.25);border-color:var(--gold);color:var(--gold)}
+
+/* Expandable explainer panel */
+.fw-info-panel{margin-top:12px;padding:14px;background:rgba(0,0,0,.25);border-radius:4px;border:1px solid rgba(200,168,75,.2)}
+.fw-info-intro{font-family:var(--font-body);font-size:12px;color:rgba(255,255,255,.85);line-height:1.5;margin-bottom:12px}
+.fw-info-intro strong{color:var(--gold)}
+
+/* Formula percentage bars */
+.fw-formula-bars{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.fw-formula-row{display:flex;flex-direction:column;gap:3px}
+.fw-formula-row-top{display:flex;justify-content:space-between;align-items:baseline}
+.fw-formula-label{font-family:var(--font-mono);font-size:9px;letter-spacing:.06em;color:rgba(255,255,255,.9)}
+.fw-formula-pct{font-family:var(--font-mono);font-size:10px;font-weight:700;color:var(--gold)}
+.fw-formula-track{height:4px;background:rgba(255,255,255,.12);border-radius:2px;overflow:hidden}
+.fw-formula-fill{height:100%;background:var(--gold);border-radius:2px;transition:width .3s}
+.fw-formula-desc{font-family:var(--font-mono);font-size:8px;color:rgba(255,255,255,.5);letter-spacing:.04em}
+
+/* Score key row */
+.fw-info-key{display:flex;gap:5px;flex-wrap:wrap;margin-top:4px}
+.fw-key-chip{font-family:var(--font-mono);font-size:8px;font-weight:700;letter-spacing:.08em;padding:3px 8px;border-radius:3px;color:#fff;white-space:nowrap}
+
+/* Direction arrows in FW table */
+.fw-table-wrap{overflow-x:auto}
+.fw-dir{font-family:var(--font-mono);font-size:13px;font-weight:700;white-space:nowrap;display:inline-flex;align-items:center;gap:1px}
+.fw-dir-up{color:#4ade80}
+.fw-dir-dn{color:#f87171}
+.fw-dir-flat{color:var(--muted-lt);font-size:11px}
+.fw-dir-delta{font-size:9px;margin-left:1px;font-weight:600}
+
+/* Squad section dividers in FW table */
+.fw-squad-divider td{font-family:var(--font-mono);font-size:8px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;padding:5px 12px;background:rgba(200,168,75,.15);color:var(--gold);border-top:1px solid rgba(200,168,75,.3);border-bottom:1px solid rgba(200,168,75,.3)}
+.fw-squad-divider-end td{background:var(--paper-mid);color:var(--muted-lt)}
+.fw-squad-row td{background:rgba(200,168,75,.09) !important;border-left:3px solid var(--gold)}
+
+/* Mobile: hide mini-bar columns */
+@media(max-width:600px){
+  .fw-hide-mobile{display:none}
+  .fw-score-cell{min-width:52px}
+  .fw-score-num{font-size:13px}
+  .fw-score-lbl{font-size:5px}
+  .fw-name{font-size:11px}
+  .fw-table{font-size:9px}
+  .fw-info-panel{padding:10px}
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   TRENDS TABLE — direction arrows, delta, squad highlight
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.tt-delta-cell{text-align:center;white-space:nowrap;font-family:var(--font-mono)}
+.tt-dir{font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:2px}
+.tt-dir-up{color:#4ade80}
+.tt-dir-dn{color:#f87171}
+.tt-dir-flat{color:var(--muted-lt);font-size:11px}
+.tt-dir-new{color:var(--gold);font-size:9px;letter-spacing:.08em}
+.tt-delta{font-size:9px;font-weight:600}
+
+/* Last week cell coloring */
+.tt-last-up{color:#4ade80;font-weight:700}
+.tt-last-dn{color:#f87171;font-weight:600}
+
+/* Squad row highlight */
+.trends-table tr.tt-squad td{background:rgba(200,168,75,.09) !important;border-left:3px solid var(--gold)}
+.trends-table tr.tt-squad td.tt-rank{color:var(--gold);font-size:12px}
+
+@media(max-width:600px){
+  .trends-table{font-size:10px}
+  .trends-table th,.trends-table td{padding:5px 6px}
+  .tt-delta{display:none}
+}
