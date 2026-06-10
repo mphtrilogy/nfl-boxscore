@@ -4491,13 +4491,28 @@ function DraftView() {
 function Footer() {
   return (
     <footer className="footer">
-      <span>The Final Whistle · nflboxscore.com · 2026</span>
-      <span className="footer-bmac">
-        Enjoying this? <a href="https://buymeacoffee.com/mhughes65v" target="_blank" rel="noopener">Buy me a coffee</a>
-        {' · '}
-        <a href={`https://www.amazon.com?tag=${AMAZON_TAG}`} target="_blank" rel="noopener">Shop Amazon</a>
-      </span>
-      <span>6pt TD · Standard / PPR</span>
+      <div className="footer-disclaimer">
+        <span className="footer-disc-text">
+          The Final Whistle is a free, independent NFL fan site for entertainment purposes only.
+          Data sourced from ESPN, CBS Sports, Google News and other public feeds —
+          roster info may lag 1–3 days on recent transactions.
+          Not affiliated with the NFL, ESPN, or any team.
+        </span>
+      </div>
+      <div className="footer-bottom">
+        <span className="footer-brand">The Final Whistle · nflboxscore.com · 2026</span>
+        <span className="footer-bmac">
+          Built for fun. If you enjoy it —{' '}
+          <a href="https://buymeacoffee.com/mhughes65v" target="_blank" rel="noopener">
+            ☕ Buy me a coffee
+          </a>
+          {' · '}
+          <a href={`https://www.amazon.com?tag=${AMAZON_TAG}`} target="_blank" rel="noopener">
+            Shop Amazon
+          </a>
+        </span>
+        <span className="footer-scoring">6pt TD · Standard / PPR</span>
+      </div>
     </footer>
   )
 }
