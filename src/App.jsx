@@ -733,6 +733,12 @@ function GameCard({ game: g, isOpen, onToggle, index, squad }) {
       <div className="card-head" onClick={onToggle}>
         {g.note && <div className="card-note">{g.note}</div>}
         {g.intl  && <div className="card-intl">🌍 {g.intlCity}</div>}
+        {/* Squad badge */}
+        {squad?.on && squad?.teams?.length > 0 && (squad.teams.includes(g.home) || squad.teams.includes(g.away)) && (
+          <div className="squad-game-badge">
+            ⚡ MY SQUAD · {squad.teams.includes(g.away) ? g.away : g.home}
+          </div>
+        )}
         <div className="card-status-row">
           <span className={`card-status ${isLive ? 'live' : isFinal ? 'final' : 'upcoming'}`}>
             {isLive && <span className="status-dot" />}
@@ -2464,9 +2470,19 @@ function FantasyLeadersView({ mode, squad }) {
   const data = FANTASY_LEADERS_2025[pos] || []
   const scoreKey = mode === 'ppr' ? 'ppr' : 'std'
 
-  // Sort by selected scoring
-  const sorted = [...data].sort((a, b) => b[scoreKey] - a[scoreKey])
+  // Sort by selected scoring, then squad to top
+  const sorted = [...data]
+    .sort((a, b) => b[scoreKey] - a[scoreKey])
     .map((p, i) => ({ ...p, rank: i + 1 }))
+    // If squad is on, float squad players to top
+    .sort((a, b) => {
+      if (!squad?.on) return 0
+      const am = squad?.players?.includes(a.name) || squad?.teams?.includes(a.team)
+      const bm = squad?.players?.includes(b.name) || squad?.teams?.includes(b.team)
+      if (am && !bm) return -1
+      if (!am && bm) return 1
+      return 0
+    })
 
   const getColor = (rank) => {
     if (rank === 1) return '#c8a84b'
@@ -2511,24 +2527,43 @@ function FantasyLeadersView({ mode, squad }) {
           </tr>
         </thead>
         <tbody>
-          {sorted.map((p, i) => (
-            <tr key={i}
-              className={`fl-row ${i < 12 ? 'fl-starter' : ''} ${squad?.on && (squad?.players?.includes(p.name) || squad?.teams?.includes(p.team)) ? 'squad-match' : ''}`}
-              onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(p.name+' fantasy football stats 2026')}`, '_blank')}
-              style={{cursor:'pointer'}}>
-              <td className="fl-rank" style={{color: getColor(p.rank)}}>
-                {p.rank === 1 ? '🥇' : p.rank === 2 ? '🥈' : p.rank === 3 ? '🥉' : `#${p.rank}`}
-              </td>
-              <td className="fl-name">{p.name}</td>
-              <td className="fl-team">
-                <a href={TEAMS[p.team]?.url || '#'} target="_blank" rel="noopener"
-                   className="sb-google-link" onClick={e => e.stopPropagation()}>{p.team}</a>
-              </td>
-              <td className="fl-gp">{p.gp}</td>
-              <td className="fl-pts" style={{color: getColor(p.rank)}}>{p[scoreKey].toFixed(1)}</td>
-              <td className="fl-avg">{(p[scoreKey] / p.gp).toFixed(1)}</td>
-            </tr>
-          ))}
+          {(() => {
+            const isSquadOn = squad?.on && (squad?.players?.length > 0 || squad?.teams?.length > 0)
+            const sqPlayers = isSquadOn ? sorted.filter(p => squad.players?.includes(p.name) || squad.teams?.includes(p.team)) : []
+            const rest      = isSquadOn ? sorted.filter(p => !squad.players?.includes(p.name) && !squad.teams?.includes(p.team)) : sorted
+            return (<>
+              {sqPlayers.length > 0 && <>
+                <tr><td colSpan={6} className="squad-table-divider">⚡ MY SQUAD</td></tr>
+                {sqPlayers.map((p,i) => (
+                  <tr key={`sq${i}`} className="fl-row squad-match"
+                    onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(p.name+' fantasy football 2026')}`, '_blank')}
+                    style={{cursor:'pointer'}}>
+                    <td className="fl-rank" style={{color:getColor(p.rank)}}>#{p.rank}</td>
+                    <td className="fl-name">{p.name} <span className="squad-badge">MY SQUAD</span></td>
+                    <td className="fl-team"><a href={TEAMS[p.team]?.url||'#'} target="_blank" rel="noopener" className="sb-google-link" onClick={e=>e.stopPropagation()}>{p.team}</a></td>
+                    <td className="fl-gp">{p.gp}</td>
+                    <td className="fl-pts" style={{color:getColor(p.rank)}}>{p[scoreKey].toFixed(1)}</td>
+                    <td className="fl-avg">{(p[scoreKey]/p.gp).toFixed(1)}</td>
+                  </tr>
+                ))}
+                <tr><td colSpan={6} className="squad-table-divider" style={{background:'var(--paper-mid)',color:'var(--muted-lt)'}}>ALL PLAYERS</td></tr>
+              </>}
+              {rest.map((p,i) => (
+                <tr key={i} className={`fl-row ${i < 12 ? 'fl-starter' : ''}`}
+                  onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(p.name+' fantasy football 2026')}`, '_blank')}
+                  style={{cursor:'pointer'}}>
+                  <td className="fl-rank" style={{color:getColor(p.rank)}}>
+                    {p.rank===1?'🥇':p.rank===2?'🥈':p.rank===3?'🥉':`#${p.rank}`}
+                  </td>
+                  <td className="fl-name">{p.name}</td>
+                  <td className="fl-team"><a href={TEAMS[p.team]?.url||'#'} target="_blank" rel="noopener" className="sb-google-link" onClick={e=>e.stopPropagation()}>{p.team}</a></td>
+                  <td className="fl-gp">{p.gp}</td>
+                  <td className="fl-pts" style={{color:getColor(p.rank)}}>{p[scoreKey].toFixed(1)}</td>
+                  <td className="fl-avg">{(p[scoreKey]/p.gp).toFixed(1)}</td>
+                </tr>
+              ))}
+            </>)
+          })()}
         </tbody>
       </table>
       <div className="atl-note">
