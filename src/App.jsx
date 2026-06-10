@@ -56,8 +56,9 @@ export default function App() {
     catch(e) { return {teams:[],players:[],on:false} }
   })
   const saveSquad = (sq) => {
-    localStorage.setItem('fw_squad_v1', JSON.stringify({...sq}))
-    setSquad({...sq})
+    const newSquad = { teams: sq.teams || [], players: sq.players || [], on: !!sq.on }
+    localStorage.setItem('fw_squad_v1', JSON.stringify(newSquad))
+    setSquad(newSquad)
   }
   const [squadModalOpen, setSquadModalOpen] = useState(false)
 
@@ -107,7 +108,7 @@ export default function App() {
     <div className="app">
       {/* ── MASTHEAD ── */}
       <Masthead lastUpdated={lastUpdated} hasLiveGame={hasLiveGame} onRefresh={refresh} fontTheme={fontTheme} setFontTheme={setFontTheme} />
-      <SquadBar squad={squad} onOpen={() => setSquadModalOpen(true)} onToggle={(on) => saveSquad({...squad,on})} />
+      <SquadBar squad={squad} onOpen={() => setSquadModalOpen(true)} onToggle={(on) => saveSquad({teams:squad.teams||[], players:squad.players||[], on})} />
       {squadModalOpen && <SquadModal squad={squad} onSave={(sq) => { saveSquad(sq); setSquadModalOpen(false) }} onClose={() => setSquadModalOpen(false)} />}
 
       {/* ── TOP NAV ── */}
@@ -358,19 +359,19 @@ const ALL_SQUAD_PLAYERS = [
   {name:'Lamar Jackson',      pos:'QB',team:'BAL'},{name:'Josh Allen',           pos:'QB',team:'BUF'},
   {name:'Patrick Mahomes',    pos:'QB',team:'KC'}, {name:'Jalen Hurts',          pos:'QB',team:'PHI'},
   {name:'Joe Burrow',         pos:'QB',team:'CIN'},{name:'Jayden Daniels',       pos:'QB',team:'WAS'},
-  {name:'Sam Darnold',        pos:'QB',team:'SEA'},{name:'Geno Smith',           pos:'QB',team:'SEA'},
+  {name:'Sam Darnold',        pos:'QB',team:'SEA'},{name:'Geno Smith',           pos:'QB',team:'NYJ'},
   {name:'Brock Purdy',        pos:'QB',team:'SF'}, {name:'C.J. Stroud',          pos:'QB',team:'HOU'},
   {name:'Tua Tagovailoa',     pos:'QB',team:'MIA'},{name:'Jordan Love',          pos:'QB',team:'GB'},
   {name:'Dak Prescott',       pos:'QB',team:'DAL'},{name:'Anthony Richardson',   pos:'QB',team:'IND'},
   {name:'Caleb Williams',     pos:'QB',team:'CHI'},{name:'Drake Maye',           pos:'QB',team:'NE'},
   {name:'Bo Nix',             pos:'QB',team:'DEN'},{name:'Baker Mayfield',       pos:'QB',team:'TB'},
-  {name:'Kirk Cousins',       pos:'QB',team:'ATL'},{name:'Justin Herbert',       pos:'QB',team:'LAC'},
+  {name:'Kirk Cousins',       pos:'QB',team:'LV'},{name:'Justin Herbert',       pos:'QB',team:'LAC'},
   {name:'Justin Fields',      pos:'QB',team:'PIT'},{name:'Matthew Stafford',     pos:'QB',team:'LA'},
   {name:'Deshaun Watson',     pos:'QB',team:'CLE'},{name:'Trevor Lawrence',      pos:'QB',team:'JAC'},
   {name:'Will Levis',         pos:'QB',team:'TEN'},{name:'Daniel Jones',         pos:'QB',team:'NYG'},
   {name:'Aaron Rodgers',      pos:'QB',team:'NYJ'},{name:'Derek Carr',           pos:'QB',team:'NO'},
   {name:'Bryce Young',        pos:'QB',team:'CAR'},{name:'Aidan O\'Connell',     pos:'QB',team:'LV'},
-  {name:'Fernando Mendoza',   pos:'QB',team:'LV'}, {name:'Kyler Murray',         pos:'QB',team:'ARI'},
+  {name:'Fernando Mendoza',   pos:'QB',team:'LV'}, {name:'Kyler Murray',         pos:'QB',team:'MIN'},
   {name:'Sam Howell',         pos:'QB',team:'WAS'},{name:'Malik Willis',         pos:'QB',team:'TEN'},
   {name:'Jacoby Brissett',    pos:'QB',team:'NE'}, {name:'Carson Wentz',         pos:'QB',team:'LA'},
   // ── RBs ────────────────────────────────────────────────────────────────────
@@ -399,7 +400,7 @@ const ALL_SQUAD_PLAYERS = [
   // ── WRs ────────────────────────────────────────────────────────────────────
   {name:"Ja'Marr Chase",      pos:'WR',team:'CIN'},{name:'CeeDee Lamb',          pos:'WR',team:'DAL'},
   {name:'Tyreek Hill',        pos:'WR',team:'MIA'},{name:'Justin Jefferson',     pos:'WR',team:'MIN'},
-  {name:'A.J. Brown',         pos:'WR',team:'PHI'},{name:'Davante Adams',        pos:'WR',team:'NYJ'},
+  {name:'A.J. Brown',         pos:'WR',team:'NE'},{name:'Davante Adams',        pos:'WR',team:'NYJ'},
   {name:'Malik Nabers',       pos:'WR',team:'NYG'},{name:'DK Metcalf',           pos:'WR',team:'SEA'},
   {name:'Stefon Diggs',       pos:'WR',team:'HOU'},{name:'Puka Nacua',           pos:'WR',team:'LA'},
   {name:'Drake London',       pos:'WR',team:'ATL'},{name:'Amon-Ra St. Brown',    pos:'WR',team:'DET'},
@@ -413,21 +414,21 @@ const ALL_SQUAD_PLAYERS = [
   {name:'DJ Moore',           pos:'WR',team:'CHI'},{name:'Amari Cooper',         pos:'WR',team:'BUF'},
   {name:'Zay Flowers',        pos:'WR',team:'BAL'},{name:'Romeo Doubs',          pos:'WR',team:'GB'},
   {name:'Marvin Harrison Jr.',pos:'WR',team:'ARI'},{name:'Calvin Ridley',        pos:'WR',team:'TEN'},
-  {name:'Diontae Johnson',    pos:'WR',team:'CAR'},{name:'Odell Beckham Jr.',    pos:'WR',team:'MIA'},
+  {name:'Diontae Johnson',    pos:'WR',team:'CAR'},{name:'Odell Beckham Jr.',    pos:'WR',team:'NYG'},
   {name:'Brandin Cooks',      pos:'WR',team:'DAL'},{name:'Tyler Lockett',        pos:'WR',team:'SEA'},
   {name:'Josh Downs',         pos:'WR',team:'IND'},{name:'Adam Thielen',         pos:'WR',team:'CAR'},
   {name:'Rashid Shaheed',     pos:'WR',team:'NO'}, {name:'Wan\'Dale Robinson',   pos:'WR',team:'NYG'},
   {name:'Nathanael Dell',     pos:'WR',team:'HOU'},{name:'Tank Dell',            pos:'WR',team:'HOU'},
   {name:'Quentin Johnston',   pos:'WR',team:'LAC'},{name:'Rome Odunze',          pos:'WR',team:'CHI'},
   {name:'Jakobi Meyers',      pos:'WR',team:'LV'}, {name:'Hunter Renfrow',       pos:'WR',team:'LV'},
-  {name:'Michael Pittman',    pos:'WR',team:'IND'},{name:'Alec Pierce',          pos:'WR',team:'IND'},
+  {name:'Michael Pittman',    pos:'WR',team:'PIT'},{name:'Alec Pierce',          pos:'WR',team:'IND'},
   {name:'Darnell Mooney',     pos:'WR',team:'ATL'},{name:'Christian Kirk',       pos:'WR',team:'JAC'},
   {name:'Curtis Samuel',      pos:'WR',team:'BUF'},{name:'Elijah Moore',         pos:'WR',team:'CLE'},
   {name:'Carnell Tate',       pos:'WR',team:'TEN'},{name:'Travis Hunter',        pos:'WR',team:'CLE'},
   {name:'Emeka Egbuka',       pos:'WR',team:'MIA'},{name:'Makai Lemon',          pos:'WR',team:'PHI'},
   {name:'Omar Cooper Jr.',    pos:'WR',team:'NYJ'},{name:'Jordyn Tyson',         pos:'WR',team:'NO'},
   {name:'Demarcus Robinson',  pos:'WR',team:'LA'}, {name:'Van Jefferson',        pos:'WR',team:'ATL'},
-  {name:'Davante Adams',      pos:'WR',team:'NYJ'},{name:'Kendrick Bourne',      pos:'WR',team:'NE'},
+  {name:'Kendrick Bourne',      pos:'WR',team:'NE'},
   {name:'Jerry Jeudy',        pos:'WR',team:'CLE'},{name:'Cedric Tillman',       pos:'WR',team:'CLE'},
   // ── TEs ────────────────────────────────────────────────────────────────────
   {name:'Travis Kelce',       pos:'TE',team:'KC'}, {name:'Sam LaPorta',          pos:'TE',team:'DET'},
@@ -447,6 +448,15 @@ const ALL_SQUAD_PLAYERS = [
   {name:'Tyler Higbee',       pos:'TE',team:'LA'}, {name:'Foster Moreau',        pos:'TE',team:'NO'},
   {name:'Kenyon Sadiq',       pos:'TE',team:'NYJ'},{name:'Tyler Warren',         pos:'TE',team:'IND'},
   {name:'Colston Loveland',   pos:'TE',team:'ARI'},{name:'Oscar Delp',           pos:'TE',team:'NO'},
+
+  // ── ADDED/CORRECTED ──────────────────────────────────────────────────────
+  {name:'Garrett Wilson',       pos:'WR',team:'NYJ'},{name:'Mason Taylor',         pos:'TE',team:'NYJ'},
+  {name:'Josh Reynolds',        pos:'WR',team:'NYJ'},{name:'Myles Garrett',        pos:'DE',team:'LA'},
+  {name:'Micah Parsons',        pos:'LB',team:'DAL'},{name:'Jared Verse',          pos:'EDGE',team:'CLE'},
+  {name:'Stefon Diggs',         pos:'WR',team:'HOU'},{name:'DeAndre Hopkins',      pos:'WR',team:'KC'},
+  {name:'Trey Sermon',          pos:'RB',team:'PHI'},{name:'Clyde Edwards-Helaire', pos:'RB',team:'KC'},
+  {name:'Irvin Charles',        pos:'WR',team:'SEA'},{name:'Braxton Berrios',      pos:'WR',team:'NYG'},
+  {name:'JuJu Smith-Schuster',  pos:'WR',team:'KC'}, {name:'Odell Beckham Jr.',    pos:'WR',team:'NYG'},
   // ── Ks ─────────────────────────────────────────────────────────────────────
   {name:'Justin Tucker',      pos:'K', team:'BAL'},{name:'Harrison Butker',      pos:'K', team:'KC'},
   {name:'Evan McPherson',     pos:'K', team:'CIN'},{name:'Tyler Bass',           pos:'K', team:'BUF'},
@@ -555,8 +565,12 @@ function SquadModal({ squad, onSave, onClose }) {
   ]
 
   const handleSave = () => {
-    const on = pendingTeams.length > 0 || pendingPlayers.length > 0
-    onSave({ teams:pendingTeams, players:pendingPlayers, on })
+    const hasSquad = pendingTeams.length > 0 || pendingPlayers.length > 0
+    onSave({
+      teams:   [...pendingTeams],
+      players: [...pendingPlayers],
+      on:      hasSquad, // auto-enable if they saved something
+    })
   }
 
   return (
@@ -1464,7 +1478,7 @@ const PLAYER_POOL = [
   { name:'CeeDee Lamb',      team:'DAL', pos:'WR', proj:17.8, matchup:'vs PHI', matchupRating:5, lastWk:21.2, avgPts:17.0 },
   { name:'Stefon Diggs',     team:'HOU', pos:'WR', proj:16.2, matchup:'vs IND', matchupRating:9, lastWk:14.8, avgPts:15.6 },
   { name:"Ja'Marr Chase",   team:'CIN', pos:'WR', proj:16.0, matchup:'vs PIT', matchupRating:7, lastWk:18.4, avgPts:15.4 },
-  { name:'A.J. Brown',       team:'PHI', pos:'WR', proj:15.6, matchup:'vs DAL', matchupRating:5, lastWk:17.2, avgPts:15.0 },
+  { name:'A.J. Brown',       team:'NE',  pos:'WR', proj:15.6, matchup:'vs DAL', matchupRating:5, lastWk:17.2, avgPts:15.0 },
   { name:'Malik Nabers',     team:'NYG', pos:'WR', proj:14.8, matchup:'vs WAS', matchupRating:6, lastWk:12.4, avgPts:14.2 },
   { name:'Davante Adams',    team:'NYJ', pos:'WR', proj:14.2, matchup:'vs MIA', matchupRating:6, lastWk:16.8, avgPts:13.8 },
   { name:'Carnell Tate',     team:'TEN', pos:'WR', proj:12.4, matchup:'vs JAC', matchupRating:7, lastWk:null, avgPts:null },
@@ -2333,9 +2347,9 @@ const FANTASY_LEADERS_2025 = {
     { rank:8,  name:'C.J. Stroud',      team:'HOU', std:238.4, ppr:238.4, gp:17 },
     { rank:9,  name:'Tua Tagovailoa',   team:'MIA', std:226.8, ppr:226.8, gp:14 },
     { rank:10, name:'Dak Prescott',     team:'DAL', std:224.2, ppr:224.2, gp:17 },
-    { rank:11, name:'Geno Smith',       team:'SEA', std:218.6, ppr:218.6, gp:12 },
+    { rank:11, name:'Geno Smith',       team:'NYJ', std:218.6, ppr:218.6, gp:12 },
     { rank:12, name:'Brock Purdy',      team:'SF',  std:216.4, ppr:216.4, gp:17 },
-    { rank:13, name:'Kirk Cousins',     team:'ATL', std:211.8, ppr:211.8, gp:17 },
+    { rank:13, name:'Kirk Cousins',     team:'LV',  std:211.8, ppr:211.8, gp:17 },
     { rank:14, name:'Justin Herbert',   team:'LAC', std:208.4, ppr:208.4, gp:17 },
     { rank:15, name:'Anthony Richardson',team:'IND',std:201.2, ppr:201.2, gp:14 },
     { rank:16, name:'Bo Nix',           team:'DEN', std:198.6, ppr:198.6, gp:17 },
@@ -2346,7 +2360,7 @@ const FANTASY_LEADERS_2025 = {
     { rank:21, name:'Jayden Daniels',   team:'WAS', std:274.2, ppr:274.2, gp:17 },
     { rank:22, name:'Trevor Lawrence',  team:'JAC', std:161.4, ppr:161.4, gp:13 },
     { rank:23, name:'Jared Goff',       team:'DET', std:248.6, ppr:248.6, gp:17 },
-    { rank:24, name:'Matthew Stafford', team:'LAR', std:152.2, ppr:152.2, gp:16 },
+    { rank:24, name:'Matthew Stafford', team:'LA',  std:152.2, ppr:152.2, gp:16 },
     { rank:25, name:'Justin Fields',    team:'PIT', std:148.8, ppr:148.8, gp:15 },
   ],
   RB: [
@@ -2381,7 +2395,7 @@ const FANTASY_LEADERS_2025 = {
     { rank:2,  name:'Justin Jefferson', team:'MIN', std:261.8, ppr:314.4, gp:17 },
     { rank:3,  name:'CeeDee Lamb',      team:'DAL', std:258.4, ppr:311.2, gp:17 },
     { rank:4,  name:'Tyreek Hill',      team:'MIA', std:248.6, ppr:298.8, gp:17 },
-    { rank:5,  name:'A.J. Brown',       team:'PHI', std:241.2, ppr:288.4, gp:16 },
+    { rank:5,  name:'A.J. Brown',       team:'NE',  std:241.2, ppr:288.4, gp:16 },
     { rank:6,  name:'Amon-Ra St. Brown',team:'DET', std:234.8, ppr:281.6, gp:17 },
     { rank:7,  name:'Drake London',     team:'ATL', std:228.4, ppr:274.8, gp:17 },
     { rank:8,  name:'Stefon Diggs',     team:'HOU', std:221.6, ppr:268.4, gp:17 },
