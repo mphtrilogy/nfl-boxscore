@@ -506,51 +506,111 @@ function SquadBar({ squad, onOpen, onToggle }) {
   )
 }
 
+// ── ESPN TEAM IDs for roster API ─────────────────────────────────────────────
+const ESPN_TEAM_IDS = {
+  ARI:22,ATL:1, BAL:33,BUF:2, CAR:29,CHI:3, CIN:4, CLE:5,
+  DAL:6, DEN:7, DET:8, GB:9,  HOU:34,IND:11,JAC:30,KC:12,
+  LA:14, LAC:24,LV:13, MIA:15,MIN:16,NE:17, NO:18, NYG:19,
+  NYJ:20,PHI:21,PIT:23,SEA:26,SF:25, TB:27, TEN:10,WAS:28,
+}
+
+// Cache key so we don't re-fetch on every modal open
+const ROSTER_CACHE_KEY = 'fw_rosters_v1'
+const ROSTER_CACHE_TTL = 6 * 60 * 60 * 1000 // 6 hours
+
+function useESPNRosters(teams) {
+  const [players,  setPlayers]  = useState([])
+  const [loading,  setLoading]  = useState(false)
+
+  useEffect(() => {
+    if (!teams || teams.length === 0) { setPlayers([]); return }
+
+    // Check cache first
+    try {
+      const cached = JSON.parse(localStorage.getItem(ROSTER_CACHE_KEY) || '{}')
+      const now = Date.now()
+      const allCached = teams.every(t => cached[t] && (now - cached[t].ts) < ROSTER_CACHE_TTL)
+      if (allCached) {
+        const all = teams.flatMap(t => cached[t].players || [])
+        setPlayers(all)
+        return
+      }
+    } catch(e) {}
+
+    // Fetch rosters for selected teams from ESPN
+    setLoading(true)
+    const FANTASY_POS = ['QB','RB','WR','TE','K']
+
+    Promise.all(
+      teams.map(abbr => {
+        const id = ESPN_TEAM_IDS[abbr]
+        if (!id) return Promise.resolve([])
+        return fetch(`/api/espn/teams/${id}/roster`)
+          .then(r => r.ok ? r.json() : null)
+          .then(data => {
+            if (!data) return []
+            const teamPlayers = []
+            ;(data.athletes || []).forEach(group => {
+              const pos = group.position || group.name || ''
+              const posAbbr = pos.includes('Quarterback') ? 'QB'
+                : pos.includes('Running Back') ? 'RB'
+                : pos.includes('Wide Receiver') ? 'WR'
+                : pos.includes('Tight End') ? 'TE'
+                : pos.includes('Kicker') || pos.includes('Place') ? 'K' : null
+              if (!posAbbr) return
+              ;(group.items || []).slice(0, posAbbr === 'QB' ? 2 : posAbbr === 'K' ? 1 : posAbbr === 'TE' ? 2 : 4)
+                .forEach(a => {
+                  if (a.fullName || a.displayName) {
+                    teamPlayers.push({
+                      name: a.fullName || a.displayName,
+                      pos:  posAbbr,
+                      team: abbr,
+                    })
+                  }
+                })
+            })
+            return teamPlayers
+          })
+          .catch(() => [])
+      })
+    ).then(results => {
+      const allPlayers = results.flat()
+
+      // Update cache
+      try {
+        const cached = JSON.parse(localStorage.getItem(ROSTER_CACHE_KEY) || '{}')
+        const now = Date.now()
+        teams.forEach((t, i) => {
+          cached[t] = { players: results[i] || [], ts: now }
+        })
+        localStorage.setItem(ROSTER_CACHE_KEY, JSON.stringify(cached))
+      } catch(e) {}
+
+      setPlayers(allPlayers)
+      setLoading(false)
+    })
+  }, [JSON.stringify(teams)])
+
+  return { players, loading }
+}
+
 function SquadModal({ squad, onSave, onClose }) {
   const [pendingTeams,   setPendingTeams]   = useState([...(squad.teams  ||[])])
   const [pendingPlayers, setPendingPlayers] = useState([...(squad.players||[])])
   const [playerSearch,   setPlayerSearch]   = useState('')
-  const [espnResults,    setEspnResults]    = useState([])
-  const [searching,      setSearching]      = useState(false)
   const [posFilter,      setPosFilter]      = useState('ALL')
 
-  // Live ESPN player search for names not in static list
-  useEffect(() => {
-    if (playerSearch.length < 3) { setEspnResults([]); return }
-    // Check if we have enough static results first
-    const staticMatches = ALL_SQUAD_PLAYERS.filter(p =>
-      p.name.toLowerCase().includes(playerSearch.toLowerCase()) ||
-      p.team.toLowerCase().includes(playerSearch.toLowerCase())
-    )
-    if (staticMatches.length >= 3) { setEspnResults([]); return }
+  // Live ESPN roster data for selected teams — always current
+  const { players: espnPlayers, loading: rosterLoading } = useESPNRosters(pendingTeams)
 
-    // Hit ESPN athlete search API for unlisted players
-    setSearching(true)
-    fetch(`/api/espn/athletes?limit=10&search=${encodeURIComponent(playerSearch)}`)
-      .then(r => r.json())
-      .then(data => {
-        const results = (data.items || data.athletes || [])
-          .map(a => ({
-            name: a.displayName || a.fullName || '',
-            pos:  a.position?.abbreviation || '?',
-            team: a.team?.abbreviation || '?',
-          }))
-          .filter(p => p.name && !ALL_SQUAD_PLAYERS.some(sp => sp.name === p.name))
-          .slice(0, 6)
-        setEspnResults(results)
-        setSearching(false)
-      })
-      .catch(() => setSearching(false))
-  }, [playerSearch])
+  // When teams are selected: show their live ESPN roster
+  // When no teams selected: show full static list for browsing
+  const baseList = pendingTeams.length > 0 && espnPlayers.length > 0
+    ? espnPlayers
+    : ALL_SQUAD_PLAYERS
 
-  const toggleTeam = (t) =>
-    setPendingTeams(prev => prev.includes(t) ? prev.filter(x=>x!==t) : [...prev,t])
-  const togglePlayer = (p) =>
-    setPendingPlayers(prev => prev.includes(p) ? prev.filter(x=>x!==p) : [...prev,p])
-
-  // Filter static list
   const lowerSearch = playerSearch.toLowerCase()
-  const staticVisible = ALL_SQUAD_PLAYERS.filter(p => {
+  const allVisible = baseList.filter(p => {
     const matchesSearch = !playerSearch ||
       p.name.toLowerCase().includes(lowerSearch) ||
       p.team.toLowerCase().includes(lowerSearch)
@@ -558,18 +618,17 @@ function SquadModal({ squad, onSave, onClose }) {
     return matchesSearch && matchesPos
   })
 
-  // Combined results — static first, ESPN additions after
-  const allVisible = [
-    ...staticVisible,
-    ...espnResults.filter(r => !staticVisible.some(s => s.name === r.name))
-  ]
+  const toggleTeam = (t) =>
+    setPendingTeams(prev => prev.includes(t) ? prev.filter(x=>x!==t) : [...prev,t])
+  const togglePlayer = (p) =>
+    setPendingPlayers(prev => prev.includes(p) ? prev.filter(x=>x!==p) : [...prev,p])
 
   const handleSave = () => {
     const hasSquad = pendingTeams.length > 0 || pendingPlayers.length > 0
     onSave({
       teams:   [...pendingTeams],
       players: [...pendingPlayers],
-      on:      hasSquad, // auto-enable if they saved something
+      on:      hasSquad,
     })
   }
 
@@ -617,7 +676,12 @@ function SquadModal({ squad, onSave, onClose }) {
           <div className="squad-section">
             <div className="squad-section-title">
               🏈 My Fantasy Players
-              <span style={{fontWeight:400,color:'var(--muted-lt)',marginLeft:8}}>{ALL_SQUAD_PLAYERS.length}+ players</span>
+              {rosterLoading
+                ? <span style={{fontWeight:400,color:'var(--gold)',marginLeft:8}}>Loading live rosters from ESPN…</span>
+                : pendingTeams.length > 0 && espnPlayers.length > 0
+                  ? <span style={{fontWeight:400,color:'var(--muted-lt)',marginLeft:8}}>Live ESPN rosters · {espnPlayers.length} players</span>
+                  : <span style={{fontWeight:400,color:'var(--muted-lt)',marginLeft:8}}>{ALL_SQUAD_PLAYERS.length}+ players — select teams above for live rosters</span>
+              }
             </div>
             {/* Position filter */}
             <div style={{display:'flex',gap:4,marginBottom:8,flexWrap:'wrap'}}>
@@ -630,7 +694,7 @@ function SquadModal({ squad, onSave, onClose }) {
             </div>
             <input className="squad-player-search" placeholder="Search by name or team (e.g. Geno, SEA, Chiefs)…"
               value={playerSearch} onChange={e => setPlayerSearch(e.target.value)} />
-            {searching && <div style={{fontFamily:'var(--font-mono)',fontSize:9,color:'var(--muted-lt)',padding:'4px 0'}}>Searching ESPN…</div>}
+            {rosterLoading && <div style={{fontFamily:'var(--font-mono)',fontSize:9,color:'var(--gold)',padding:'4px 0'}}>⚡ Fetching live rosters from ESPN…</div>}
             <div className="squad-player-grid">
               {allVisible.map((p,i) => (
                 <button key={i}
@@ -3013,14 +3077,6 @@ const TEAM_ESPN_IDS = {
   LA:19, LAC:24, LV:13, MIA:20, MIN:21, NE:17, NO:18, NYG:22,
   NYJ:23, PHI:25, PIT:26, SEA:28, SF:29, TB:27, TEN:10, WAS:28,
 }
-// Fixed ESPN IDs
-const ESPN_TEAM_IDS = {
-  ARI:22, ATL:1,  BAL:33, BUF:2,  CAR:29, CHI:3,  CIN:4,  CLE:5,
-  DAL:6,  DEN:7,  DET:8,  GB:9,   HOU:34, IND:11, JAC:30, KC:12,
-  LA:14,  LAC:24, LV:13,  MIA:15, MIN:16, NE:17,  NO:18,  NYG:19,
-  NYJ:20, PHI:21, PIT:23, SEA:26, SF:25,  TB:27,  TEN:10, WAS:28,
-}
-
 // ── NEWS VIEW ─────────────────────────────────────────────────────────────────
 // ── MULTI-SOURCE NEWS HOOK ────────────────────────────────────────────────────
 // ── NFL News sources — ESPN, Google News, CBS, PFT confirmed working
