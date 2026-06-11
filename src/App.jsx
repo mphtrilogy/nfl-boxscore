@@ -26,7 +26,7 @@ function getAutoWeek() {
 }
 
 // ── TOP-LEVEL NAV VIEWS ───────────────────────────────────────────────────────
-const VIEWS = ['Scores', 'Schedule', 'Standings', 'TV Guide', 'News', 'Injuries', 'Leaders', 'Fantasy', 'Draft', 'History']
+const VIEWS = ['Scores', 'Schedule', 'Standings', 'TV Guide', 'News', 'Injuries', 'Leaders', 'Fantasy', 'Draft', 'History', 'Playroom', 'Resources']
 
 export default function App() {
   const [activeView,    setActiveView]    = useState('Scores')
@@ -116,7 +116,7 @@ export default function App() {
         {VIEWS.map(v => (
           <button
             key={v}
-            className={`tnav-btn ${activeView === v ? 'on' : ''} ${v === 'Fantasy' ? 'tnav-fantasy' : ''}`}
+            className={`tnav-btn ${activeView === v ? 'on' : ''} ${v === 'Fantasy' ? 'tnav-fantasy' : ''} ${v === 'Playroom' ? 'tnav-playroom' : ''} ${v === 'Resources' ? 'tnav-resources' : ''}`}
             onClick={() => setActiveView(v)}
           >{v}</button>
         ))}
@@ -169,6 +169,8 @@ export default function App() {
         )}
         {activeView === 'Draft'     && <DraftView />}
         {activeView === 'History'   && <HistoryView />}
+        {activeView === 'Playroom'  && <PlayroomView />}
+        {activeView === 'Resources' && <ResourcesView />}
       </main>
 
       <Footer />
@@ -1817,64 +1819,39 @@ function useFWFantasyScores(currentWeek, mode) {
 }
 
 // ── FW FORMULA VIEW ────────────────────────────────────────────────────────────
-// ── FW FORMULA VIEW ────────────────────────────────────────────────────────────
-// FW (Fantasy Worth) = Trend(35%) + Matchup(30%) + Usage(20%) + Weather(10%) + Momentum(5%)
-// All data live from ESPN box scores — no manual updates ever.
-function FWFormulaView({ currentWeek, mode, squad }) {
-  const [pos,      setPos]      = useState('ALL')
-  const [showInfo, setShowInfo] = useState(false)
+function FWFormulaView({ currentWeek, mode }) {
+  const [pos, setPos]           = useState('ALL')
+  const [showBreakdown, setShowBreakdown] = useState(false)
   const seasonStarted = new Date() >= new Date('2026-09-09T00:00:00-04:00')
-  const { players, loading } = useFWFantasyScores(currentWeek, mode)
+  const { players, loading }    = useFWFantasyScores(currentWeek, mode)
 
   const POSITIONS = ['ALL','QB','RB','WR','TE','K']
-
-  // Squad helpers
-  const isSquadPlayer = (p) =>
-    squad?.on && (
-      squad?.players?.includes(p.name) ||
-      squad?.teams?.includes(p.team)
-    )
-
-  // Float squad players to top, then sort by fwScore
-  const base = pos === 'ALL'
-    ? players.slice(0, 50)
-    : players.filter(p => p.pos === pos).slice(0, 30)
-
-  const squadPlayers = squad?.on ? base.filter(p => isSquadPlayer(p)) : []
-  const restPlayers  = squad?.on ? base.filter(p => !isSquadPlayer(p)) : base
+  const filtered = pos === 'ALL'
+    ? players.slice(0, 40)
+    : players.filter(p => p.pos === pos).slice(0, 25)
 
   const scoreColor = (s) =>
     s >= 7.5 ? '#1a5c1a' : s >= 6.5 ? '#4ade80' : s >= 5.5 ? '#c8a84b' :
     s >= 4   ? '#d97706' : '#8b1a1a'
 
   const scoreLabel = (s) =>
-    s >= 7.5 ? 'STRONG START' : s >= 6.5 ? 'START' :
-    s >= 5.5 ? 'FLEX' : s >= 4 ? 'RISKY' : 'SIT'
+    s >= 7.5 ? '🟢 STRONG START' : s >= 6.5 ? '🟢 START' :
+    s >= 5.5 ? '🟡 FLEX' : s >= 4 ? '🟠 RISKY' : '🔴 SIT'
 
-  // Direction arrow based on last3avg vs seasonAvg
-  const dirArrow = (p) => {
-    if (!p.seasonAvg || p.seasonAvg === 0) return { symbol: '→', cls: 'fw-dir-flat', delta: '' }
-    const delta = p.last3avg - p.seasonAvg
-    if (delta >  1.5) return { symbol: '↑', cls: 'fw-dir-up',   delta: `+${delta.toFixed(1)}` }
-    if (delta < -1.5) return { symbol: '↓', cls: 'fw-dir-dn',   delta:  delta.toFixed(1) }
-    return { symbol: '→', cls: 'fw-dir-flat', delta: '' }
-  }
-
-  // Off-season placeholder
   if (!seasonStarted) return (
     <div className="leaders-coming-soon">
       <div className="cs-icon">⚡</div>
       <div className="cs-title">FW Formula — Live Sep 9</div>
       <div className="cs-text">
-        FW (Fantasy Worth) scores every rostered player automatically using
-        recent performance, opponent difficulty, usage, weather, and momentum.
-        No manual updates — ever.
+        The Final Whistle Fantasy Score pulls live from ESPN box scores,
+        defensive matchup data, and weather to rank every player automatically.
+        No manual updates needed — ever.
       </div>
       <div style={{margin:'16px auto',maxWidth:500,textAlign:'left',padding:'0 20px'}}>
         <div className="fl-offseason-banner" style={{borderRadius:4}}>
-          🧮 Trend (35%) + Matchup (30%) + Usage (20%) + Weather (10%) + Momentum (5%)<br/>
-          📡 Live ESPN box scores · Defensive rankings · Open-Meteo weather<br/>
-          🔄 Recalculates every page load — zero manual work
+          🧮 Formula: Trend (35%) + Matchup (30%) + Usage (20%) + Weather (10%) + Momentum (5%)<br/>
+          📡 Data: ESPN box scores · Defensive rankings · Open-Meteo weather · Live weekly<br/>
+          🔄 Updates: Every time you load the page — zero manual work
         </div>
       </div>
       <div className="cs-date">Season opens Sep 9 · SEA vs NE</div>
@@ -1883,60 +1860,26 @@ function FWFormulaView({ currentWeek, mode, squad }) {
 
   return (
     <div>
-      {/* ── HEADER BAR ── */}
+      {/* Header */}
       <div className="fw-formula-header">
         <div className="fw-formula-title">
           <span>⚡ FW Fantasy Score</span>
-          {/* Info chip — click to expand formula explanation */}
-          <button
-            className={`fw-info-chip ${showInfo ? 'on' : ''}`}
-            onClick={() => setShowInfo(!showInfo)}
-            title="What is the FW Score?"
-          >
-            ⓘ How it works
+          <button className="fw-breakdown-btn" onClick={() => setShowBreakdown(!showBreakdown)}>
+            {showBreakdown ? 'Hide' : 'Show'} Formula
           </button>
         </div>
-
-        {/* Expandable formula explainer */}
-        {showInfo && (
-          <div className="fw-info-panel">
-            <div className="fw-info-intro">
-              <strong>FW (Fantasy Worth)</strong> is a 0–10 composite score that ranks every
-              player by how likely they are to produce this week — based purely on
-              numbers, not gut feel.
-            </div>
-            <div className="fw-formula-bars">
-              {[
-                { label:'📈 Recent Trend',    pct:35, desc:'Last 3 wks avg vs season avg — are they getting better?' },
-                { label:'🛡️ Matchup',         pct:30, desc:'Pts allowed by the opponent to this position historically' },
-                { label:'📊 Usage',           pct:20, desc:'Target share + carries per game — are they being used?' },
-                { label:'🌤️ Weather',         pct:10, desc:'Wind / rain / cold penalty for outdoor stadiums' },
-                { label:'⚡ Momentum',         pct:5,  desc:'Last game vs their rolling 3-week average' },
-              ].map(f => (
-                <div key={f.label} className="fw-formula-row">
-                  <div className="fw-formula-row-top">
-                    <span className="fw-formula-label">{f.label}</span>
-                    <span className="fw-formula-pct">{f.pct}%</span>
-                  </div>
-                  <div className="fw-formula-track">
-                    <div className="fw-formula-fill" style={{width:`${f.pct * 2.86}%`}} />
-                  </div>
-                  <div className="fw-formula-desc">{f.desc}</div>
-                </div>
-              ))}
-            </div>
-            <div className="fw-info-key">
-              <span className="fw-key-chip" style={{background:'#1a5c1a'}}>7.5–10 · Strong Start</span>
-              <span className="fw-key-chip" style={{background:'#4ade80',color:'#000'}}>6.5–7.4 · Start</span>
-              <span className="fw-key-chip" style={{background:'#c8a84b',color:'#000'}}>5.5–6.4 · Flex</span>
-              <span className="fw-key-chip" style={{background:'#d97706'}}>4–5.4 · Risky</span>
-              <span className="fw-key-chip" style={{background:'#8b1a1a'}}>0–3.9 · Sit</span>
-            </div>
+        {showBreakdown && (
+          <div className="fw-breakdown-panel">
+            <div className="fw-bd-row"><span>📈 Trend (35%)</span><span>Last 3 wks avg vs season avg</span></div>
+            <div className="fw-bd-row"><span>🛡️ Matchup (30%)</span><span>Pts allowed by opp vs position</span></div>
+            <div className="fw-bd-row"><span>📊 Usage (20%)</span><span>Target share + carries per game</span></div>
+            <div className="fw-bd-row"><span>🌤️ Weather (10%)</span><span>Wind/rain/cold penalty (outdoor)</span></div>
+            <div className="fw-bd-row"><span>⚡ Momentum (5%)</span><span>Last game vs last-3 trend</span></div>
           </div>
         )}
       </div>
 
-      {/* ── POSITION FILTER ── */}
+      {/* Position filter */}
       <div className="fw-pos-bar">
         {POSITIONS.map(p => (
           <button key={p} className={`tc-btn ${pos === p ? 'on' : ''}`} onClick={() => setPos(p)}>{p}</button>
@@ -1950,100 +1893,57 @@ function FWFormulaView({ currentWeek, mode, squad }) {
         </div>
       )}
 
-      {/* ── TABLE ── */}
-      {!loading && (squadPlayers.length > 0 || restPlayers.length > 0) && (
-        <div className="fw-table-wrap">
-          <table className="fw-table">
-            <thead>
-              <tr>
-                <th className="fw-th-score">FW</th>
-                <th className="fw-th-name">Player</th>
-                <th className="fw-th-pos">Pos</th>
-                <th className="fw-th-team">Tm</th>
-                <th className="fw-th-opp">vs</th>
-                <th className="fw-th-proj">Proj</th>
-                <th className="fw-th-last">L1</th>
-                <th className="fw-th-avg">L3 Avg</th>
-                <th className="fw-th-dir">Dir</th>
-                <th className="fw-th-mb fw-hide-mobile">Matchup</th>
-                <th className="fw-th-mb fw-hide-mobile">Usage</th>
+      {!loading && filtered.length > 0 && (
+        <table className="fw-table">
+          <thead>
+            <tr>
+              <th>FW Score</th>
+              <th>Player</th>
+              <th>Pos</th>
+              <th>Team</th>
+              <th>vs</th>
+              <th>Proj</th>
+              <th>L1</th>
+              <th>L3 Avg</th>
+              <th>Trend</th>
+              <th>Matchup</th>
+              <th>Usage</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((p, i) => (
+              <tr key={i} className="fw-row">
+                <td>
+                  <div className="fw-score-cell" style={{background: scoreColor(p.fwScore)}}>
+                    <div className="fw-score-num">{p.fwScore}</div>
+                    <div className="fw-score-lbl">{scoreLabel(p.fwScore)}</div>
+                  </div>
+                </td>
+                <td className="fw-name">{p.name}</td>
+                <td className="fw-pos">{p.pos}</td>
+                <td className="fw-team">{p.team}</td>
+                <td className="fw-opp">{p.opp || '—'}</td>
+                <td className="fw-proj">{p.projPts}</td>
+                <td className={`fw-last ${p.last1 > p.seasonAvg ? 'fw-up' : 'fw-dn'}`}>{p.last1}</td>
+                <td className="fw-avg">{p.last3avg}</td>
+                <td className="fw-trend">{p.trend}</td>
+                <td>
+                  <div className="fw-mini-bar">
+                    <div style={{width:`${p.matchupScore * 10}%`, background: scoreColor(p.matchupScore)}} />
+                  </div>
+                </td>
+                <td>
+                  <div className="fw-mini-bar">
+                    <div style={{width:`${p.usageScore * 10}%`, background:'#4a90d9'}} />
+                  </div>
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {/* ── MY SQUAD section ── */}
-              {squadPlayers.length > 0 && (<>
-                <tr className="fw-squad-divider">
-                  <td colSpan={11}>⚡ MY FANTASY SQUAD</td>
-                </tr>
-                {squadPlayers.map((p, i) => {
-                  const dir = dirArrow(p)
-                  return (
-                    <tr key={`sq-${i}`} className="fw-row fw-squad-row">
-                      <td>
-                        <div className="fw-score-cell" style={{background: scoreColor(p.fwScore)}}>
-                          <div className="fw-score-num">{p.fwScore}</div>
-                          <div className="fw-score-lbl">{scoreLabel(p.fwScore)}</div>
-                        </div>
-                      </td>
-                      <td className="fw-name">
-                        {p.name}
-                        <span className="squad-badge">MY SQUAD</span>
-                      </td>
-                      <td className="fw-pos">{p.pos}</td>
-                      <td className="fw-team">{p.team}</td>
-                      <td className="fw-opp">{p.opp || '—'}</td>
-                      <td className="fw-proj">{p.projPts}</td>
-                      <td className={`fw-last ${p.last1 > p.seasonAvg ? 'fw-up' : 'fw-dn'}`}>{p.last1}</td>
-                      <td className="fw-avg">{p.last3avg}</td>
-                      <td className={`fw-dir ${dir.cls}`}>{dir.symbol}{dir.delta && <span className="fw-dir-delta">{dir.delta}</span>}</td>
-                      <td className="fw-hide-mobile">
-                        <div className="fw-mini-bar"><div style={{width:`${p.matchupScore * 10}%`, background: scoreColor(p.matchupScore)}} /></div>
-                      </td>
-                      <td className="fw-hide-mobile">
-                        <div className="fw-mini-bar"><div style={{width:`${p.usageScore * 10}%`, background:'#4a90d9'}} /></div>
-                      </td>
-                    </tr>
-                  )
-                })}
-                <tr className="fw-squad-divider fw-squad-divider-end">
-                  <td colSpan={11}>ALL PLAYERS</td>
-                </tr>
-              </>)}
-
-              {/* ── Main player list ── */}
-              {restPlayers.map((p, i) => {
-                const dir = dirArrow(p)
-                return (
-                  <tr key={i} className="fw-row">
-                    <td>
-                      <div className="fw-score-cell" style={{background: scoreColor(p.fwScore)}}>
-                        <div className="fw-score-num">{p.fwScore}</div>
-                        <div className="fw-score-lbl">{scoreLabel(p.fwScore)}</div>
-                      </div>
-                    </td>
-                    <td className="fw-name">{p.name}</td>
-                    <td className="fw-pos">{p.pos}</td>
-                    <td className="fw-team">{p.team}</td>
-                    <td className="fw-opp">{p.opp || '—'}</td>
-                    <td className="fw-proj">{p.projPts}</td>
-                    <td className={`fw-last ${p.last1 > p.seasonAvg ? 'fw-up' : 'fw-dn'}`}>{p.last1}</td>
-                    <td className="fw-avg">{p.last3avg}</td>
-                    <td className={`fw-dir ${dir.cls}`}>{dir.symbol}{dir.delta && <span className="fw-dir-delta">{dir.delta}</span>}</td>
-                    <td className="fw-hide-mobile">
-                      <div className="fw-mini-bar"><div style={{width:`${p.matchupScore * 10}%`, background: scoreColor(p.matchupScore)}} /></div>
-                    </td>
-                    <td className="fw-hide-mobile">
-                      <div className="fw-mini-bar"><div style={{width:`${p.usageScore * 10}%`, background:'#4a90d9'}} /></div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </tbody>
+        </table>
       )}
 
-      {!loading && squadPlayers.length === 0 && restPlayers.length === 0 && (
+      {!loading && filtered.length === 0 && (
         <div className="leaders-coming-soon">
           <div className="cs-icon">📊</div>
           <div className="cs-title">No data yet</div>
@@ -2053,7 +1953,6 @@ function FWFormulaView({ currentWeek, mode, squad }) {
     </div>
   )
 }
-
 
 function StartSitView({ mode }) {
   const [playerA, setPlayerA] = useState(null)
@@ -2839,8 +2738,7 @@ function FantasyView({ mode, setMode, currentWeek, squad, trendsMode, setTrendsM
           <TrendsView currentWeek={currentWeek}
             mode={trendsMode} setMode={setTrendsMode}
             range={trendsRange} setRange={setTrendsRange}
-            pos={trendsPos} setPos={setTrendsPos}
-            squad={squad} />
+            pos={trendsPos} setPos={setTrendsPos} />
         </TabErrorBoundary>
       )}
       {tab === 'news'     && <TabErrorBoundary><FantasyNewsView mode={mode} /></TabErrorBoundary>}
@@ -2914,12 +2812,11 @@ const CAT_TO_POS = {
 }
 
 // ── TRENDS VIEW ───────────────────────────────────────────────────────────────
-// ── TRENDS VIEW ───────────────────────────────────────────────────────────────
-function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos, squad }) {
-  const [players, setPlayers] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [error,   setError]   = useState(null)
-  const [fetched, setFetched] = useState(false)
+function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos }) {
+  const [players, setPlayers]   = useState([])
+  const [loading, setLoading]   = useState(false)
+  const [error,   setError]     = useState(null)
+  const [fetched, setFetched]   = useState(false)
 
   const POSITIONS = ['ALL', 'QB', 'RB', 'WR', 'TE', 'K', 'DEF']
   const RANGES    = [
@@ -2931,12 +2828,6 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos, 
 
   const seasonStarted = currentWeek > 1 || new Date() >= new Date('2026-09-09')
 
-  const isSquadPlayer = (p) =>
-    squad?.on && (
-      squad?.players?.includes(p.name) ||
-      squad?.teams?.includes(p.team)
-    )
-
   useEffect(() => {
     if (!seasonStarted) return
     fetchTrends()
@@ -2946,6 +2837,7 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos, 
     setLoading(true)
     setError(null)
     try {
+      // Determine which weeks to fetch
       const weeksToFetch = []
       if (range === 'season') {
         for (let w = 1; w <= currentWeek; w++) weeksToFetch.push(w)
@@ -2954,6 +2846,7 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos, 
         for (let w = start; w <= currentWeek; w++) weeksToFetch.push(w)
       }
 
+      // Fetch all scoreboards in parallel
       const scoreboards = await Promise.all(
         weeksToFetch.map(w =>
           fetch(`/api/espn/scoreboard?week=${w}&seasontype=2&limit=20`)
@@ -2962,12 +2855,16 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos, 
         )
       )
 
+      // Get all game IDs
       const gameIds = []
       scoreboards.forEach((sb, idx) => {
         if (!sb?.events) return
-        sb.events.forEach(ev => gameIds.push({ id: ev.id, week: weeksToFetch[idx] }))
+        sb.events.forEach(ev => {
+          gameIds.push({ id: ev.id, week: weeksToFetch[idx] })
+        })
       })
 
+      // Fetch all box scores in parallel (cap at 20 to avoid rate limits)
       const capped = gameIds.slice(0, 20)
       const boxScores = await Promise.all(
         capped.map(g =>
@@ -2978,7 +2875,8 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos, 
         )
       )
 
-      const playerMap = {}
+      // Aggregate player stats across all box scores
+      const playerMap = {} // key: name+team
 
       boxScores.forEach(bs => {
         if (!bs?.boxscore?.players) return
@@ -2992,40 +2890,45 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos, 
               if (!name) return
               const key = `${name}|${tm}`
               const vals = {}
-              statGroup.labels?.forEach((lbl, i) => { vals[lbl] = a.stats?.[i] || '0' })
+              statGroup.labels?.forEach((lbl, i) => {
+                vals[lbl] = a.stats?.[i] || '0'
+              })
               const weekPts = calcFantasyPts(vals, mode, detectedPos)
               if (!playerMap[key]) {
-                playerMap[key] = { name, team: tm, pos: detectedPos, weeks: {} }
+                playerMap[key] = {
+                  name, team: tm, pos: detectedPos,
+                  weeks: {}, totalPts: 0, weekCount: 0,
+                }
               }
-              if (!playerMap[key].weeks[bs.week]) playerMap[key].weeks[bs.week] = 0
+              if (!playerMap[key].weeks[bs.week]) {
+                playerMap[key].weeks[bs.week] = 0
+              }
               playerMap[key].weeks[bs.week] += weekPts
             })
           })
         })
       })
 
+      // Calculate totals, averages, and trend
       const allPlayers = Object.values(playerMap).map(p => {
         const weekPts = Object.values(p.weeks)
         const total   = weekPts.reduce((a, b) => a + b, 0)
         const avg     = weekPts.length > 0 ? total / weekPts.length : 0
         const lastWk  = p.weeks[currentWeek] || 0
-        const prevWks = weekPts.slice(0, -1)
-        const prevAvg = prevWks.length > 0 ? prevWks.reduce((a,b) => a+b,0) / prevWks.length : avg
-        const delta   = lastWk - prevAvg
         const trend   = weekPts.length > 1
-          ? (delta >  1.5 ? 'up' : delta < -1.5 ? 'down' : 'flat')
+          ? lastWk >= avg ? 'hot' : 'cold'
           : 'new'
         return {
           ...p,
-          totalPts:  Math.round(total  * 10) / 10,
-          avgPts:    Math.round(avg    * 10) / 10,
+          totalPts:  Math.round(total * 10) / 10,
+          avgPts:    Math.round(avg   * 10) / 10,
           lastWkPts: Math.round(lastWk * 10) / 10,
-          delta:     Math.round(delta  * 10) / 10,
           trend,
           weekCount: weekPts.length,
         }
       })
 
+      // Sort by total points descending
       allPlayers.sort((a, b) => b.totalPts - a.totalPts)
       setPlayers(allPlayers)
       setFetched(true)
@@ -3036,46 +2939,12 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos, 
     }
   }
 
-  // Filter by position, then split squad / rest
-  const base = pos === 'ALL'
-    ? players.slice(0, 40)
-    : players.filter(p => p.pos === pos).slice(0, 20)
-
-  const squadPlayers = squad?.on ? base.filter(p => isSquadPlayer(p)) : []
-  const restPlayers  = squad?.on ? base.filter(p => !isSquadPlayer(p)) : base
+  // Filter by position
+  const filtered = pos === 'ALL'
+    ? players.slice(0, 30)
+    : players.filter(p => p.pos === pos).slice(0, 15)
 
   const rangeLabel = RANGES.find(r => r.value === range)?.label || 'Last 3'
-
-  // Direction indicator component
-  const TrendIndicator = ({ p }) => {
-    if (p.trend === 'up')   return <span className="tt-dir tt-dir-up">↑ <span className="tt-delta">+{p.delta}</span></span>
-    if (p.trend === 'down') return <span className="tt-dir tt-dir-dn">↓ <span className="tt-delta">{p.delta}</span></span>
-    if (p.trend === 'flat') return <span className="tt-dir tt-dir-flat">→</span>
-    return <span className="tt-dir tt-dir-new">★ NEW</span>
-  }
-
-  // Reusable row renderer
-  const renderRow = (p, i, isSquad = false) => (
-    <tr
-      key={`${p.name}-${p.team}-${i}`}
-      className={[
-        i < 3 && !isSquad ? 'tt-top3' : '',
-        isSquad ? 'tt-squad' : '',
-      ].filter(Boolean).join(' ')}
-    >
-      <td className="tt-rank">{isSquad ? '⚡' : i + 1}</td>
-      <td className="tt-name">
-        {p.name}
-        {isSquad && <span className="squad-badge" style={{marginLeft:5}}>MY SQUAD</span>}
-      </td>
-      <td className="tt-team">{p.team}</td>
-      <td className="tt-pos">{p.pos}</td>
-      <td className="tt-pts">{p.totalPts}</td>
-      <td className="tt-avg">{p.avgPts}</td>
-      <td className={`tt-last ${p.lastWkPts >= p.avgPts ? 'tt-last-up' : 'tt-last-dn'}`}>{p.lastWkPts}</td>
-      <td className="tt-delta-cell"><TrendIndicator p={p} /></td>
-    </tr>
-  )
 
   return (
     <div>
@@ -3087,15 +2956,21 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos, 
 
       {/* Controls */}
       <div className="trends-controls">
+        {/* Week range */}
         <div className="tc-group">
           <span className="tc-label">Range</span>
           <div className="tc-btns">
             {RANGES.map(r => (
-              <button key={r.value} className={`tc-btn ${range === r.value ? 'on' : ''}`}
-                onClick={() => setRange(r.value)}>{r.label}</button>
+              <button
+                key={r.value}
+                className={`tc-btn ${range === r.value ? 'on' : ''}`}
+                onClick={() => setRange(r.value)}
+              >{r.label}</button>
             ))}
           </div>
         </div>
+
+        {/* Scoring mode */}
         <div className="tc-group">
           <span className="tc-label">Scoring</span>
           <div className="tc-btns">
@@ -3103,12 +2978,17 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos, 
             <button className={`tc-btn ${mode === 'ppr' ? 'on' : ''}`} onClick={() => setMode('ppr')}>PPR</button>
           </div>
         </div>
+
+        {/* Position filter */}
         <div className="tc-group">
           <span className="tc-label">Position</span>
           <div className="tc-btns">
             {POSITIONS.map(p => (
-              <button key={p} className={`tc-btn ${pos === p ? 'on' : ''}`}
-                onClick={() => setPos(p)}>{p}</button>
+              <button
+                key={p}
+                className={`tc-btn ${pos === p ? 'on' : ''}`}
+                onClick={() => setPos(p)}
+              >{p}</button>
             ))}
           </div>
         </div>
@@ -3120,9 +3000,9 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos, 
           <div className="cs-icon">🔥</div>
           <div className="cs-title">Trends Available Week 3</div>
           <div className="cs-text">
-            Fantasy trending stats — hottest players over last 1, 3, or 5 weeks —
-            populate automatically once the season gets rolling. ↑ / ↓ arrows show
-            whether each player is trending up or down vs their own average.
+            Fantasy trending stats — hottest players over the last 1, 3, or 5 weeks —
+            will populate automatically once the season gets rolling. Standard and PPR
+            scoring, all positions including K and DEF, top 10+ per position.
           </div>
           <div className="cs-date">Season opens Sep 9 · SEA vs NE · Need 3 weeks for full trends</div>
         </div>
@@ -3136,45 +3016,52 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos, 
         </div>
       )}
 
+      {/* Error */}
       {error && <div className="sch-error">{error}</div>}
 
       {/* Player table */}
-      {seasonStarted && !loading && fetched && (squadPlayers.length > 0 || restPlayers.length > 0) && (
+      {seasonStarted && !loading && fetched && filtered.length > 0 && (
         <div className="trends-table-wrap">
           <table className="trends-table">
             <thead>
               <tr>
                 <th className="tt-rank">#</th>
                 <th className="tt-name">Player</th>
-                <th className="tt-team">Tm</th>
-                <th className="tt-pos">Pos</th>
+                <th className="tt-team">TM</th>
+                <th className="tt-pos">POS</th>
                 <th className="tt-pts">Total</th>
                 <th className="tt-avg">Avg/Wk</th>
                 <th className="tt-last">Last Wk</th>
-                <th className="tt-delta-cell">vs Avg</th>
+                <th className="tt-trend">Trend</th>
               </tr>
             </thead>
             <tbody>
-              {squadPlayers.length > 0 && (<>
-                <tr>
-                  <td colSpan={8} className="squad-table-divider">⚡ MY FANTASY SQUAD</td>
+              {filtered.map((p, i) => (
+                <tr key={`${p.name}-${p.team}`} className={i < 3 ? 'tt-top3' : ''}>
+                  <td className="tt-rank">{i + 1}</td>
+                  <td className="tt-name">{p.name}</td>
+                  <td className="tt-team">{p.team}</td>
+                  <td className="tt-pos">{p.pos}</td>
+                  <td className="tt-pts">{p.totalPts}</td>
+                  <td className="tt-avg">{p.avgPts}</td>
+                  <td className="tt-last">{p.lastWkPts}</td>
+                  <td className="tt-trend">
+                    {p.trend === 'hot'  && <span className="trend-hot">🔥</span>}
+                    {p.trend === 'cold' && <span className="trend-cold">❄️</span>}
+                    {p.trend === 'new'  && <span className="trend-new">⚡</span>}
+                  </td>
                 </tr>
-                {squadPlayers.map((p, i) => renderRow(p, i, true))}
-                <tr>
-                  <td colSpan={8} className="squad-table-divider" style={{background:'var(--paper-mid)',color:'var(--muted-lt)'}}>ALL PLAYERS</td>
-                </tr>
-              </>)}
-              {restPlayers.map((p, i) => renderRow(p, i))}
+              ))}
             </tbody>
           </table>
           <div className="trends-footer">
-            ↑↓ vs Avg = last week pts vs prior average · {mode === 'ppr' ? 'PPR' : 'Standard'} · Pass 1pt/25yds · 6pt TD · −2 INT · Rush/Rec 1pt/10yds{mode === 'ppr' ? ' · +1pt REC' : ''}
+            {mode === 'ppr' ? 'PPR' : 'Standard'} · Pass 1pt/25yds · 6pt TD · −2 INT · Rush/Rec 1pt/10yds{mode === 'ppr' ? ' · +1pt REC' : ''}
           </div>
         </div>
       )}
 
       {/* Empty state */}
-      {seasonStarted && !loading && fetched && squadPlayers.length === 0 && restPlayers.length === 0 && (
+      {seasonStarted && !loading && fetched && filtered.length === 0 && (
         <div className="leaders-coming-soon">
           <div className="cs-icon">📊</div>
           <div className="cs-title">No data for this filter yet</div>
@@ -4598,6 +4485,365 @@ function DraftView() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ── PLAYROOM DATA ─────────────────────────────────────────────────────────────
+// To update: edit the arrays below. No backend needed.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const EMOJI_QUIZ = [
+  { emoji:'🏃🏾⚡👑',  answer:'Bo Jackson',        hint:'Two-sport legend. Heisman. The myth.' },
+  { emoji:'💪🏾🇳🇬🚂',  answer:'Christian Okoye',   hint:'The Nigerian Nightmare. KC bruiser.' },
+  { emoji:'🕕🔔📺',     answer:'Monday Night Football', hint:'Al Michaels. Cosell. Prime time.' },
+  { emoji:'🦁🦁🦁🏆',  answer:'Barry Sanders',      hint:'Detroit Lions RB. Never won a ring. Walked away.' },
+  { emoji:'🍞🧀🏆',    answer:'Brett Favre',        hint:'Iron man QB. Cheese country. 297 straight starts.' },
+  { emoji:'⚡🐝🌊',    answer:'Deion Sanders',       hint:'Prime Time. Two-sport superstar. DB extraordinaire.' },
+  { emoji:'🏈💨📺🎙️', answer:'John Madden',         hint:'Coach. Analyst. Video game legend.' },
+  { emoji:'🎩🏈🦅',    answer:'Randall Cunningham', hint:'Ultimate Weapon. Eagles QB. Years ahead of his time.' },
+  { emoji:'🐎🎠🏈',    answer:'Walter Payton',      hint:'Sweetness. Chicago legend. Career 16,726 rush yards.' },
+  { emoji:'🔫🌵🏈',    answer:'Emmitt Smith',        hint:'All-time rush leader. Cowboys RB. Three rings.' },
+  { emoji:'🧊🏈❄️',    answer:'Dan Marino',          hint:'Never won a ring. Greatest arm of his era. Miami.' },
+  { emoji:'🦅🏹⚡',    answer:'Michael Vick',        hint:'Most electrifying QB ever. ATL 2004 MVP season.' },
+  { emoji:'🐻🔵🏆🏆',  answer:'Mike Singletary',   hint:'Samurai Mike. Bears LB. Eye black. 1985 Super Bowl.' },
+  { emoji:'🔴🔵⚡🏈',  answer:'LaDainian Tomlinson',hint:'28 TDs in 2006. Greatest fantasy RB season.' },
+  { emoji:'🧲🏈🖤🟡',  answer:'Hines Ward',          hint:'Toughest WR. Super Bowl XL MVP. Steelers.' },
+]
+
+const TRIVIA_FACTS = [
+  { fact:'Tom Brady went undrafted in the MLB Draft by the Expos but chose football instead.', category:'Did You Know' },
+  { fact:'Bo Jackson is the only player to be named an All-Star in both Major League Baseball and the NFL Pro Bowl.', category:'Legend' },
+  { fact:'Jerry Rice went to a Division I-AA school (Mississippi Valley State) before becoming the GOAT.', category:'Origin Story' },
+  { fact:'The 1972 Miami Dolphins remain the only team to finish a season undefeated and win the Super Bowl (17-0).', category:'Record Book' },
+  { fact:'Lawrence Taylor changed the way the NFL game is played — the left tackle position exploded in value directly because of him.', category:'Impact Player' },
+  { fact:'Emmitt Smith rushed for 18,355 career yards — an NFL record that still stands.', category:'Record Book' },
+  { fact:'Calvin Johnson (Megatron) recorded 1,964 receiving yards in 2012 — still the single-season record.', category:'Record Book' },
+  { fact:'The "Hail Mary" play that Roger Staubach threw in 1975 is literally where that term came from.', category:'History' },
+  { fact:'Barry Sanders averaged 5.0 yards per carry over his entire career — a stat that still seems impossible.', category:'Legend' },
+  { fact:'Peyton Manning studied defenses so obsessively that he changed his own plays at the line more than any QB in history.', category:'Film Room' },
+  { fact:'The XFL tried twice (2001, 2020) and technically returned in 2023. The Vince McMahon to Dana White transition is still wild.', category:'Strange But True' },
+  { fact:'John Madden was afraid to fly, so he traveled to every road game by bus or train during his coaching career.', category:'Did You Know' },
+  { fact:'Randy Moss played basketball at Marshall University before transferring to Dupont HS and then Florida State — his recruiting story is a whole movie.', category:'Origin Story' },
+  { fact:'The "Ice Bowl" (1967 NFL Championship, Packers vs. Cowboys) was played in −13°F — the referee\'s whistle froze to his lips.', category:'Classic Game' },
+  { fact:'Minnesota Vikings have lost four Super Bowls — the most of any franchise that has never won one.', category:'Hard Truth' },
+  { fact:'Alvin Kamara scored 6 rushing TDs on Christmas Day 2020 — the most in a single game since Ernie Nevers in 1929.', category:'Record Book' },
+  { fact:'Michael Strahan\'s record-breaking sack in 2001 (22.5) is still questioned — Brett Favre seemed to fall down intentionally.', category:'Controversy' },
+  { fact:'The West Coast Offense was invented by Bill Walsh at Stanford and San Jose State before he ever coached the 49ers.', category:'History' },
+  { fact:'Jim Brown never missed a game in his entire 9-year career and retired at his absolute peak, age 29.', category:'Legend' },
+  { fact:'The "Immaculate Reception" by Franco Harris in 1972 is still debated — did the ball hit a Steeler or a Raider first?', category:'Classic Game' },
+]
+
+const MEMORY_LANE_PROMPTS = [
+  { prompt:'Would LaDainian Tomlinson be a first-round pick today in PPR formats?', hot:true },
+  { prompt:'Marshall Faulk in 2000 had 2,189 scrimmage yards and 26 TDs. Would he go #1 overall in your draft?', hot:false },
+  { prompt:'Randy Moss in 1998 had 1,313 yards and 17 TDs as a rookie. What would that ADP look like today?', hot:true },
+  { prompt:'Pre-GPS Peyton Manning audibled at the line constantly. Would he thrive in today\'s RPO-heavy league?', hot:false },
+  { prompt:'Michael Vick\'s 2004 Madden rating was 95. His real-life 2004 season: 16 rush TDs, 902 rush yards as a QB. First overall pick today?', hot:true },
+  { prompt:'Barry Sanders averaged 5.0 YPC for a decade. Would he be a fantasy #1 overall pick in 2026?', hot:false },
+  { prompt:'Deion Sanders played in both a World Series and a Super Bowl in the same calendar year (1992). Name another athlete who could do that today.', hot:true },
+  { prompt:'The 1985 Chicago Bears defense — 46 sacks, 23 interceptions — how would they fare against today\'s spread offenses?', hot:false },
+]
+
+const CLASSIC_GAMES = [
+  { title:'The Ice Bowl', year:1967, teams:'Packers 21 · Cowboys 17', headline:'Starr QB sneak with 16 seconds left. −13°F. Greatest game ever played.', link:'https://www.google.com/search?q=1967+Ice+Bowl+Packers+Cowboys' },
+  { title:'The Catch', year:1982, teams:'49ers 28 · Cowboys 27', headline:'Dwight Clark. Six yards deep in the back of the end zone. Montana scrambling right. The dynasty begins.', link:'https://www.google.com/search?q=The+Catch+1982+49ers+Cowboys+Dwight+Clark' },
+  { title:'The Drive', year:1987, teams:'Broncos 23 · Browns 20 (OT)', headline:'Elway. 98 yards. 5:02 left. 15 plays. The stadium went silent.', link:'https://www.google.com/search?q=The+Drive+1987+Elway+Browns' },
+  { title:'The Miracle at the Meadowlands', year:1978, teams:'Eagles 19 · Giants 17', headline:'Giants kneeled it. The play that changed the rules of the game forever.', link:'https://www.google.com/search?q=Miracle+at+the+Meadowlands+1978+Eagles+Giants' },
+  { title:'The Immaculate Reception', year:1972, teams:'Steelers 13 · Raiders 7', headline:'Fourth-and-10. Tipped ball. Franco Harris scoops it up. Still debated.', link:'https://www.google.com/search?q=Immaculate+Reception+1972+Steelers+Raiders+Franco+Harris' },
+  { title:'Super Bowl XLII', year:2008, teams:'Giants 17 · Patriots 14', headline:'Helmet catch. 18-0 bid ended. Eli Manning. Greatest upset in Super Bowl history.', link:'https://www.google.com/search?q=Super+Bowl+XLII+Giants+Patriots+2008+David+Tyree' },
+  { title:'The Monday Night Miracle', year:2000, teams:'Jets 40 · Dolphins 37 (OT)', headline:'Down 30-7 at halftime. Greatest Monday Night comeback. Vinny Testaverde.', link:'https://www.google.com/search?q=Monday+Night+Miracle+2000+Jets+Dolphins' },
+  { title:'The Music City Miracle', year:2000, teams:'Titans 22 · Bills 16', headline:'Lateral on a kickoff return. Kevin Dyson 75 yards. Wildcard game. The play that still haunts Buffalo.', link:'https://www.google.com/search?q=Music+City+Miracle+2000+Titans+Bills' },
+  { title:'The Greatest Show on Turf', year:2000, teams:'Rams 23 · Buccaneers 11 (NFC Champ)', headline:'Marshall Faulk. Isaac Bruce. Torry Holt. Kurt Warner. The most unstoppable offense in NFL history.', link:'https://www.google.com/search?q=Greatest+Show+on+Turf+2000+Rams+season' },
+  { title:'The Snow Bowl / Tuck Rule Game', year:2002, teams:'Patriots 16 · Raiders 13 (OT)', headline:'Brady fumble? Or incomplete pass? The Tuck Rule. The dynasty that almost never was.', link:'https://www.google.com/search?q=Tuck+Rule+Game+2002+Patriots+Raiders' },
+  { title:'Bills 41 · Oilers 38 (OT)', year:1993, teams:'Bills 41 · Oilers 38 (OT)', headline:'Down 35-3 at halftime. Frank Reich. The greatest comeback in NFL playoff history.', link:'https://www.google.com/search?q=1993+Bills+Oilers+playoff+comeback+Frank+Reich' },
+  { title:'The Catch II', year:1999, teams:'49ers 30 · Packers 27', headline:'Terrell Owens, end zone, last-second catch. Steve Young had gone down and out came Joe Montana\'s heir.', link:'https://www.google.com/search?q=The+Catch+II+1999+49ers+Packers+Terrell+Owens' },
+]
+
+const QUICK_LINKS = [
+  {
+    category: '📊 Fantasy Tools',
+    links: [
+      { label:'FantasyPros Waiver Wire', url:'https://www.fantasypros.com/nfl/waiver-wire-assistant.php' },
+      { label:'RotoWire Player News', url:'https://www.rotoworld.com/football/nfl/player-news' },
+      { label:'ESPN Fantasy Rankings', url:'https://www.espn.com/fantasy/football/story/_/id/rankings' },
+      { label:'Sleeper ADP Tool', url:'https://sleeper.com/nfl/research/players' },
+      { label:'KeepTradeCut Values', url:'https://keeptradecut.com/fantasy-rankings' },
+      { label:'4for4 Projections', url:'https://www.4for4.com/projections' },
+    ]
+  },
+  {
+    category: '🏥 Injury & Depth Charts',
+    links: [
+      { label:'Official NFL Injury Report', url:'https://www.nfl.com/injuries/' },
+      { label:'ESPN NFL Injuries', url:'https://www.espn.com/nfl/injuries' },
+      { label:'Ourlads Depth Charts', url:'https://www.ourlads.com/nfldepthcharts/' },
+      { label:'FantasyPros Injury News', url:'https://www.fantasypros.com/nfl/injury-news.php' },
+      { label:'RotoWire Injury News', url:'https://www.rotoworld.com/football/nfl/injury-news' },
+    ]
+  },
+  {
+    category: '📺 Streaming & TV',
+    links: [
+      { label:'NFL+ Streaming', url:'https://www.nfl.com/plus' },
+      { label:'ESPN+ NFL Coverage', url:'https://plus.espn.com' },
+      { label:'Peacock NFL Games', url:'https://www.peacocktv.com/sports/nfl' },
+      { label:'Amazon Prime TNF', url:'https://www.amazon.com/primevideo/nfl' },
+      { label:'YouTube NFL Sunday Ticket', url:'https://tv.youtube.com/learn/nflsundayticket' },
+      { label:'Paramount+ AFC Games', url:'https://www.paramountplus.com/sports/nfl' },
+    ]
+  },
+  {
+    category: '📰 News & Analysis',
+    links: [
+      { label:'NFL.com News', url:'https://www.nfl.com/news/' },
+      { label:'Pro Football Talk', url:'https://profootballtalk.nbcsports.com' },
+      { label:'The Athletic NFL', url:'https://theathletic.com/nfl/' },
+      { label:'Football Outsiders', url:'https://www.footballoutsiders.com' },
+      { label:'Sharp Football Stats', url:'https://www.sharpfootballstats.com' },
+      { label:'Next Gen Stats', url:'https://nextgenstats.nfl.com' },
+    ]
+  },
+  {
+    category: '🏈 Trade & Research',
+    links: [
+      { label:'PFF Player Grades', url:'https://www.pff.com/nfl/grades' },
+      { label:'Pro Football Reference', url:'https://www.pro-football-reference.com' },
+      { label:'Spotrac Contracts', url:'https://www.spotrac.com/nfl' },
+      { label:'Over The Cap', url:'https://overthecap.com' },
+      { label:'Draft Network Profiles', url:'https://thedraftnetwork.com' },
+    ]
+  },
+]
+
+// ── PLAYROOM VIEW ─────────────────────────────────────────────────────────────
+function PlayroomView() {
+  const [section,       setSection]       = useState('trivia')
+  const [quizIdx,       setQuizIdx]       = useState(() => Math.floor(Math.random() * EMOJI_QUIZ.length))
+  const [quizRevealed,  setQuizRevealed]  = useState(false)
+  const [triviaIdx,     setTriviaIdx]     = useState(() => Math.floor(Math.random() * TRIVIA_FACTS.length))
+  const [memIdx,        setMemIdx]        = useState(() => Math.floor(Math.random() * MEMORY_LANE_PROMPTS.length))
+  const [classicIdx,    setClassicIdx]    = useState(() => Math.floor(Math.random() * CLASSIC_GAMES.length))
+  const [guessInput,    setGuessInput]    = useState('')
+  const [guessResult,   setGuessResult]   = useState(null) // null | 'correct' | 'wrong'
+  const [hofIdx,        setHofIdx]        = useState(() => Math.floor(Math.random() * FANTASY_HOF.length))
+
+  // Random HOF legend rotator (also used in History tab)
+  const hofLegend = FANTASY_HOF[hofIdx]
+
+  // Cycle helpers
+  const nextQuiz    = () => { setQuizIdx(i => (i + 1) % EMOJI_QUIZ.length);    setQuizRevealed(false); setGuessInput(''); setGuessResult(null) }
+  const nextTrivia  = () => setTriviaIdx(i => (i + 1) % TRIVIA_FACTS.length)
+  const nextMem     = () => setMemIdx(i    => (i + 1) % MEMORY_LANE_PROMPTS.length)
+  const nextClassic = () => setClassicIdx(i => (i + 1) % CLASSIC_GAMES.length)
+  const nextHof     = () => setHofIdx(i   => (i + 1) % FANTASY_HOF.length)
+
+  const quiz    = EMOJI_QUIZ[quizIdx]
+  const trivia  = TRIVIA_FACTS[triviaIdx]
+  const mem     = MEMORY_LANE_PROMPTS[memIdx]
+  const classic = CLASSIC_GAMES[classicIdx]
+
+  // Guess check — case-insensitive, partial match OK
+  const checkGuess = () => {
+    const correct = quiz.answer.toLowerCase()
+    const guess   = guessInput.trim().toLowerCase()
+    if (!guess) return
+    const hit = correct.includes(guess) || guess.includes(correct.split(' ')[0]) || guess.includes(correct.split(' ').pop())
+    setGuessResult(hit ? 'correct' : 'wrong')
+    if (hit) setQuizRevealed(true)
+  }
+
+  const SECTIONS = [
+    { id:'trivia',  label:'🧠 Trivia' },
+    { id:'emoji',   label:'😀 Emoji Quiz' },
+    { id:'classic', label:'📼 Classic Game' },
+    { id:'memory',  label:'💭 Memory Lane' },
+    { id:'hof',     label:'⚡ HOF Legend' },
+  ]
+
+  return (
+    <div>
+      <div className="section-bar">
+        <h2>The Playroom</h2>
+        <div className="sb-rule" />
+        <span className="sb-ct">Trivia · Emoji Quiz · Classic Games · Memory Lane · HOF</span>
+      </div>
+
+      {/* Section tabs */}
+      <div className="hist-tabs">
+        {SECTIONS.map(s => (
+          <button key={s.id} className={`htab ${section === s.id ? 'on' : ''}`}
+            onClick={() => setSection(s.id)}>{s.label}</button>
+        ))}
+      </div>
+
+      {/* ── TRIVIA ── */}
+      {section === 'trivia' && (
+        <div className="pr-card">
+          <div className="pr-badge">{trivia.category}</div>
+          <div className="pr-fact">{trivia.fact}</div>
+          <div className="pr-actions">
+            <button className="pr-btn" onClick={nextTrivia}>Next Fact ›</button>
+            <a className="pr-link"
+              href={`https://www.google.com/search?q=${encodeURIComponent(trivia.fact.split(' ').slice(0,5).join(' '))}`}
+              target="_blank" rel="noopener">Dig Deeper ↗</a>
+          </div>
+          <div className="pr-counter">{triviaIdx + 1} of {TRIVIA_FACTS.length}</div>
+        </div>
+      )}
+
+      {/* ── EMOJI QUIZ ── */}
+      {section === 'emoji' && (
+        <div className="pr-card">
+          <div className="pr-badge">Guess the Legend</div>
+          <div className="pr-emoji-display">{quiz.emoji}</div>
+          <div className="pr-hint">{quiz.hint}</div>
+
+          {!quizRevealed ? (
+            <>
+              <div className="pr-guess-row">
+                <input
+                  className="pr-input"
+                  placeholder="Who is it?"
+                  value={guessInput}
+                  onChange={e => { setGuessInput(e.target.value); setGuessResult(null) }}
+                  onKeyDown={e => e.key === 'Enter' && checkGuess()}
+                />
+                <button className="pr-btn" onClick={checkGuess}>Guess</button>
+              </div>
+              {guessResult === 'wrong' && (
+                <div className="pr-wrong">❌ Not quite — try again or reveal</div>
+              )}
+              <div className="pr-actions">
+                <button className="pr-btn-ghost" onClick={() => setQuizRevealed(true)}>Reveal Answer</button>
+                <button className="pr-btn" onClick={nextQuiz}>Skip ›</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="pr-reveal">
+                {guessResult === 'correct' ? '✅' : '💡'} <strong>{quiz.answer}</strong>
+              </div>
+              <div className="pr-actions">
+                <button className="pr-btn" onClick={nextQuiz}>Next Quiz ›</button>
+                <a className="pr-link"
+                  href={`https://www.google.com/search?q=${encodeURIComponent(quiz.answer + ' NFL career')}`}
+                  target="_blank" rel="noopener">Look Up ↗</a>
+              </div>
+            </>
+          )}
+          <div className="pr-counter">{quizIdx + 1} of {EMOJI_QUIZ.length}</div>
+        </div>
+      )}
+
+      {/* ── CLASSIC GAME ── */}
+      {section === 'classic' && (
+        <div className="pr-card pr-card-dark">
+          <div className="pr-badge pr-badge-gold">📼 Relive a Classic</div>
+          <div className="pr-classic-title">{classic.title}</div>
+          <div className="pr-classic-year">{classic.year}</div>
+          <div className="pr-classic-teams">{classic.teams}</div>
+          <div className="pr-classic-headline">{classic.headline}</div>
+          <div className="pr-actions">
+            <a className="pr-btn" href={classic.link} target="_blank" rel="noopener">Watch / Read ↗</a>
+            <button className="pr-btn-ghost" onClick={nextClassic}>Another Game ›</button>
+          </div>
+          <div className="pr-counter">{classicIdx + 1} of {CLASSIC_GAMES.length}</div>
+        </div>
+      )}
+
+      {/* ── MEMORY LANE ── */}
+      {section === 'memory' && (
+        <div className="pr-card">
+          <div className="pr-badge">💭 Memory Lane</div>
+          {mem.hot && <div className="pr-hot-tag">🔥 Hot Take Territory</div>}
+          <div className="pr-prompt">{mem.prompt}</div>
+          <div className="pr-actions">
+            <button className="pr-btn" onClick={nextMem}>Next Prompt ›</button>
+          </div>
+          <div className="pr-counter">{memIdx + 1} of {MEMORY_LANE_PROMPTS.length}</div>
+        </div>
+      )}
+
+      {/* ── HOF LEGEND ROTATOR ── */}
+      {section === 'hof' && (
+        <div className="pr-card pr-card-dark">
+          <div className="pr-badge pr-badge-gold">⚡ Fantasy Hall of Fame</div>
+          <div className="pr-hof-player">{hofLegend.player}</div>
+          <div className="pr-hof-meta">
+            <span className="pr-hof-team">{hofLegend.team}</span>
+            <span className="pr-hof-pos">{hofLegend.pos}</span>
+            <span className="pr-hof-year">{hofLegend.year} · Wk {hofLegend.week}</span>
+          </div>
+          <div className="pr-hof-pts">{hofLegend.pts} <span>pts</span></div>
+          <div className="pr-hof-line">{hofLegend.line}</div>
+          <div className="pr-hof-note">{hofLegend.note}</div>
+          <div className="pr-actions">
+            <button className="pr-btn-ghost" onClick={nextHof}>Next Legend ›</button>
+            <a className="pr-link"
+              href={`https://www.google.com/search?q=${encodeURIComponent(hofLegend.player + ' ' + hofLegend.year + ' NFL fantasy')}`}
+              target="_blank" rel="noopener">Research ↗</a>
+          </div>
+          <div className="pr-counter">{hofIdx + 1} of {FANTASY_HOF.length}</div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── RESOURCES VIEW ────────────────────────────────────────────────────────────
+function ResourcesView() {
+  const [openCat, setOpenCat] = useState(null)
+
+  return (
+    <div>
+      <div className="section-bar">
+        <h2>Resources</h2>
+        <div className="sb-rule" />
+        <span className="sb-ct">Fantasy Tools · Injuries · Streaming · News · Research</span>
+      </div>
+
+      <div className="res-intro">
+        The best external tools for serious fantasy players, all in one place.
+        Opens in a new tab — we just curate the links.
+      </div>
+
+      <div className="res-grid">
+        {QUICK_LINKS.map((cat, ci) => (
+          <div key={ci} className="res-category">
+            <button
+              className={`res-cat-header ${openCat === ci ? 'open' : ''}`}
+              onClick={() => setOpenCat(openCat === ci ? null : ci)}
+            >
+              <span>{cat.category}</span>
+              <span className="res-chevron">{openCat === ci ? '▲' : '▼'}</span>
+            </button>
+            {openCat === ci && (
+              <div className="res-links">
+                {cat.links.map((lnk, li) => (
+                  <a
+                    key={li}
+                    href={lnk.url}
+                    target="_blank"
+                    rel="noopener"
+                    className="res-link"
+                  >
+                    <span className="res-link-label">{lnk.label}</span>
+                    <span className="res-link-arrow">↗</span>
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="res-footer">
+        Links open external sites — we don't control their content. No affiliation implied.
+        Last curated June 2026.
+      </div>
     </div>
   )
 }
