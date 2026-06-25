@@ -26,7 +26,7 @@ function getAutoWeek() {
 }
 
 // ── TOP-LEVEL NAV VIEWS ───────────────────────────────────────────────────────
-const VIEWS = ['Scores', 'Schedule', 'Standings', 'TV Guide', 'News', 'Injuries', 'Leaders', 'Fantasy', 'Draft', 'History', 'Playroom', 'Resources']
+const VIEWS = ['Scores', 'Schedule', 'Standings', 'TV Guide', 'News', 'Injuries', 'Stats', 'Leaders', 'Fantasy', 'Draft', 'History']
 
 export default function App() {
   const [activeView,    setActiveView]    = useState('Scores')
@@ -116,7 +116,7 @@ export default function App() {
         {VIEWS.map(v => (
           <button
             key={v}
-            className={`tnav-btn ${activeView === v ? 'on' : ''} ${v === 'Fantasy' ? 'tnav-fantasy' : ''} ${v === 'Playroom' ? 'tnav-playroom' : ''} ${v === 'Resources' ? 'tnav-resources' : ''}`}
+            className={`tnav-btn ${activeView === v ? 'on' : ''} ${v === 'Fantasy' ? 'tnav-fantasy' : ''}`}
             onClick={() => setActiveView(v)}
           >{v}</button>
         ))}
@@ -154,8 +154,9 @@ export default function App() {
         {activeView === 'TV Guide'  && <TVGuideView currentWeek={activeWeek} />}
         {activeView === 'News'      && <NewsView teamFilter={newsTeam} setTeamFilter={setNewsTeam} />}
         {activeView === 'Injuries'  && <InjuriesView />}
+        {activeView === 'Stats'     && <StatsView squad={squad} />}
         {activeView === 'Leaders'   && (
-          <LeadersView tab={leadersTab} setTab={setLeadersTab} />
+          <LeadersView tab={leadersTab} setTab={setLeadersTab} onGoToStats={() => setActiveView('Stats')} />
         )}
         {activeView === 'Fantasy'   && (
           <FantasyView
@@ -169,11 +170,16 @@ export default function App() {
         )}
         {activeView === 'Draft'     && <DraftView />}
         {activeView === 'History'   && <HistoryView />}
-        {activeView === 'Playroom'  && <PlayroomView />}
-        {activeView === 'Resources' && <ResourcesView />}
       </main>
 
-      <Footer />
+      <Footer squad={squad} favTeam={teamFilter} />
+      {/* Newsletter confirmation toast */}
+      {typeof window !== "undefined" && new URLSearchParams(window.location.search).get("nl") === "confirmed" && (
+        <div className="nl-toast">✓ Subscription confirmed — see you Week 1!</div>
+      )}
+      {typeof window !== "undefined" && new URLSearchParams(window.location.search).get("nl") === "unsubscribed" && (
+        <div className="nl-toast nl-toast-unsub">Unsubscribed. Thanks for reading.</div>
+      )}
     </div>
   )
 }
@@ -1490,7 +1496,7 @@ function StandingsView() {
 }
 
 // ── LEADERS ───────────────────────────────────────────────────────────────────
-function LeadersView({ tab, setTab }) {
+function LeadersView({ tab, setTab, onGoToStats }) {
   return (
     <div>
       <div className="section-bar">
@@ -1498,23 +1504,22 @@ function LeadersView({ tab, setTab }) {
         <div className="sb-rule" />
         <span className="sb-ct">Season Stats</span>
       </div>
-      <div className="leaders-tabs">
-        {['Offense', 'Defense'].map(t => (
-          <button
-            key={t}
-            className={`ltab ${tab === t.toLowerCase() ? 'on' : ''}`}
-            onClick={() => setTab(t.toLowerCase())}
-          >{t}</button>
-        ))}
-      </div>
       <div className="leaders-coming-soon">
         <div className="cs-icon">📊</div>
-        <div className="cs-title">Season Stats Available Week 1</div>
+        <div className="cs-title">Full Stats Hub is Live</div>
         <div className="cs-text">
-          Individual player leaderboards will populate automatically as the 2026 season kicks off September 9.
-          Stats pull live from ESPN after each game.
+          Individual and team leaderboards have moved to the new Stats tab —
+          sortable tables for every category, live from ESPN.
         </div>
-        <div className="cs-date">Kickoff: Sep 9, 2026 · SEA vs NE · 8:20 PM ET</div>
+        <div style={{marginTop:16,textAlign:'center'}}>
+          <button
+            className="nl-submit-btn"
+            style={{display:'inline-block',padding:'10px 24px'}}
+            onClick={onGoToStats}
+          >
+            Go to Stats Tab →
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -4490,368 +4495,953 @@ function DraftView() {
 }
 
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// ── PLAYROOM DATA ─────────────────────────────────────────────────────────────
-// To update: edit the arrays below. No backend needed.
-// ═══════════════════════════════════════════════════════════════════════════════
+// ── NEWSLETTER SIGNUP ─────────────────────────────────────────────────────────
+// NewsletterSignup widget — embeds in Footer
+// Reads squad + fav team from props so signup pre-populates what we already know
+function NewsletterSignup({ squad, favTeam }) {
+  const [email,     setEmail]     = useState('')
+  const [team,      setTeam]      = useState(favTeam || 'All')
+  const [mode,      setMode]      = useState('ppr')
+  const [sends,     setSends]     = useState(['monday','tuesday','thursday','friday'])
+  const [status,    setStatus]    = useState('idle') // idle | loading | ok | error
+  const [expanded,  setExpanded]  = useState(false)
+  const [message,   setMessage]   = useState('')
 
-const EMOJI_QUIZ = [
-  { emoji:'🏃🏾⚡👑',  answer:'Bo Jackson',        hint:'Two-sport legend. Heisman. The myth.' },
-  { emoji:'💪🏾🇳🇬🚂',  answer:'Christian Okoye',   hint:'The Nigerian Nightmare. KC bruiser.' },
-  { emoji:'🕕🔔📺',     answer:'Monday Night Football', hint:'Al Michaels. Cosell. Prime time.' },
-  { emoji:'🦁🦁🦁🏆',  answer:'Barry Sanders',      hint:'Detroit Lions RB. Never won a ring. Walked away.' },
-  { emoji:'🍞🧀🏆',    answer:'Brett Favre',        hint:'Iron man QB. Cheese country. 297 straight starts.' },
-  { emoji:'⚡🐝🌊',    answer:'Deion Sanders',       hint:'Prime Time. Two-sport superstar. DB extraordinaire.' },
-  { emoji:'🏈💨📺🎙️', answer:'John Madden',         hint:'Coach. Analyst. Video game legend.' },
-  { emoji:'🎩🏈🦅',    answer:'Randall Cunningham', hint:'Ultimate Weapon. Eagles QB. Years ahead of his time.' },
-  { emoji:'🐎🎠🏈',    answer:'Walter Payton',      hint:'Sweetness. Chicago legend. Career 16,726 rush yards.' },
-  { emoji:'🔫🌵🏈',    answer:'Emmitt Smith',        hint:'All-time rush leader. Cowboys RB. Three rings.' },
-  { emoji:'🧊🏈❄️',    answer:'Dan Marino',          hint:'Never won a ring. Greatest arm of his era. Miami.' },
-  { emoji:'🦅🏹⚡',    answer:'Michael Vick',        hint:'Most electrifying QB ever. ATL 2004 MVP season.' },
-  { emoji:'🐻🔵🏆🏆',  answer:'Mike Singletary',   hint:'Samurai Mike. Bears LB. Eye black. 1985 Super Bowl.' },
-  { emoji:'🔴🔵⚡🏈',  answer:'LaDainian Tomlinson',hint:'28 TDs in 2006. Greatest fantasy RB season.' },
-  { emoji:'🧲🏈🖤🟡',  answer:'Hines Ward',          hint:'Toughest WR. Super Bowl XL MVP. Steelers.' },
-]
+  // Pre-populate squad players from My Fantasy Squad if available
+  const squadStr = squad?.players?.join(', ') || ''
 
-const TRIVIA_FACTS = [
-  { fact:'Tom Brady went undrafted in the MLB Draft by the Expos but chose football instead.', category:'Did You Know' },
-  { fact:'Bo Jackson is the only player to be named an All-Star in both Major League Baseball and the NFL Pro Bowl.', category:'Legend' },
-  { fact:'Jerry Rice went to a Division I-AA school (Mississippi Valley State) before becoming the GOAT.', category:'Origin Story' },
-  { fact:'The 1972 Miami Dolphins remain the only team to finish a season undefeated and win the Super Bowl (17-0).', category:'Record Book' },
-  { fact:'Lawrence Taylor changed the way the NFL game is played — the left tackle position exploded in value directly because of him.', category:'Impact Player' },
-  { fact:'Emmitt Smith rushed for 18,355 career yards — an NFL record that still stands.', category:'Record Book' },
-  { fact:'Calvin Johnson (Megatron) recorded 1,964 receiving yards in 2012 — still the single-season record.', category:'Record Book' },
-  { fact:'The "Hail Mary" play that Roger Staubach threw in 1975 is literally where that term came from.', category:'History' },
-  { fact:'Barry Sanders averaged 5.0 yards per carry over his entire career — a stat that still seems impossible.', category:'Legend' },
-  { fact:'Peyton Manning studied defenses so obsessively that he changed his own plays at the line more than any QB in history.', category:'Film Room' },
-  { fact:'The XFL tried twice (2001, 2020) and technically returned in 2023. The Vince McMahon to Dana White transition is still wild.', category:'Strange But True' },
-  { fact:'John Madden was afraid to fly, so he traveled to every road game by bus or train during his coaching career.', category:'Did You Know' },
-  { fact:'Randy Moss played basketball at Marshall University before transferring to Dupont HS and then Florida State — his recruiting story is a whole movie.', category:'Origin Story' },
-  { fact:'The "Ice Bowl" (1967 NFL Championship, Packers vs. Cowboys) was played in −13°F — the referee\'s whistle froze to his lips.', category:'Classic Game' },
-  { fact:'Minnesota Vikings have lost four Super Bowls — the most of any franchise that has never won one.', category:'Hard Truth' },
-  { fact:'Alvin Kamara scored 6 rushing TDs on Christmas Day 2020 — the most in a single game since Ernie Nevers in 1929.', category:'Record Book' },
-  { fact:'Michael Strahan\'s record-breaking sack in 2001 (22.5) is still questioned — Brett Favre seemed to fall down intentionally.', category:'Controversy' },
-  { fact:'The West Coast Offense was invented by Bill Walsh at Stanford and San Jose State before he ever coached the 49ers.', category:'History' },
-  { fact:'Jim Brown never missed a game in his entire 9-year career and retired at his absolute peak, age 29.', category:'Legend' },
-  { fact:'The "Immaculate Reception" by Franco Harris in 1972 is still debated — did the ball hit a Steeler or a Raider first?', category:'Classic Game' },
-]
-
-const MEMORY_LANE_PROMPTS = [
-  { prompt:'Would LaDainian Tomlinson be a first-round pick today in PPR formats?', hot:true },
-  { prompt:'Marshall Faulk in 2000 had 2,189 scrimmage yards and 26 TDs. Would he go #1 overall in your draft?', hot:false },
-  { prompt:'Randy Moss in 1998 had 1,313 yards and 17 TDs as a rookie. What would that ADP look like today?', hot:true },
-  { prompt:'Pre-GPS Peyton Manning audibled at the line constantly. Would he thrive in today\'s RPO-heavy league?', hot:false },
-  { prompt:'Michael Vick\'s 2004 Madden rating was 95. His real-life 2004 season: 16 rush TDs, 902 rush yards as a QB. First overall pick today?', hot:true },
-  { prompt:'Barry Sanders averaged 5.0 YPC for a decade. Would he be a fantasy #1 overall pick in 2026?', hot:false },
-  { prompt:'Deion Sanders played in both a World Series and a Super Bowl in the same calendar year (1992). Name another athlete who could do that today.', hot:true },
-  { prompt:'The 1985 Chicago Bears defense — 46 sacks, 23 interceptions — how would they fare against today\'s spread offenses?', hot:false },
-]
-
-const CLASSIC_GAMES = [
-  { title:'The Ice Bowl', year:1967, teams:'Packers 21 · Cowboys 17', headline:'Starr QB sneak with 16 seconds left. −13°F. Greatest game ever played.', link:'https://www.google.com/search?q=1967+Ice+Bowl+Packers+Cowboys' },
-  { title:'The Catch', year:1982, teams:'49ers 28 · Cowboys 27', headline:'Dwight Clark. Six yards deep in the back of the end zone. Montana scrambling right. The dynasty begins.', link:'https://www.google.com/search?q=The+Catch+1982+49ers+Cowboys+Dwight+Clark' },
-  { title:'The Drive', year:1987, teams:'Broncos 23 · Browns 20 (OT)', headline:'Elway. 98 yards. 5:02 left. 15 plays. The stadium went silent.', link:'https://www.google.com/search?q=The+Drive+1987+Elway+Browns' },
-  { title:'The Miracle at the Meadowlands', year:1978, teams:'Eagles 19 · Giants 17', headline:'Giants kneeled it. The play that changed the rules of the game forever.', link:'https://www.google.com/search?q=Miracle+at+the+Meadowlands+1978+Eagles+Giants' },
-  { title:'The Immaculate Reception', year:1972, teams:'Steelers 13 · Raiders 7', headline:'Fourth-and-10. Tipped ball. Franco Harris scoops it up. Still debated.', link:'https://www.google.com/search?q=Immaculate+Reception+1972+Steelers+Raiders+Franco+Harris' },
-  { title:'Super Bowl XLII', year:2008, teams:'Giants 17 · Patriots 14', headline:'Helmet catch. 18-0 bid ended. Eli Manning. Greatest upset in Super Bowl history.', link:'https://www.google.com/search?q=Super+Bowl+XLII+Giants+Patriots+2008+David+Tyree' },
-  { title:'The Monday Night Miracle', year:2000, teams:'Jets 40 · Dolphins 37 (OT)', headline:'Down 30-7 at halftime. Greatest Monday Night comeback. Vinny Testaverde.', link:'https://www.google.com/search?q=Monday+Night+Miracle+2000+Jets+Dolphins' },
-  { title:'The Music City Miracle', year:2000, teams:'Titans 22 · Bills 16', headline:'Lateral on a kickoff return. Kevin Dyson 75 yards. Wildcard game. The play that still haunts Buffalo.', link:'https://www.google.com/search?q=Music+City+Miracle+2000+Titans+Bills' },
-  { title:'The Greatest Show on Turf', year:2000, teams:'Rams 23 · Buccaneers 11 (NFC Champ)', headline:'Marshall Faulk. Isaac Bruce. Torry Holt. Kurt Warner. The most unstoppable offense in NFL history.', link:'https://www.google.com/search?q=Greatest+Show+on+Turf+2000+Rams+season' },
-  { title:'The Snow Bowl / Tuck Rule Game', year:2002, teams:'Patriots 16 · Raiders 13 (OT)', headline:'Brady fumble? Or incomplete pass? The Tuck Rule. The dynasty that almost never was.', link:'https://www.google.com/search?q=Tuck+Rule+Game+2002+Patriots+Raiders' },
-  { title:'Bills 41 · Oilers 38 (OT)', year:1993, teams:'Bills 41 · Oilers 38 (OT)', headline:'Down 35-3 at halftime. Frank Reich. The greatest comeback in NFL playoff history.', link:'https://www.google.com/search?q=1993+Bills+Oilers+playoff+comeback+Frank+Reich' },
-  { title:'The Catch II', year:1999, teams:'49ers 30 · Packers 27', headline:'Terrell Owens, end zone, last-second catch. Steve Young had gone down and out came Joe Montana\'s heir.', link:'https://www.google.com/search?q=The+Catch+II+1999+49ers+Packers+Terrell+Owens' },
-]
-
-const QUICK_LINKS = [
-  {
-    category: '📊 Fantasy Tools',
-    links: [
-      { label:'FantasyPros Waiver Wire', url:'https://www.fantasypros.com/nfl/waiver-wire-assistant.php' },
-      { label:'RotoWire Player News', url:'https://www.rotoworld.com/football/nfl/player-news' },
-      { label:'ESPN Fantasy Rankings', url:'https://www.espn.com/fantasy/football/story/_/id/rankings' },
-      { label:'Sleeper ADP Tool', url:'https://sleeper.com/nfl/research/players' },
-      { label:'KeepTradeCut Values', url:'https://keeptradecut.com/fantasy-rankings' },
-      { label:'4for4 Projections', url:'https://www.4for4.com/projections' },
-    ]
-  },
-  {
-    category: '🏥 Injury & Depth Charts',
-    links: [
-      { label:'Official NFL Injury Report', url:'https://www.nfl.com/injuries/' },
-      { label:'ESPN NFL Injuries', url:'https://www.espn.com/nfl/injuries' },
-      { label:'Ourlads Depth Charts', url:'https://www.ourlads.com/nfldepthcharts/' },
-      { label:'FantasyPros Injury News', url:'https://www.fantasypros.com/nfl/injury-news.php' },
-      { label:'RotoWire Injury News', url:'https://www.rotoworld.com/football/nfl/injury-news' },
-    ]
-  },
-  {
-    category: '📺 Streaming & TV',
-    links: [
-      { label:'NFL+ Streaming', url:'https://www.nfl.com/plus' },
-      { label:'ESPN+ NFL Coverage', url:'https://plus.espn.com' },
-      { label:'Peacock NFL Games', url:'https://www.peacocktv.com/sports/nfl' },
-      { label:'Amazon Prime TNF', url:'https://www.amazon.com/primevideo/nfl' },
-      { label:'YouTube NFL Sunday Ticket', url:'https://tv.youtube.com/learn/nflsundayticket' },
-      { label:'Paramount+ AFC Games', url:'https://www.paramountplus.com/sports/nfl' },
-    ]
-  },
-  {
-    category: '📰 News & Analysis',
-    links: [
-      { label:'NFL.com News', url:'https://www.nfl.com/news/' },
-      { label:'Pro Football Talk', url:'https://profootballtalk.nbcsports.com' },
-      { label:'The Athletic NFL', url:'https://theathletic.com/nfl/' },
-      { label:'Football Outsiders', url:'https://www.footballoutsiders.com' },
-      { label:'Sharp Football Stats', url:'https://www.sharpfootballstats.com' },
-      { label:'Next Gen Stats', url:'https://nextgenstats.nfl.com' },
-    ]
-  },
-  {
-    category: '🏈 Trade & Research',
-    links: [
-      { label:'PFF Player Grades', url:'https://www.pff.com/nfl/grades' },
-      { label:'Pro Football Reference', url:'https://www.pro-football-reference.com' },
-      { label:'Spotrac Contracts', url:'https://www.spotrac.com/nfl' },
-      { label:'Over The Cap', url:'https://overthecap.com' },
-      { label:'Draft Network Profiles', url:'https://thedraftnetwork.com' },
-    ]
-  },
-]
-
-// ── PLAYROOM VIEW ─────────────────────────────────────────────────────────────
-function PlayroomView() {
-  const [section,       setSection]       = useState('trivia')
-  const [quizIdx,       setQuizIdx]       = useState(() => Math.floor(Math.random() * EMOJI_QUIZ.length))
-  const [quizRevealed,  setQuizRevealed]  = useState(false)
-  const [triviaIdx,     setTriviaIdx]     = useState(() => Math.floor(Math.random() * TRIVIA_FACTS.length))
-  const [memIdx,        setMemIdx]        = useState(() => Math.floor(Math.random() * MEMORY_LANE_PROMPTS.length))
-  const [classicIdx,    setClassicIdx]    = useState(() => Math.floor(Math.random() * CLASSIC_GAMES.length))
-  const [guessInput,    setGuessInput]    = useState('')
-  const [guessResult,   setGuessResult]   = useState(null) // null | 'correct' | 'wrong'
-  const [hofIdx,        setHofIdx]        = useState(() => Math.floor(Math.random() * FANTASY_HOF.length))
-
-  // Random HOF legend rotator (also used in History tab)
-  const hofLegend = FANTASY_HOF[hofIdx]
-
-  // Cycle helpers
-  const nextQuiz    = () => { setQuizIdx(i => (i + 1) % EMOJI_QUIZ.length);    setQuizRevealed(false); setGuessInput(''); setGuessResult(null) }
-  const nextTrivia  = () => setTriviaIdx(i => (i + 1) % TRIVIA_FACTS.length)
-  const nextMem     = () => setMemIdx(i    => (i + 1) % MEMORY_LANE_PROMPTS.length)
-  const nextClassic = () => setClassicIdx(i => (i + 1) % CLASSIC_GAMES.length)
-  const nextHof     = () => setHofIdx(i   => (i + 1) % FANTASY_HOF.length)
-
-  const quiz    = EMOJI_QUIZ[quizIdx]
-  const trivia  = TRIVIA_FACTS[triviaIdx]
-  const mem     = MEMORY_LANE_PROMPTS[memIdx]
-  const classic = CLASSIC_GAMES[classicIdx]
-
-  // Guess check — case-insensitive, partial match OK
-  const checkGuess = () => {
-    const correct = quiz.answer.toLowerCase()
-    const guess   = guessInput.trim().toLowerCase()
-    if (!guess) return
-    const hit = correct.includes(guess) || guess.includes(correct.split(' ')[0]) || guess.includes(correct.split(' ').pop())
-    setGuessResult(hit ? 'correct' : 'wrong')
-    if (hit) setQuizRevealed(true)
-  }
-
-  const SECTIONS = [
-    { id:'trivia',  label:'🧠 Trivia' },
-    { id:'emoji',   label:'😀 Emoji Quiz' },
-    { id:'classic', label:'📼 Classic Game' },
-    { id:'memory',  label:'💭 Memory Lane' },
-    { id:'hof',     label:'⚡ HOF Legend' },
+  const NFL_TEAMS = [
+    'All','ARI','ATL','BAL','BUF','CAR','CHI','CIN','CLE',
+    'DAL','DEN','DET','GB','HOU','IND','JAC','KC','LA','LAC',
+    'LV','MIA','MIN','NE','NO','NYG','NYJ','PHI','PIT','SEA',
+    'SF','TB','TEN','WAS',
   ]
 
+  const SEND_OPTIONS = [
+    { id:'monday',   label:'Mon · Sunday Recap' },
+    { id:'tuesday',  label:'Tue · Waiver Wire' },
+    { id:'thursday', label:'Thu · TNF Start/Sit' },
+    { id:'friday',   label:'Fri · Weekend Prep' },
+  ]
+
+  const toggleSend = (id) => {
+    setSends(prev =>
+      prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]
+    )
+  }
+
+  const handleSubmit = async () => {
+    if (!email || !email.includes('@')) {
+      setMessage('Enter a valid email address.')
+      return
+    }
+    if (!sends.length) {
+      setMessage('Select at least one newsletter day.')
+      return
+    }
+
+    setStatus('loading')
+    try {
+      const r = await fetch('/api/newsletter/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          favTeam: team,
+          squadPlayers: squadStr,
+          scoringMode: mode,
+          sends,
+        }),
+      })
+      const data = await r.json()
+      if (r.ok) {
+        setStatus('ok')
+        setMessage('Check your email to confirm. See you Week 1.')
+      } else {
+        setStatus('error')
+        setMessage(data.error || 'Something went wrong.')
+      }
+    } catch(e) {
+      setStatus('error')
+      setMessage('Network error — try again.')
+    }
+  }
+
+  if (status === 'ok') {
+    return (
+      <div className="nl-widget nl-success">
+        <div className="nl-success-icon">✓</div>
+        <div className="nl-success-text">You're in. Confirm email to activate.</div>
+        <div className="nl-success-sub">First issue drops Week 1, Sep 9.</div>
+      </div>
+    )
+  }
+
   return (
-    <div>
-      <div className="section-bar">
-        <h2>The Playroom</h2>
-        <div className="sb-rule" />
-        <span className="sb-ct">Trivia · Emoji Quiz · Classic Games · Memory Lane · HOF</span>
-      </div>
-
-      {/* Section tabs */}
-      <div className="hist-tabs">
-        {SECTIONS.map(s => (
-          <button key={s.id} className={`htab ${section === s.id ? 'on' : ''}`}
-            onClick={() => setSection(s.id)}>{s.label}</button>
-        ))}
-      </div>
-
-      {/* ── TRIVIA ── */}
-      {section === 'trivia' && (
-        <div className="pr-card">
-          <div className="pr-badge">{trivia.category}</div>
-          <div className="pr-fact">{trivia.fact}</div>
-          <div className="pr-actions">
-            <button className="pr-btn" onClick={nextTrivia}>Next Fact ›</button>
-            <a className="pr-link"
-              href={`https://www.google.com/search?q=${encodeURIComponent(trivia.fact.split(' ').slice(0,5).join(' '))}`}
-              target="_blank" rel="noopener">Dig Deeper ↗</a>
+    <div className="nl-widget">
+      {!expanded ? (
+        // Collapsed teaser — just email + big button
+        <div className="nl-teaser">
+          <div className="nl-teaser-copy">
+            <div className="nl-teaser-title">📬 The Final Whistle Newsletter</div>
+            <div className="nl-teaser-sub">
+              Mon · Tue · Thu · Fri · Scores, fantasy, waiver wire, start/sit — delivered.
+            </div>
           </div>
-          <div className="pr-counter">{triviaIdx + 1} of {TRIVIA_FACTS.length}</div>
+          <div className="nl-teaser-row">
+            <input
+              className="nl-input"
+              type="email"
+              placeholder="your@email.com"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && (sends.length ? handleSubmit() : setExpanded(true))}
+            />
+            <button
+              className="nl-submit-btn"
+              onClick={() => email ? setExpanded(true) : null}
+            >
+              Subscribe
+            </button>
+          </div>
+          {message && <div className="nl-message">{message}</div>}
         </div>
-      )}
+      ) : (
+        // Expanded — choose preferences
+        <div className="nl-expanded">
+          <div className="nl-exp-title">Customize your newsletter</div>
 
-      {/* ── EMOJI QUIZ ── */}
-      {section === 'emoji' && (
-        <div className="pr-card">
-          <div className="pr-badge">Guess the Legend</div>
-          <div className="pr-emoji-display">{quiz.emoji}</div>
-          <div className="pr-hint">{quiz.hint}</div>
+          {/* Email (shown again in expanded form) */}
+          <div className="nl-field">
+            <label className="nl-label">Email</label>
+            <input
+              className="nl-input"
+              type="email"
+              placeholder="your@email.com"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+            />
+          </div>
 
-          {!quizRevealed ? (
-            <>
-              <div className="pr-guess-row">
-                <input
-                  className="pr-input"
-                  placeholder="Who is it?"
-                  value={guessInput}
-                  onChange={e => { setGuessInput(e.target.value); setGuessResult(null) }}
-                  onKeyDown={e => e.key === 'Enter' && checkGuess()}
-                />
-                <button className="pr-btn" onClick={checkGuess}>Guess</button>
-              </div>
-              {guessResult === 'wrong' && (
-                <div className="pr-wrong">❌ Not quite — try again or reveal</div>
-              )}
-              <div className="pr-actions">
-                <button className="pr-btn-ghost" onClick={() => setQuizRevealed(true)}>Reveal Answer</button>
-                <button className="pr-btn" onClick={nextQuiz}>Skip ›</button>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="pr-reveal">
-                {guessResult === 'correct' ? '✅' : '💡'} <strong>{quiz.answer}</strong>
-              </div>
-              <div className="pr-actions">
-                <button className="pr-btn" onClick={nextQuiz}>Next Quiz ›</button>
-                <a className="pr-link"
-                  href={`https://www.google.com/search?q=${encodeURIComponent(quiz.answer + ' NFL career')}`}
-                  target="_blank" rel="noopener">Look Up ↗</a>
-              </div>
-            </>
+          {/* Fav team */}
+          <div className="nl-field">
+            <label className="nl-label">Favorite Team</label>
+            <select
+              className="nl-select"
+              value={team}
+              onChange={e => setTeam(e.target.value)}
+            >
+              {NFL_TEAMS.map(t => (
+                <option key={t} value={t}>{t === 'All' ? 'No preference' : t}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Scoring mode */}
+          <div className="nl-field">
+            <label className="nl-label">Scoring Format</label>
+            <div className="nl-toggle-row">
+              <button
+                className={`nl-toggle-btn ${mode === 'ppr' ? 'on' : ''}`}
+                onClick={() => setMode('ppr')}
+              >PPR</button>
+              <button
+                className={`nl-toggle-btn ${mode === 'std' ? 'on' : ''}`}
+                onClick={() => setMode('std')}
+              >Standard</button>
+            </div>
+          </div>
+
+          {/* Which days */}
+          <div className="nl-field">
+            <label className="nl-label">Send Days</label>
+            <div className="nl-sends">
+              {SEND_OPTIONS.map(s => (
+                <button
+                  key={s.id}
+                  className={`nl-send-btn ${sends.includes(s.id) ? 'on' : ''}`}
+                  onClick={() => toggleSend(s.id)}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Squad preview */}
+          {squadStr && (
+            <div className="nl-squad-preview">
+              ⚡ We'll track your squad: <span>{squadStr}</span>
+            </div>
           )}
-          <div className="pr-counter">{quizIdx + 1} of {EMOJI_QUIZ.length}</div>
-        </div>
-      )}
 
-      {/* ── CLASSIC GAME ── */}
-      {section === 'classic' && (
-        <div className="pr-card pr-card-dark">
-          <div className="pr-badge pr-badge-gold">📼 Relive a Classic</div>
-          <div className="pr-classic-title">{classic.title}</div>
-          <div className="pr-classic-year">{classic.year}</div>
-          <div className="pr-classic-teams">{classic.teams}</div>
-          <div className="pr-classic-headline">{classic.headline}</div>
-          <div className="pr-actions">
-            <a className="pr-btn" href={classic.link} target="_blank" rel="noopener">Watch / Read ↗</a>
-            <button className="pr-btn-ghost" onClick={nextClassic}>Another Game ›</button>
-          </div>
-          <div className="pr-counter">{classicIdx + 1} of {CLASSIC_GAMES.length}</div>
-        </div>
-      )}
+          {message && <div className="nl-message">{message}</div>}
 
-      {/* ── MEMORY LANE ── */}
-      {section === 'memory' && (
-        <div className="pr-card">
-          <div className="pr-badge">💭 Memory Lane</div>
-          {mem.hot && <div className="pr-hot-tag">🔥 Hot Take Territory</div>}
-          <div className="pr-prompt">{mem.prompt}</div>
-          <div className="pr-actions">
-            <button className="pr-btn" onClick={nextMem}>Next Prompt ›</button>
+          <div className="nl-btn-row">
+            <button
+              className="nl-submit-btn nl-submit-big"
+              onClick={handleSubmit}
+              disabled={status === 'loading'}
+            >
+              {status === 'loading' ? 'Sending…' : 'Confirm Subscription →'}
+            </button>
+            <button className="nl-cancel-btn" onClick={() => setExpanded(false)}>Back</button>
           </div>
-          <div className="pr-counter">{memIdx + 1} of {MEMORY_LANE_PROMPTS.length}</div>
-        </div>
-      )}
 
-      {/* ── HOF LEGEND ROTATOR ── */}
-      {section === 'hof' && (
-        <div className="pr-card pr-card-dark">
-          <div className="pr-badge pr-badge-gold">⚡ Fantasy Hall of Fame</div>
-          <div className="pr-hof-player">{hofLegend.player}</div>
-          <div className="pr-hof-meta">
-            <span className="pr-hof-team">{hofLegend.team}</span>
-            <span className="pr-hof-pos">{hofLegend.pos}</span>
-            <span className="pr-hof-year">{hofLegend.year} · Wk {hofLegend.week}</span>
+          <div className="nl-fine-print">
+            Free, ad-free, unsubscribe any time. We never share your email.
           </div>
-          <div className="pr-hof-pts">{hofLegend.pts} <span>pts</span></div>
-          <div className="pr-hof-line">{hofLegend.line}</div>
-          <div className="pr-hof-note">{hofLegend.note}</div>
-          <div className="pr-actions">
-            <button className="pr-btn-ghost" onClick={nextHof}>Next Legend ›</button>
-            <a className="pr-link"
-              href={`https://www.google.com/search?q=${encodeURIComponent(hofLegend.player + ' ' + hofLegend.year + ' NFL fantasy')}`}
-              target="_blank" rel="noopener">Research ↗</a>
-          </div>
-          <div className="pr-counter">{hofIdx + 1} of {FANTASY_HOF.length}</div>
         </div>
       )}
     </div>
   )
 }
 
-// ── RESOURCES VIEW ────────────────────────────────────────────────────────────
-function ResourcesView() {
-  const [openCat, setOpenCat] = useState(null)
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ── STATS VIEW ────────────────────────────────────────────────────────────────
+// The newspaper back page — deep NFL stats for every category
+// All live from ESPN sports.core.api + site.api
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ── Hooks ─────────────────────────────────────────────────────────────────────
+
+function useTeamStats(season) {
+  const [data,    setData]    = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error,   setError]   = useState(null)
+
+  useEffect(() => {
+    setLoading(true)
+    setError(null)
+    fetch(`/api/espn/teamstats?season=${season}`)
+      .then(r => r.json())
+      .then(d => { setData(d.teams || []); setLoading(false) })
+      .catch(e => { setError(e.message); setLoading(false) })
+  }, [season])
+
+  return { teams: data, loading, error }
+}
+
+function usePlayerStats(season, category) {
+  const [data,    setData]    = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error,   setError]   = useState(null)
+
+  useEffect(() => {
+    if (!category) return
+    setLoading(true)
+    setData(null)
+    setError(null)
+    fetch(`/api/espn/playerstats?season=${season}&category=${category}`)
+      .then(r => r.json())
+      .then(d => {
+        setData({ athletes: d.athletes || [], labels: d.abbreviations || d.labels || [] })
+        setLoading(false)
+      })
+      .catch(e => { setError(e.message); setLoading(false) })
+  }, [season, category])
+
+  return { athletes: data?.athletes, labels: data?.labels, loading, error }
+}
+
+// ── Sortable table helper ─────────────────────────────────────────────────────
+function useSortable(rows, defaultKey, defaultDir = 'desc') {
+  const [sortKey, setSortKey] = useState(defaultKey)
+  const [sortDir, setSortDir] = useState(defaultDir)
+
+  const handleSort = (key) => {
+    if (key === sortKey) {
+      setSortDir(d => d === 'desc' ? 'asc' : 'desc')
+    } else {
+      setSortKey(key)
+      setSortDir('desc')
+    }
+  }
+
+  const sorted = [...(rows || [])].sort((a, b) => {
+    const av = typeof a[sortKey] === 'number' ? a[sortKey] : parseFloat(a[sortKey]) || 0
+    const bv = typeof b[sortKey] === 'number' ? b[sortKey] : parseFloat(b[sortKey]) || 0
+    return sortDir === 'desc' ? bv - av : av - bv
+  })
+
+  return { sorted, sortKey, sortDir, handleSort }
+}
+
+// ── SortTH — sortable column header ──────────────────────────────────────────
+function SortTH({ label, statKey, sortKey, sortDir, onSort, title }) {
+  const active = sortKey === statKey
+  return (
+    <th
+      className={`stats-th sortable ${active ? 'sort-active' : ''}`}
+      onClick={() => onSort(statKey)}
+      title={title || label}
+    >
+      {label}
+      {active && <span className="sort-arrow">{sortDir === 'desc' ? ' ↓' : ' ↑'}</span>}
+    </th>
+  )
+}
+
+// ── Team Offense Table ────────────────────────────────────────────────────────
+function TeamOffenseTable({ teams, squad }) {
+  // Flatten ESPN stats into display rows
+  const rows = (teams || []).map(t => {
+    const s = t.stats
+    const get = (key) => s[key]?.value ?? null
+    const disp = (key) => s[key]?.display ?? '—'
+    return {
+      abbr:     t.abbr,
+      // Core offense
+      ppg:      get('pointsPerGame')   ?? get('avgPoints')          ?? get('PTS/G') ?? 0,
+      ypg:      get('totalYardsPerGame') ?? get('yardsPerGame')      ?? get('YDS/G') ?? 0,
+      pypg:     get('netPassingYardsPerGame') ?? get('passYardsPerGame') ?? 0,
+      rypg:     get('rushingYardsPerGame') ?? get('rushYardsPerGame') ?? 0,
+      // Efficiency
+      thirdPct: get('thirdDownPct')    ?? get('thirdDownConvPct')    ?? 0,
+      rzPct:    get('redZonePct')      ?? get('redZoneConvPct')      ?? 0,
+      ypp:      get('yardsPerPlay')    ?? get('totalYardsPerPlay')   ?? 0,
+      // Scoring / possession
+      topMin:   get('possessionTime') ?? get('timeOfPossession')     ?? 0,
+      // Turnovers (lower is better for offense)
+      to:       get('turnovers')       ?? get('totalTurnovers')       ?? 0,
+      // Raw display strings for some
+      thirdPctD: disp('thirdDownPct')  ?? disp('thirdDownConvPct'),
+      rzPctD:    disp('redZonePct')    ?? disp('redZoneConvPct'),
+      topD:      disp('possessionTime') ?? disp('timeOfPossession'),
+    }
+  })
+
+  const { sorted, sortKey, sortDir, handleSort } = useSortable(rows, 'ppg')
+  const squadTeams = squad?.teams || []
+
+  const thProps = { sortKey, sortDir, onSort: handleSort }
+
+  return (
+    <div className="stats-table-wrap">
+      <table className="stats-table">
+        <thead>
+          <tr>
+            <th className="stats-th stats-th-rank">#</th>
+            <th className="stats-th stats-th-team">Team</th>
+            <SortTH label="PTS/G"  statKey="ppg"      title="Points Per Game"              {...thProps} />
+            <SortTH label="YDS/G"  statKey="ypg"      title="Total Yards Per Game"         {...thProps} />
+            <SortTH label="PASS/G" statKey="pypg"     title="Net Passing Yards Per Game"   {...thProps} />
+            <SortTH label="RUSH/G" statKey="rypg"     title="Rushing Yards Per Game"       {...thProps} />
+            <SortTH label="YPP"    statKey="ypp"      title="Yards Per Play"               {...thProps} />
+            <SortTH label="3RD%"   statKey="thirdPct" title="3rd Down Conversion %"        {...thProps} />
+            <SortTH label="RZ%"    statKey="rzPct"    title="Red Zone TD %"                {...thProps} />
+            <SortTH label="TOP"    statKey="topMin"   title="Time of Possession (minutes)" {...thProps} />
+            <SortTH label="TO"     statKey="to"       title="Total Turnovers (lower = better)" {...thProps} />
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((row, i) => {
+            const inSquad = squadTeams.includes(row.abbr)
+            return (
+              <tr key={row.abbr} className={`stats-row ${inSquad ? 'stats-squad-row' : ''} ${i < 5 ? 'stats-top5' : ''}`}>
+                <td className="stats-rank">{i + 1}</td>
+                <td className="stats-team-cell">
+                  <span className="stats-abbr">{row.abbr}</span>
+                  {inSquad && <span className="stats-squad-dot" title="My Squad" />}
+                </td>
+                <td className="stats-val stats-val-primary">{row.ppg > 0 ? row.ppg.toFixed(1) : '—'}</td>
+                <td className="stats-val">{row.ypg > 0 ? row.ypg.toFixed(1) : '—'}</td>
+                <td className="stats-val">{row.pypg > 0 ? row.pypg.toFixed(1) : '—'}</td>
+                <td className="stats-val">{row.rypg > 0 ? row.rypg.toFixed(1) : '—'}</td>
+                <td className="stats-val">{row.ypp > 0 ? row.ypp.toFixed(2) : '—'}</td>
+                <td className="stats-val">{row.thirdPctD !== '—' ? row.thirdPctD : (row.thirdPct > 0 ? (row.thirdPct * 100).toFixed(1) + '%' : '—')}</td>
+                <td className="stats-val">{row.rzPctD !== '—' ? row.rzPctD : (row.rzPct > 0 ? (row.rzPct * 100).toFixed(1) + '%' : '—')}</td>
+                <td className="stats-val">{row.topD !== '—' ? row.topD : (row.topMin > 0 ? row.topMin.toFixed(1) : '—')}</td>
+                <td className={`stats-val ${row.to > 2 ? 'stats-bad' : row.to <= 1 ? 'stats-good' : ''}`}>{row.to > 0 ? row.to : '—'}</td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// ── Team Defense Table ────────────────────────────────────────────────────────
+function TeamDefenseTable({ teams, squad }) {
+  const rows = (teams || []).map(t => {
+    const s = t.stats
+    const get = (key) => s[key]?.value ?? null
+    const disp = (key) => s[key]?.display ?? '—'
+    return {
+      abbr:     t.abbr,
+      papg:     get('pointsAllowedPerGame') ?? get('ptspg') ?? 0,
+      yapg:     get('yardsAllowedPerGame')  ?? get('ydspg') ?? 0,
+      pyapg:    get('passingYardsAllowedPerGame') ?? 0,
+      ryapg:    get('rushingYardsAllowedPerGame') ?? 0,
+      sacks:    get('sacks')           ?? get('totalSacks')       ?? 0,
+      ints:     get('interceptions')   ?? get('totalInterceptions') ?? 0,
+      fFum:     get('forcedFumbles')   ?? get('fumbleRecoveries')  ?? 0,
+      tfl:      get('tacklesForLoss')  ?? get('totalTFL')          ?? 0,
+      pd:       get('passesDefended')  ?? get('totalPD')           ?? 0,
+      thirdPct: get('opponentThirdDownPct') ?? 0,
+      thirdPctD: disp('opponentThirdDownPct'),
+    }
+  })
+
+  const { sorted, sortKey, sortDir, handleSort } = useSortable(rows, 'papg', 'asc')
+  const squadTeams = squad?.teams || []
+  const thProps = { sortKey, sortDir, onSort: handleSort }
+
+  return (
+    <div className="stats-table-wrap">
+      <table className="stats-table">
+        <thead>
+          <tr>
+            <th className="stats-th stats-th-rank">#</th>
+            <th className="stats-th stats-th-team">Team</th>
+            <SortTH label="PTS/G"   statKey="papg"     title="Points Allowed Per Game"         {...thProps} />
+            <SortTH label="YDS/G"   statKey="yapg"     title="Total Yards Allowed Per Game"    {...thProps} />
+            <SortTH label="PASS/G"  statKey="pyapg"    title="Pass Yards Allowed Per Game"     {...thProps} />
+            <SortTH label="RUSH/G"  statKey="ryapg"    title="Rush Yards Allowed Per Game"     {...thProps} />
+            <SortTH label="SACKS"   statKey="sacks"    title="Total Sacks"                     {...thProps} />
+            <SortTH label="INT"     statKey="ints"     title="Interceptions"                   {...thProps} />
+            <SortTH label="FF"      statKey="fFum"     title="Forced Fumbles"                  {...thProps} />
+            <SortTH label="TFL"     statKey="tfl"      title="Tackles For Loss"                {...thProps} />
+            <SortTH label="PD"      statKey="pd"       title="Passes Defended"                 {...thProps} />
+            <SortTH label="OPP 3RD" statKey="thirdPct" title="Opponent 3rd Down Conversion %" {...thProps} />
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((row, i) => {
+            const inSquad = squadTeams.includes(row.abbr)
+            return (
+              <tr key={row.abbr} className={`stats-row ${inSquad ? 'stats-squad-row' : ''} ${i < 5 ? 'stats-top5' : ''}`}>
+                <td className="stats-rank">{i + 1}</td>
+                <td className="stats-team-cell">
+                  <span className="stats-abbr">{row.abbr}</span>
+                  {inSquad && <span className="stats-squad-dot" title="My Squad" />}
+                </td>
+                <td className={`stats-val stats-val-primary ${row.papg < 18 ? 'stats-good' : row.papg > 28 ? 'stats-bad' : ''}`}>
+                  {row.papg > 0 ? row.papg.toFixed(1) : '—'}
+                </td>
+                <td className="stats-val">{row.yapg > 0 ? row.yapg.toFixed(1) : '—'}</td>
+                <td className="stats-val">{row.pyapg > 0 ? row.pyapg.toFixed(1) : '—'}</td>
+                <td className="stats-val">{row.ryapg > 0 ? row.ryapg.toFixed(1) : '—'}</td>
+                <td className={`stats-val ${row.sacks > 40 ? 'stats-good' : ''}`}>{row.sacks > 0 ? row.sacks : '—'}</td>
+                <td className={`stats-val ${row.ints > 15 ? 'stats-good' : ''}`}>{row.ints > 0 ? row.ints : '—'}</td>
+                <td className="stats-val">{row.fFum > 0 ? row.fFum : '—'}</td>
+                <td className="stats-val">{row.tfl > 0 ? row.tfl : '—'}</td>
+                <td className="stats-val">{row.pd > 0 ? row.pd : '—'}</td>
+                <td className="stats-val">{row.thirdPctD !== '—' ? row.thirdPctD : (row.thirdPct > 0 ? (row.thirdPct * 100).toFixed(1) + '%' : '—')}</td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// ── Player Passing Table ──────────────────────────────────────────────────────
+function PassingTable({ athletes, squad }) {
+  const squadPlayers = squad?.players || []
+
+  const rows = (athletes || []).map(a => {
+    const s = a.stats
+    const v = (k) => s[k]?.value ?? 0
+    return {
+      name:    a.name,
+      team:    a.team,
+      pos:     a.pos,
+      yds:     v('YDS') || v('passingYards') || 0,
+      td:      v('TD')  || v('passingTouchdowns') || 0,
+      int:     v('INT') || v('interceptions') || 0,
+      cmp:     v('CMP') || v('completions') || 0,
+      att:     v('ATT') || v('passingAttempts') || 0,
+      cmpPct:  v('PCT') || v('completionPct') || (v('CMP') && v('ATT') ? (v('CMP')/v('ATT')*100) : 0),
+      ypa:     v('AVG') || v('yardsPerAttempt') || (v('YDS') && v('ATT') ? v('YDS')/v('ATT') : 0),
+      rating:  v('QBR') || v('QBRating') || v('passer_rating') || 0,
+      long:    v('LNG') || v('longPassing') || 0,
+      sacks:   v('SACK') || v('sacksTaken') || 0,
+      _fpts:   (v('YDS')||0)/25 + (v('TD')||0)*6 - (v('INT')||0)*2,
+    }
+  }).filter(r => r.yds > 0 || r.td > 0)
+
+  const { sorted, sortKey, sortDir, handleSort } = useSortable(rows, 'yds')
+  const thProps = { sortKey, sortDir, onSort: handleSort }
+
+  return (
+    <div className="stats-table-wrap">
+      <table className="stats-table stats-table-players">
+        <thead>
+          <tr>
+            <th className="stats-th stats-th-rank">#</th>
+            <th className="stats-th stats-th-player">Player</th>
+            <th className="stats-th">TM</th>
+            <SortTH label="YDS"   statKey="yds"    title="Passing Yards"         {...thProps} />
+            <SortTH label="TD"    statKey="td"     title="Touchdown Passes"       {...thProps} />
+            <SortTH label="INT"   statKey="int"    title="Interceptions Thrown"   {...thProps} />
+            <SortTH label="CMP%"  statKey="cmpPct" title="Completion Percentage"  {...thProps} />
+            <SortTH label="YPA"   statKey="ypa"    title="Yards Per Attempt"      {...thProps} />
+            <SortTH label="QBR"   statKey="rating" title="Passer Rating"          {...thProps} />
+            <SortTH label="LNG"   statKey="long"   title="Long Pass"              {...thProps} />
+            <SortTH label="FPTS"  statKey="_fpts"  title="Fantasy Points (STD)"   {...thProps} />
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((row, i) => {
+            const inSquad = squadPlayers.some(p => row.name.toLowerCase().includes(p.toLowerCase()))
+            return (
+              <tr key={`${row.name}-${i}`} className={`stats-row ${inSquad ? 'stats-squad-row' : ''}`}>
+                <td className="stats-rank">{i + 1}</td>
+                <td className="stats-player-cell">
+                  {row.name}
+                  {inSquad && <span className="stats-squad-tag">⚡</span>}
+                </td>
+                <td className="stats-team-sm">{row.team}</td>
+                <td className="stats-val stats-val-primary">{row.yds > 0 ? row.yds.toLocaleString() : '—'}</td>
+                <td className={`stats-val ${row.td >= 25 ? 'stats-good' : ''}`}>{row.td || '—'}</td>
+                <td className={`stats-val ${row.int > 12 ? 'stats-bad' : row.int <= 5 ? 'stats-good' : ''}`}>{row.int || '—'}</td>
+                <td className="stats-val">{row.cmpPct > 0 ? row.cmpPct.toFixed(1) + '%' : '—'}</td>
+                <td className="stats-val">{row.ypa > 0 ? row.ypa.toFixed(1) : '—'}</td>
+                <td className={`stats-val ${row.rating >= 100 ? 'stats-good' : row.rating < 80 ? 'stats-bad' : ''}`}>
+                  {row.rating > 0 ? row.rating.toFixed(1) : '—'}
+                </td>
+                <td className="stats-val">{row.long || '—'}</td>
+                <td className="stats-val stats-fpts">{row._fpts > 0 ? row._fpts.toFixed(1) : '—'}</td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// ── Player Rushing Table ──────────────────────────────────────────────────────
+function RushingTable({ athletes, squad }) {
+  const squadPlayers = squad?.players || []
+
+  const rows = (athletes || []).map(a => {
+    const s = a.stats
+    const v = (k) => s[k]?.value ?? 0
+    return {
+      name:  a.name,
+      team:  a.team,
+      pos:   a.pos,
+      yds:   v('YDS') || v('rushingYards') || 0,
+      att:   v('CAR') || v('ATT') || v('rushingAttempts') || 0,
+      td:    v('TD')  || v('rushingTouchdowns') || 0,
+      ypc:   v('AVG') || v('yardsPerRushAttempt') || (v('YDS') && v('CAR') ? v('YDS')/v('CAR') : 0),
+      long:  v('LNG') || v('longRushing') || 0,
+      fum:   v('FUM') || v('fumbles') || 0,
+      twent: v('20+') || v('rushingTwentyPlus') || 0,
+      ypg:   v('YDS/G') || v('rushYardsPerGame') || 0,
+      _fpts: (v('YDS')||0)/10 + (v('TD')||0)*6,
+    }
+  }).filter(r => r.yds > 0 || r.att > 0)
+
+  const { sorted, sortKey, sortDir, handleSort } = useSortable(rows, 'yds')
+  const thProps = { sortKey, sortDir, onSort: handleSort }
+
+  return (
+    <div className="stats-table-wrap">
+      <table className="stats-table stats-table-players">
+        <thead>
+          <tr>
+            <th className="stats-th stats-th-rank">#</th>
+            <th className="stats-th stats-th-player">Player</th>
+            <th className="stats-th">TM</th>
+            <SortTH label="YDS"   statKey="yds"  title="Rushing Yards"             {...thProps} />
+            <SortTH label="CAR"   statKey="att"  title="Carries"                   {...thProps} />
+            <SortTH label="TD"    statKey="td"   title="Rushing Touchdowns"         {...thProps} />
+            <SortTH label="YPC"   statKey="ypc"  title="Yards Per Carry"            {...thProps} />
+            <SortTH label="YPG"   statKey="ypg"  title="Rushing Yards Per Game"     {...thProps} />
+            <SortTH label="LNG"   statKey="long" title="Long Run"                   {...thProps} />
+            <SortTH label="20+"   statKey="twent" title="Runs of 20+ Yards"         {...thProps} />
+            <SortTH label="FUM"   statKey="fum"  title="Fumbles"                    {...thProps} />
+            <SortTH label="FPTS"  statKey="_fpts" title="Fantasy Points (STD)"      {...thProps} />
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((row, i) => {
+            const inSquad = squadPlayers.some(p => row.name.toLowerCase().includes(p.toLowerCase()))
+            return (
+              <tr key={`${row.name}-${i}`} className={`stats-row ${inSquad ? 'stats-squad-row' : ''}`}>
+                <td className="stats-rank">{i + 1}</td>
+                <td className="stats-player-cell">
+                  {row.name}
+                  {inSquad && <span className="stats-squad-tag">⚡</span>}
+                </td>
+                <td className="stats-team-sm">{row.team}</td>
+                <td className="stats-val stats-val-primary">{row.yds > 0 ? row.yds.toLocaleString() : '—'}</td>
+                <td className="stats-val">{row.att || '—'}</td>
+                <td className={`stats-val ${row.td >= 10 ? 'stats-good' : ''}`}>{row.td || '—'}</td>
+                <td className={`stats-val ${row.ypc >= 5 ? 'stats-good' : row.ypc < 3.5 ? 'stats-bad' : ''}`}>
+                  {row.ypc > 0 ? row.ypc.toFixed(1) : '—'}
+                </td>
+                <td className="stats-val">{row.ypg > 0 ? row.ypg.toFixed(1) : '—'}</td>
+                <td className="stats-val">{row.long || '—'}</td>
+                <td className="stats-val">{row.twent || '—'}</td>
+                <td className={`stats-val ${row.fum > 3 ? 'stats-bad' : ''}`}>{row.fum || '—'}</td>
+                <td className="stats-val stats-fpts">{row._fpts > 0 ? row._fpts.toFixed(1) : '—'}</td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// ── Player Receiving Table ────────────────────────────────────────────────────
+function ReceivingTable({ athletes, squad }) {
+  const squadPlayers = squad?.players || []
+
+  const rows = (athletes || []).map(a => {
+    const s = a.stats
+    const v = (k) => s[k]?.value ?? 0
+    return {
+      name:  a.name,
+      team:  a.team,
+      pos:   a.pos,
+      yds:   v('YDS') || v('receivingYards') || 0,
+      rec:   v('REC') || v('receptions') || 0,
+      tgt:   v('TGT') || v('targets') || 0,
+      td:    v('TD')  || v('receivingTouchdowns') || 0,
+      ypr:   v('AVG') || v('yardsPerReception') || (v('YDS') && v('REC') ? v('YDS')/v('REC') : 0),
+      ypg:   v('YDS/G') || v('receivingYardsPerGame') || 0,
+      long:  v('LNG') || v('longReception') || 0,
+      twent: v('20+') || v('receivingTwentyPlus') || 0,
+      tgtPct: v('TGT%') || (v('TGT') && v('TGT') > 0 ? null : 0),
+      _fpts_ppr: (v('YDS')||0)/10 + (v('TD')||0)*6 + (v('REC')||0),
+      _fpts_std: (v('YDS')||0)/10 + (v('TD')||0)*6,
+    }
+  }).filter(r => r.yds > 0 || r.rec > 0)
+
+  const { sorted, sortKey, sortDir, handleSort } = useSortable(rows, 'yds')
+  const thProps = { sortKey, sortDir, onSort: handleSort }
+
+  return (
+    <div className="stats-table-wrap">
+      <table className="stats-table stats-table-players">
+        <thead>
+          <tr>
+            <th className="stats-th stats-th-rank">#</th>
+            <th className="stats-th stats-th-player">Player</th>
+            <th className="stats-th">TM</th>
+            <th className="stats-th">POS</th>
+            <SortTH label="YDS"   statKey="yds"       title="Receiving Yards"         {...thProps} />
+            <SortTH label="REC"   statKey="rec"       title="Receptions"              {...thProps} />
+            <SortTH label="TGT"   statKey="tgt"       title="Targets"                 {...thProps} />
+            <SortTH label="TD"    statKey="td"        title="Receiving Touchdowns"    {...thProps} />
+            <SortTH label="YPR"   statKey="ypr"       title="Yards Per Reception"     {...thProps} />
+            <SortTH label="YPG"   statKey="ypg"       title="Receiving Yards Per Game"  {...thProps} />
+            <SortTH label="LNG"   statKey="long"      title="Long Reception"          {...thProps} />
+            <SortTH label="PPR"   statKey="_fpts_ppr" title="Fantasy Points (PPR)"    {...thProps} />
+            <SortTH label="STD"   statKey="_fpts_std" title="Fantasy Points (Standard)" {...thProps} />
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((row, i) => {
+            const inSquad = squadPlayers.some(p => row.name.toLowerCase().includes(p.toLowerCase()))
+            return (
+              <tr key={`${row.name}-${i}`} className={`stats-row ${inSquad ? 'stats-squad-row' : ''}`}>
+                <td className="stats-rank">{i + 1}</td>
+                <td className="stats-player-cell">
+                  {row.name}
+                  {inSquad && <span className="stats-squad-tag">⚡</span>}
+                </td>
+                <td className="stats-team-sm">{row.team}</td>
+                <td className="stats-pos">{row.pos}</td>
+                <td className="stats-val stats-val-primary">{row.yds > 0 ? row.yds.toLocaleString() : '—'}</td>
+                <td className="stats-val">{row.rec || '—'}</td>
+                <td className="stats-val">{row.tgt || '—'}</td>
+                <td className={`stats-val ${row.td >= 8 ? 'stats-good' : ''}`}>{row.td || '—'}</td>
+                <td className={`stats-val ${row.ypr >= 14 ? 'stats-good' : ''}`}>{row.ypr > 0 ? row.ypr.toFixed(1) : '—'}</td>
+                <td className="stats-val">{row.ypg > 0 ? row.ypg.toFixed(1) : '—'}</td>
+                <td className="stats-val">{row.long || '—'}</td>
+                <td className="stats-val stats-fpts">{row._fpts_ppr > 0 ? row._fpts_ppr.toFixed(1) : '—'}</td>
+                <td className="stats-val stats-fpts">{row._fpts_std > 0 ? row._fpts_std.toFixed(1) : '—'}</td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// ── Player Defense Table ──────────────────────────────────────────────────────
+function DefensePlayerTable({ athletes, squad }) {
+  const squadPlayers = squad?.players || []
+
+  const rows = (athletes || []).map(a => {
+    const s = a.stats
+    const v = (k) => s[k]?.value ?? 0
+    return {
+      name:   a.name,
+      team:   a.team,
+      pos:    a.pos,
+      tot:    v('TOT') || v('totalTackles') || v('tackles') || 0,
+      solo:   v('SOLO') || v('soloTackles') || 0,
+      ast:    v('AST') || v('assistedTackles') || 0,
+      sacks:  v('SACKS') || v('sacks') || 0,
+      tfl:    v('TFL') || v('tacklesForLoss') || 0,
+      int:    v('INT') || v('interceptions') || 0,
+      pd:     v('PD') || v('passesDefended') || 0,
+      ff:     v('FF') || v('forcedFumbles') || 0,
+      fr:     v('FR') || v('fumbleRecoveries') || 0,
+      td:     v('TD') || v('defensiveTouchdowns') || 0,
+    }
+  }).filter(r => r.tot > 0 || r.sacks > 0 || r.int > 0)
+
+  const { sorted, sortKey, sortDir, handleSort } = useSortable(rows, 'tot')
+  const thProps = { sortKey, sortDir, onSort: handleSort }
+
+  return (
+    <div className="stats-table-wrap">
+      <table className="stats-table stats-table-players">
+        <thead>
+          <tr>
+            <th className="stats-th stats-th-rank">#</th>
+            <th className="stats-th stats-th-player">Player</th>
+            <th className="stats-th">TM</th>
+            <th className="stats-th">POS</th>
+            <SortTH label="TOT"   statKey="tot"   title="Total Tackles"        {...thProps} />
+            <SortTH label="SOLO"  statKey="solo"  title="Solo Tackles"         {...thProps} />
+            <SortTH label="AST"   statKey="ast"   title="Assisted Tackles"     {...thProps} />
+            <SortTH label="SACKS" statKey="sacks" title="Sacks"                {...thProps} />
+            <SortTH label="TFL"   statKey="tfl"   title="Tackles For Loss"     {...thProps} />
+            <SortTH label="INT"   statKey="int"   title="Interceptions"        {...thProps} />
+            <SortTH label="PD"    statKey="pd"    title="Passes Defended"      {...thProps} />
+            <SortTH label="FF"    statKey="ff"    title="Forced Fumbles"       {...thProps} />
+            <SortTH label="FR"    statKey="fr"    title="Fumble Recoveries"    {...thProps} />
+            <SortTH label="TD"    statKey="td"    title="Defensive Touchdowns" {...thProps} />
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((row, i) => {
+            const inSquad = squadPlayers.some(p => row.name.toLowerCase().includes(p.toLowerCase()))
+            return (
+              <tr key={`${row.name}-${i}`} className={`stats-row ${inSquad ? 'stats-squad-row' : ''}`}>
+                <td className="stats-rank">{i + 1}</td>
+                <td className="stats-player-cell">
+                  {row.name}
+                  {inSquad && <span className="stats-squad-tag">⚡</span>}
+                </td>
+                <td className="stats-team-sm">{row.team}</td>
+                <td className="stats-pos">{row.pos}</td>
+                <td className="stats-val stats-val-primary">{row.tot || '—'}</td>
+                <td className="stats-val">{row.solo || '—'}</td>
+                <td className="stats-val">{row.ast || '—'}</td>
+                <td className={`stats-val ${row.sacks >= 8 ? 'stats-good' : ''}`}>{row.sacks > 0 ? row.sacks.toFixed(1) : '—'}</td>
+                <td className="stats-val">{row.tfl > 0 ? row.tfl.toFixed(1) : '—'}</td>
+                <td className={`stats-val ${row.int >= 4 ? 'stats-good' : ''}`}>{row.int || '—'}</td>
+                <td className="stats-val">{row.pd || '—'}</td>
+                <td className="stats-val">{row.ff || '—'}</td>
+                <td className="stats-val">{row.fr || '—'}</td>
+                <td className={`stats-val ${row.td > 0 ? 'stats-good' : ''}`}>{row.td || '—'}</td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// ── Loading + Error states ────────────────────────────────────────────────────
+function StatsLoading({ label }) {
+  return (
+    <div className="stats-loading">
+      <div className="stats-loading-icon">📊</div>
+      <div className="stats-loading-text">Loading {label}…</div>
+      <div className="stats-loading-sub">Pulling from ESPN · Takes a moment</div>
+    </div>
+  )
+}
+
+function StatsEmpty({ label }) {
+  return (
+    <div className="stats-empty">
+      <div className="stats-empty-icon">📋</div>
+      <div className="stats-empty-title">No {label} data yet</div>
+      <div className="stats-empty-sub">Stats populate once the 2026 season kicks off Sep 9.</div>
+    </div>
+  )
+}
+
+// ── Main StatsView ─────────────────────────────────────────────────────────────
+function StatsView({ squad }) {
+  const SEASON = '2026'
+
+  // Sub-tabs: team offense/defense, player categories
+  const TABS = [
+    { id:'team-offense',  label:'Team Offense',   group:'team'   },
+    { id:'team-defense',  label:'Team Defense',   group:'team'   },
+    { id:'passing',       label:'Passing',         group:'player' },
+    { id:'rushing',       label:'Rushing',         group:'player' },
+    { id:'receiving',     label:'Receiving',       group:'player' },
+    { id:'defensive',     label:'Defense',         group:'player' },
+  ]
+
+  const [tab, setTab] = useState('team-offense')
+  const activeTab = TABS.find(t => t.id === tab)
+
+  // Team stats (shared for both team tabs)
+  const { teams, loading: teamLoading, error: teamError } = useTeamStats(SEASON)
+
+  // Player stats (lazy — only fetches when a player tab is selected)
+  const playerCategory = activeTab?.group === 'player' ? tab : null
+  const { athletes, loading: playerLoading, error: playerError } = usePlayerStats(SEASON, playerCategory)
+
+  const seasonStarted = new Date() >= new Date('2026-09-09T00:00:00-04:00')
 
   return (
     <div>
+      {/* Section bar */}
       <div className="section-bar">
-        <h2>Resources</h2>
+        <h2>2026 NFL Stats</h2>
         <div className="sb-rule" />
-        <span className="sb-ct">Fantasy Tools · Injuries · Streaming · News · Research</span>
+        <span className="sb-ct">
+          {seasonStarted ? `Live · ${SEASON} Regular Season` : 'Season opens Sep 9'}
+        </span>
       </div>
 
-      <div className="res-intro">
-        The best external tools for serious fantasy players, all in one place.
-        Opens in a new tab — we just curate the links.
-      </div>
-
-      <div className="res-grid">
-        {QUICK_LINKS.map((cat, ci) => (
-          <div key={ci} className="res-category">
+      {/* Tab bar */}
+      <div className="stats-tabs">
+        <div className="stats-tab-group">
+          <span className="stats-tab-label">Teams</span>
+          {TABS.filter(t => t.group === 'team').map(t => (
             <button
-              className={`res-cat-header ${openCat === ci ? 'open' : ''}`}
-              onClick={() => setOpenCat(openCat === ci ? null : ci)}
-            >
-              <span>{cat.category}</span>
-              <span className="res-chevron">{openCat === ci ? '▲' : '▼'}</span>
-            </button>
-            {openCat === ci && (
-              <div className="res-links">
-                {cat.links.map((lnk, li) => (
-                  <a
-                    key={li}
-                    href={lnk.url}
-                    target="_blank"
-                    rel="noopener"
-                    className="res-link"
-                  >
-                    <span className="res-link-label">{lnk.label}</span>
-                    <span className="res-link-arrow">↗</span>
-                  </a>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
+              key={t.id}
+              className={`stats-tab ${tab === t.id ? 'on' : ''}`}
+              onClick={() => setTab(t.id)}
+            >{t.label}</button>
+          ))}
+        </div>
+        <div className="stats-tab-group">
+          <span className="stats-tab-label">Players</span>
+          {TABS.filter(t => t.group === 'player').map(t => (
+            <button
+              key={t.id}
+              className={`stats-tab ${tab === t.id ? 'on' : ''}`}
+              onClick={() => setTab(t.id)}
+            >{t.label}</button>
+          ))}
+        </div>
       </div>
 
-      <div className="res-footer">
-        Links open external sites — we don't control their content. No affiliation implied.
-        Last curated June 2026.
-      </div>
+      {/* Off-season gate */}
+      {!seasonStarted && (
+        <div className="leaders-coming-soon">
+          <div className="cs-icon">📊</div>
+          <div className="cs-title">Full Stats Hub — Live Sep 9</div>
+          <div className="cs-text">
+            Team offense & defense rankings · Individual leaders in every category ·
+            Passing, rushing, receiving, defense · All sortable · Live from ESPN.
+          </div>
+          <div className="cs-date">Season opens Sep 9, 2026 · SEA vs NE · 8:20 PM ET</div>
+        </div>
+      )}
+
+      {/* ── TEAM OFFENSE ── */}
+      {seasonStarted && tab === 'team-offense' && (
+        <>
+          <div className="stats-info-bar">
+            Click any column header to sort. Green = top 5, red = bottom 5 for that stat.
+            Squad teams highlighted in gold.
+          </div>
+          {teamLoading && <StatsLoading label="team offense stats" />}
+          {teamError && <div className="sch-error">Could not load team stats: {teamError}</div>}
+          {!teamLoading && !teamError && (!teams || teams.length === 0) && <StatsEmpty label="team offense" />}
+          {!teamLoading && teams?.length > 0 && <TeamOffenseTable teams={teams} squad={squad} />}
+        </>
+      )}
+
+      {/* ── TEAM DEFENSE ── */}
+      {seasonStarted && tab === 'team-defense' && (
+        <>
+          <div className="stats-info-bar">
+            Click any column header to sort. Default sorted by fewest points allowed.
+            Squad teams highlighted in gold.
+          </div>
+          {teamLoading && <StatsLoading label="team defense stats" />}
+          {teamError && <div className="sch-error">Could not load team stats: {teamError}</div>}
+          {!teamLoading && !teamError && (!teams || teams.length === 0) && <StatsEmpty label="team defense" />}
+          {!teamLoading && teams?.length > 0 && <TeamDefenseTable teams={teams} squad={squad} />}
+        </>
+      )}
+
+      {/* ── PASSING ── */}
+      {seasonStarted && tab === 'passing' && (
+        <>
+          <div className="stats-info-bar">
+            Top 50 passers · Click to sort · Squad players highlighted ⚡ · FPTS = Standard scoring
+          </div>
+          {playerLoading && <StatsLoading label="passing stats" />}
+          {playerError && <div className="sch-error">Could not load passing stats: {playerError}</div>}
+          {!playerLoading && !playerError && (!athletes || athletes.length === 0) && <StatsEmpty label="passing" />}
+          {!playerLoading && athletes?.length > 0 && <PassingTable athletes={athletes} squad={squad} />}
+        </>
+      )}
+
+      {/* ── RUSHING ── */}
+      {seasonStarted && tab === 'rushing' && (
+        <>
+          <div className="stats-info-bar">
+            Top 50 rushers · Click to sort · Squad players highlighted ⚡
+          </div>
+          {playerLoading && <StatsLoading label="rushing stats" />}
+          {playerError && <div className="sch-error">Could not load rushing stats: {playerError}</div>}
+          {!playerLoading && !playerError && (!athletes || athletes.length === 0) && <StatsEmpty label="rushing" />}
+          {!playerLoading && athletes?.length > 0 && <RushingTable athletes={athletes} squad={squad} />}
+        </>
+      )}
+
+      {/* ── RECEIVING ── */}
+      {seasonStarted && tab === 'receiving' && (
+        <>
+          <div className="stats-info-bar">
+            Top 50 receivers · Click to sort · Both PPR and Standard fantasy points shown · Squad players highlighted ⚡
+          </div>
+          {playerLoading && <StatsLoading label="receiving stats" />}
+          {playerError && <div className="sch-error">Could not load receiving stats: {playerError}</div>}
+          {!playerLoading && !playerError && (!athletes || athletes.length === 0) && <StatsEmpty label="receiving" />}
+          {!playerLoading && athletes?.length > 0 && <ReceivingTable athletes={athletes} squad={squad} />}
+        </>
+      )}
+
+      {/* ── DEFENSIVE PLAYERS ── */}
+      {seasonStarted && tab === 'defensive' && (
+        <>
+          <div className="stats-info-bar">
+            Top 50 defenders · Click to sort · Squad players highlighted ⚡
+          </div>
+          {playerLoading && <StatsLoading label="defensive stats" />}
+          {playerError && <div className="sch-error">Could not load defensive stats: {playerError}</div>}
+          {!playerLoading && !playerError && (!athletes || athletes.length === 0) && <StatsEmpty label="defense" />}
+          {!playerLoading && athletes?.length > 0 && <DefensePlayerTable athletes={athletes} squad={squad} />}
+        </>
+      )}
+
+      {/* Footer note */}
+      {seasonStarted && (
+        <div className="stats-footer-note">
+          Data via ESPN · Updates after each game · Season {SEASON} Regular Season ·
+          Click column headers to sort ascending or descending
+        </div>
+      )}
     </div>
   )
 }
 
 // ── FOOTER ────────────────────────────────────────────────────────────────────
-function Footer() {
+function Footer({ squad, favTeam }) {
   return (
     <footer className="footer">
+      {/* Newsletter signup — above the standard footer */}
+      <NewsletterSignup squad={squad} favTeam={favTeam} />
+
       <div className="footer-disclaimer">
         <span className="footer-disc-text">
           The Final Whistle is a free, independent NFL fan site for entertainment purposes only.
@@ -4870,6 +5460,10 @@ function Footer() {
           {' · '}
           <a href={`https://www.amazon.com?tag=${AMAZON_TAG}`} target="_blank" rel="noopener">
             Shop Amazon
+          </a>
+          {' · '}
+          <a href="https://nysportsdaily.com" target="_blank" rel="noopener">
+            NY Sports Daily
           </a>
         </span>
         <span className="footer-scoring">6pt TD · Standard / PPR</span>
