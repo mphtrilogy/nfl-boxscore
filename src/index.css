@@ -1222,10 +1222,9 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   display: grid;
   grid-template-columns: 1fr 240px;
   align-items: start;
-  max-width: 1200px;
-  margin: 0 auto;
+  width: 100%;            /* full viewport width — no centering constraint */
 }
-.app-main { min-width: 0; } /* prevent grid blowout */
+.app-main { min-width: 0; width: 100%; } /* prevent grid blowout, take all available space */
 
 /* Sidebar */
 .sidebar {
@@ -1688,4 +1687,35 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   .mob-overlay { display: none; }
   .mob-tab-bar { display: none; }
   .mob-hamburger { display: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FANTASY HUB MOBILE FIXES
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media(max-width:600px){
+  /* Hide the scoring key text — takes too much space on mobile */
+  .fmb-key { display: none; }
+  .fant-mode-bar { padding: 8px 12px; gap: 8px; }
+
+  /* Fantasy sub-tabs — ensure proper horizontal scroll, no wrap */
+  .hist-tabs { flex-wrap: nowrap; padding: 0 4px; }
+  .htab { font-size: 8px; padding: 9px 9px; letter-spacing: .06em; }
+
+  /* Section bar tighter */
+  .section-bar { padding: 8px 12px 6px; }
+  .section-bar h2 { font-size: 16px; }
+  .sb-ct { display: none; } /* hide subtitle on mobile */
+
+  /* FW info panel full width */
+  .fw-info-panel { margin: 8px 0; }
+
+  /* Leaders table scroll */
+  .fl-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Trends controls stack */
+  .trends-controls { flex-direction: column; gap: 8px; padding: 10px 12px; }
+  .tc-group { flex-direction: row; align-items: center; gap: 8px; }
+  .tc-label { width: 56px; flex-shrink: 0; }
+  .tc-btns { flex-wrap: wrap; gap: 3px; }
+  .tc-btn { font-size: 8px; padding: 5px 8px; }
 }
