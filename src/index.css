@@ -502,9 +502,15 @@ body::before {
 .news-ticker-wrap{display:flex;align-items:center;border-top:1px solid var(--rule);overflow:hidden;height:28px;background:var(--ink)}
 .ticker-label{font-family:var(--font-mono);font-size:8px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--paper);background:var(--accent);padding:0 10px;height:28px;display:flex;align-items:center;flex-shrink:0;white-space:nowrap}
 .ticker-track{flex:1;overflow:hidden;height:28px;display:flex;align-items:center}
-.ticker-inner{display:flex;align-items:center;animation:ticker-scroll 120s linear infinite;white-space:nowrap}
+.ticker-inner{display:flex;align-items:center;animation:ticker-scroll 90s linear infinite;white-space:nowrap}
 .ticker-inner:hover{animation-play-state:paused}
 @keyframes ticker-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+/* Mobile: slow ticker down so it's readable */
+@media(max-width:600px){
+  .ticker-inner{animation-duration:140s}
+  .ticker-label{font-size:7px;padding:0 7px;letter-spacing:.12em}
+  .ticker-item{font-size:8px}
+}
 .ticker-item{font-family:var(--font-mono);font-size:9px;letter-spacing:.06em;color:rgba(245,240,232,.7);text-decoration:none;padding:0 6px;transition:color .15s;white-space:nowrap}
 .ticker-item:hover{color:var(--paper)}
 .ticker-sep{margin-left:6px;color:rgba(245,240,232,.25)}
@@ -1183,11 +1189,19 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   }
   /* Prevent text selection flash on tap */
   button { -webkit-tap-highlight-color: transparent; user-select: none; }
-  /* Smoother scrolling everywhere */
-  * { -webkit-overflow-scrolling: touch; }
-  /* Reduce motion for battery/performance */
-  @media(prefers-reduced-motion: reduce){
-    * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  /* Smoother scrolling on scroll containers only — NOT * which breaks ticker */
+  .top-nav, .drawer-tabs, .fantab-bar, .stats-tabs,
+  .fw-table-wrap, .trends-table-wrap, .stats-table-wrap,
+  .linescore-wrap, .hist-tabs, .news-filters {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+/* Reduce motion — outside media query to avoid nesting issue */
+@media(prefers-reduced-motion: reduce){
+  /* Exclude ticker from reduced motion — it needs to keep scrolling */
+  *:not(.ticker-inner):not(.ticker-item) {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }
 
@@ -1197,4 +1211,254 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   .game-card.featured { grid-column: 1 / -1; }
   .tnav-btn { font-size: 9px; padding: 9px 11px; }
   .stats-tab { font-size: 9px; padding: 7px 10px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SIDEBAR + TWO-COLUMN LAYOUT
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Two-column wrapper */
+.app-body {
+  display: grid;
+  grid-template-columns: 1fr 240px;
+  align-items: start;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.app-main { min-width: 0; } /* prevent grid blowout */
+
+/* Sidebar */
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  border-left: 1px solid var(--rule);
+  background: var(--paper);
+  scrollbar-width: none;
+  padding-bottom: 40px;
+}
+.sidebar::-webkit-scrollbar { display: none; }
+
+/* Widget */
+.sb-widget {
+  border-bottom: 1px solid var(--rule);
+  padding: 12px 14px;
+}
+.sb-widget-dark {
+  background: var(--ink);
+  color: var(--paper);
+}
+.sb-widget-promo {
+  background: var(--paper-dark);
+}
+.sb-widget-title {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 9px;
+}
+.sb-widget-dark .sb-widget-title { color: rgba(255,255,255,.4); }
+
+/* Countdown */
+.sb-countdown {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--gold);
+  line-height: 1;
+  margin-bottom: 3px;
+}
+.sb-countdown-game {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: rgba(255,255,255,.6);
+  letter-spacing: .06em;
+}
+
+/* Conference leaders */
+.sb-leader-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--rule);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+.sb-leader-row:last-of-type { border-bottom: none; }
+.sb-leader-conf {
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  color: var(--muted-lt);
+  width: 28px;
+  flex-shrink: 0;
+}
+.sb-leader-team {
+  font-weight: 700;
+  color: var(--ink);
+  flex: 1;
+}
+.sb-leader-record { color: var(--muted); font-size: 9px; }
+
+/* Upcoming games */
+.sb-game-row {
+  padding: 5px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.sb-game-row:last-of-type { border-bottom: none; }
+.sb-game-row.sb-game-fav { border-left: 2px solid var(--gold); padding-left: 6px; }
+.sb-game-teams {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.sb-fav-dot {
+  width: 5px; height: 5px;
+  background: var(--gold);
+  border-radius: 50%;
+  display: inline-block;
+}
+.sb-game-time {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--muted-lt);
+  margin-top: 1px;
+  letter-spacing: .04em;
+}
+.sb-game-tv {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--accent);
+  font-weight: 700;
+  letter-spacing: .06em;
+}
+
+/* Injury rows */
+.sb-inj-row {
+  padding: 5px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.sb-inj-row:last-child { border-bottom: none; }
+.sb-inj-player {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.sb-inj-pos {
+  font-size: 7px;
+  color: var(--muted-lt);
+  font-weight: 400;
+}
+.sb-inj-team {
+  font-size: 7px;
+  color: var(--gold);
+  font-weight: 700;
+}
+.sb-inj-status {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+.sb-inj-out   { color: #8b1a1a; }
+.sb-inj-doubt { color: #d97706; }
+.sb-inj-qtb   { color: var(--muted); }
+
+/* More button */
+.sb-more-btn {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: none;
+  border: none;
+  padding: 6px 0 0;
+  cursor: pointer;
+  display: block;
+  width: 100%;
+  text-align: left;
+  transition: color .12s;
+}
+.sb-more-btn:hover { color: var(--ink); }
+
+/* Quick nav links */
+.sb-quicklink {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ink);
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--rule);
+  padding: 7px 0;
+  cursor: pointer;
+  letter-spacing: .04em;
+  transition: color .12s, padding-left .12s;
+}
+.sb-quicklink:last-child { border-bottom: none; }
+.sb-quicklink:hover { color: var(--accent); padding-left: 4px; }
+
+/* NY Sports Daily promo */
+.sb-promo-title {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+.sb-promo-text {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--muted);
+  letter-spacing: .06em;
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+.sb-promo-btn {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--paper);
+  background: var(--ink);
+  padding: 6px 12px;
+  border-radius: var(--r);
+  text-decoration: none;
+  transition: background .12s;
+}
+.sb-promo-btn:hover { background: var(--accent); }
+
+/* ── Mobile: hide sidebar, full-width content ─────────────────────────────── */
+@media(max-width:900px){
+  .app-body { grid-template-columns: 1fr; }
+  .sidebar { display: none; }
+}
+
+/* ── Tablet: narrower sidebar ─────────────────────────────────────────────── */
+@media(min-width:901px) and (max-width:1100px){
+  .app-body { grid-template-columns: 1fr 200px; }
+  .sb-countdown { font-size: 26px; }
+  .sb-widget { padding: 10px 10px; }
 }
