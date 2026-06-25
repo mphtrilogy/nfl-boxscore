@@ -149,8 +149,20 @@ async function getWeekContext(sendType) {
   return { currentWeek: week, recapWeek: null }
 }
 
+// Season type helper — mirrors the app's espnSeasonType()
+// ESPN: seasontype=1 (preseason Aug 7–Sep 8), seasontype=2 (regular Sep 9+)
+function getSeasonType() {
+  const now            = new Date()
+  const preseasonStart = new Date('2026-08-07T00:00:00-04:00')
+  const regularStart   = new Date('2026-09-09T00:00:00-04:00')
+  if (now >= regularStart)   return 2
+  if (now >= preseasonStart) return 1
+  return 1  // default to preseason during off-season for testing
+}
+
 async function getWeekEvents(week) {
-  const sb = await espnFetch(`/scoreboard?week=${week}&seasontype=2&limit=20`)
+  const st = getSeasonType()
+  const sb = await espnFetch(`/scoreboard?week=${week}&seasontype=${st}&limit=20`)
   return sb?.events || []
 }
 
