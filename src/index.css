@@ -1719,3 +1719,24 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   .tc-btns { flex-wrap: wrap; gap: 3px; }
   .tc-btn { font-size: 8px; padding: 5px 8px; }
 }
+
+/* ── Squad newsletter sync status ─────────────────────────────────────────── */
+.squad-sync-ok {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  color: #1a5c1a;
+  padding: 4px 8px;
+  background: rgba(26,92,26,.08);
+  border-radius: var(--r);
+  white-space: nowrap;
+}
+.squad-sync-hint {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--muted-lt);
+  letter-spacing: .04em;
+  flex: 1;
+  text-align: right;
+}
