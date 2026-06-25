@@ -213,16 +213,16 @@ async function fetchGameWeather(homeTeam, gameDate) {
     const tMax  = Math.round(days.temperature_2m_max[i] || 70)
     const code  = days.weather_code[i] || 0
 
-    const condIcon = code <= 1 ? '☀️' : code <= 3 ? '⛅' : code <= 48 ? '🌫️' :
-                     code <= 67 ? '🌧️' : code <= 77 ? '❄️' : '⛈️'
+    const condIcon = code <= 1 ? 'sunny' : code <= 3 ? 'cloudy' : code <= 48 ? 'foggy' :
+                     code <= 67 ? 'rainy' : code <= 77 ? 'snowy' : 'stormy'
 
     // Fantasy impact flags — what actually matters
     const flags = []
-    if (wind >= 25)  flags.push({ icon:'💨', text:`${wind} mph wind — fade pass catchers, WRs/TEs at risk` })
-    if (wind >= 20 && wind < 25) flags.push({ icon:'💨', text:`${wind} mph wind — monitor kickers and deep threats` })
-    if (rain > 0.2)  flags.push({ icon:'🌧️', text:`Rain expected (${rain.toFixed(1)}"`) + ` — favor RBs, fade kickers` })
-    if (tMin < 25)   flags.push({ icon:'🥶', text:`Extreme cold (low ${tMin}°F) — expect run-heavy game plan` })
-    if (tMin < 35 && tMin >= 25) flags.push({ icon:'🌨️', text:`Cold game (low ${tMin}°F) — slight RB boost` })
+    if (wind >= 25)  flags.push({ icon:'wind', text:`${wind} mph wind — fade pass catchers, WRs/TEs at risk` })
+    if (wind >= 20 && wind < 25) flags.push({ icon:'wind', text:`${wind} mph wind — monitor kickers and deep threats` })
+    if (rain > 0.2)  flags.push({ icon:"rain", text:`Rain expected (${rain.toFixed(1)} in) — favor RBs, fade kickers` })
+    if (tMin < 25)   flags.push({ icon:'cold', text:`Extreme cold (low ${tMin}°F) — expect run-heavy game plan` })
+    if (tMin < 35 && tMin >= 25) flags.push({ icon:'snow', text:`Cold game (low ${tMin}°F) — slight RB boost` })
 
     return {
       wind, rain: rain.toFixed(2), tMin, tMax, condIcon,
