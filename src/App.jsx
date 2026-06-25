@@ -26,7 +26,7 @@ function getAutoWeek() {
 }
 
 // ── TOP-LEVEL NAV VIEWS ───────────────────────────────────────────────────────
-const VIEWS = ['Scores', 'Schedule', 'Standings', 'TV Guide', 'News', 'Injuries', 'Stats', 'Leaders', 'Fantasy', 'Draft', 'History']
+const VIEWS = ['Scores', 'Schedule', 'Standings', 'TV Guide', 'News', 'Injuries', 'Leaders', 'Fantasy', 'Draft', 'History']
 
 export default function App() {
   const [activeView,    setActiveView]    = useState('Scores')
@@ -122,8 +122,9 @@ export default function App() {
         ))}
       </nav>
 
-      {/* ── CONTENT ── */}
-      <main>
+      {/* ── CONTENT + SIDEBAR ── */}
+      <div className="app-body">
+        <main className="app-main">
         {activeView === 'Scores'    && (
           <ScoresView
             week={activeWeek}
@@ -154,9 +155,8 @@ export default function App() {
         {activeView === 'TV Guide'  && <TVGuideView currentWeek={activeWeek} />}
         {activeView === 'News'      && <NewsView teamFilter={newsTeam} setTeamFilter={setNewsTeam} />}
         {activeView === 'Injuries'  && <InjuriesView />}
-        {activeView === 'Stats'     && <StatsView squad={squad} />}
         {activeView === 'Leaders'   && (
-          <LeadersView tab={leadersTab} setTab={setLeadersTab} onGoToStats={() => setActiveView('Stats')} />
+          <LeadersView tab={leadersTab} setTab={setLeadersTab} />
         )}
         {activeView === 'Fantasy'   && (
           <FantasyView
@@ -170,7 +170,9 @@ export default function App() {
         )}
         {activeView === 'Draft'     && <DraftView />}
         {activeView === 'History'   && <HistoryView />}
-      </main>
+        </main>
+        <Sidebar activeWeek={activeWeek} setActiveView={setActiveView} squad={squad} />
+      </div>
 
       <Footer squad={squad} favTeam={teamFilter} />
       {/* Newsletter confirmation toast */}
@@ -1496,7 +1498,7 @@ function StandingsView() {
 }
 
 // ── LEADERS ───────────────────────────────────────────────────────────────────
-function LeadersView({ tab, setTab, onGoToStats }) {
+function LeadersView({ tab, setTab }) {
   return (
     <div>
       <div className="section-bar">
@@ -1504,22 +1506,23 @@ function LeadersView({ tab, setTab, onGoToStats }) {
         <div className="sb-rule" />
         <span className="sb-ct">Season Stats</span>
       </div>
+      <div className="leaders-tabs">
+        {['Offense', 'Defense'].map(t => (
+          <button
+            key={t}
+            className={`ltab ${tab === t.toLowerCase() ? 'on' : ''}`}
+            onClick={() => setTab(t.toLowerCase())}
+          >{t}</button>
+        ))}
+      </div>
       <div className="leaders-coming-soon">
         <div className="cs-icon">📊</div>
-        <div className="cs-title">Full Stats Hub is Live</div>
+        <div className="cs-title">Season Stats Available Week 1</div>
         <div className="cs-text">
-          Individual and team leaderboards have moved to the new Stats tab —
-          sortable tables for every category, live from ESPN.
+          Individual player leaderboards will populate automatically as the 2026 season kicks off September 9.
+          Stats pull live from ESPN after each game.
         </div>
-        <div style={{marginTop:16,textAlign:'center'}}>
-          <button
-            className="nl-submit-btn"
-            style={{display:'inline-block',padding:'10px 24px'}}
-            onClick={onGoToStats}
-          >
-            Go to Stats Tab →
-          </button>
-        </div>
+        <div className="cs-date">Kickoff: Sep 9, 2026 · SEA vs NE · 8:20 PM ET</div>
       </div>
     </div>
   )
@@ -4699,739 +4702,236 @@ function NewsletterSignup({ squad, favTeam }) {
 
 
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// ── STATS VIEW ────────────────────────────────────────────────────────────────
-// The newspaper back page — deep NFL stats for every category
-// All live from ESPN sports.core.api + site.api
-// ═══════════════════════════════════════════════════════════════════════════════
+// ── SIDEBAR ───────────────────────────────────────────────────────────────────
+// Sticky right rail — mirrors nysportsdaily.com sidebar pattern
+// Shows: division leaders, top injuries, next game countdown, quick links
+function Sidebar({ activeWeek, setActiveView, squad }) {
+  const [standings, setStandings] = useState(null)
+  const [injuries,  setInjuries]  = useState([])
+  const [events,    setEvents]    = useState([])
+  const [now,       setNow]       = useState(new Date())
 
-// ── Hooks ─────────────────────────────────────────────────────────────────────
-
-function useTeamStats(season) {
-  const [data,    setData]    = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error,   setError]   = useState(null)
-
+  // Live clock for countdown
   useEffect(() => {
-    setLoading(true)
-    setError(null)
-    fetch(`/api/espn/teamstats?season=${season}`)
+    const t = setInterval(() => setNow(new Date()), 60000)
+    return () => clearInterval(t)
+  }, [])
+
+  // Standings
+  useEffect(() => {
+    fetch('/api/espn/standings')
       .then(r => r.json())
-      .then(d => { setData(d.teams || []); setLoading(false) })
-      .catch(e => { setError(e.message); setLoading(false) })
-  }, [season])
+      .then(setStandings)
+      .catch(() => {})
+  }, [])
 
-  return { teams: data, loading, error }
-}
-
-function usePlayerStats(season, category) {
-  const [data,    setData]    = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error,   setError]   = useState(null)
-
+  // Injuries (top 6)
   useEffect(() => {
-    if (!category) return
-    setLoading(true)
-    setData(null)
-    setError(null)
-    fetch(`/api/espn/playerstats?season=${season}&category=${category}`)
+    fetch('/api/espn-core/injuries?limit=20')
       .then(r => r.json())
       .then(d => {
-        setData({ athletes: d.athletes || [], labels: d.abbreviations || d.labels || [] })
-        setLoading(false)
+        const items = (d.items || [])
+          .filter(inj => inj.athlete?.displayName && inj.status)
+          .slice(0, 6)
+          .map(inj => ({
+            name:   inj.athlete?.displayName || '',
+            team:   inj.athlete?.team?.abbreviation || '',
+            pos:    inj.athlete?.position?.abbreviation || '',
+            status: inj.type?.description || inj.status || '',
+          }))
+        setInjuries(items)
       })
-      .catch(e => { setError(e.message); setLoading(false) })
-  }, [season, category])
+      .catch(() => {})
+  }, [])
 
-  return { athletes: data?.athletes, labels: data?.labels, loading, error }
-}
+  // Next few games
+  useEffect(() => {
+    fetch(`/api/espn/scoreboard?week=${activeWeek}&seasontype=2&limit=20`)
+      .then(r => r.json())
+      .then(d => setEvents(d.events || []))
+      .catch(() => {})
+  }, [activeWeek])
 
-// ── Sortable table helper ─────────────────────────────────────────────────────
-function useSortable(rows, defaultKey, defaultDir = 'desc') {
-  const [sortKey, setSortKey] = useState(defaultKey)
-  const [sortDir, setSortDir] = useState(defaultDir)
-
-  const handleSort = (key) => {
-    if (key === sortKey) {
-      setSortDir(d => d === 'desc' ? 'asc' : 'desc')
-    } else {
-      setSortKey(key)
-      setSortDir('desc')
-    }
+  // Get division leaders from standings
+  const getDivLeaders = () => {
+    if (!standings?.children) return []
+    const leaders = []
+    standings.children.forEach(conf => {
+      conf.standings?.entries
+        ?.reduce((divMap, entry) => {
+          const div = entry.team?.groups?.[0]?.name || ''
+          if (!divMap[div]) divMap[div] = []
+          divMap[div].push(entry)
+          return divMap
+        }, {})
+      // Simpler: just get top team per conference
+      const sorted = (conf.standings?.entries || [])
+        .map(e => {
+          const stats = e.stats || []
+          const w = stats.find(s => s.name === 'wins')?.value ?? 0
+          const l = stats.find(s => s.name === 'losses')?.value ?? 0
+          return { abbr: e.team?.abbreviation, w, l, name: conf.name }
+        })
+        .sort((a, b) => b.w - a.w)
+      if (sorted[0]) leaders.push(sorted[0])
+    })
+    return leaders
   }
 
-  const sorted = [...(rows || [])].sort((a, b) => {
-    const av = typeof a[sortKey] === 'number' ? a[sortKey] : parseFloat(a[sortKey]) || 0
-    const bv = typeof b[sortKey] === 'number' ? b[sortKey] : parseFloat(b[sortKey]) || 0
-    return sortDir === 'desc' ? bv - av : av - bv
+  // Countdown to next game
+  const nextGame = events.find(ev => {
+    const status = ev.status?.type?.state
+    return status === 'pre'
   })
+  const getCountdown = () => {
+    if (!nextGame) return null
+    const gameTime = new Date(nextGame.date)
+    const diff     = gameTime - now
+    if (diff < 0) return null
+    const hrs  = Math.floor(diff / 3600000)
+    const mins = Math.floor((diff % 3600000) / 60000)
+    const days = Math.floor(hrs / 24)
+    if (days > 0) return `${days}d ${hrs % 24}h`
+    if (hrs > 0)  return `${hrs}h ${mins}m`
+    return `${mins}m`
+  }
 
-  return { sorted, sortKey, sortDir, handleSort }
-}
+  const countdown = getCountdown()
+  const divLeaders = getDivLeaders()
 
-// ── SortTH — sortable column header ──────────────────────────────────────────
-function SortTH({ label, statKey, sortKey, sortDir, onSort, title }) {
-  const active = sortKey === statKey
-  return (
-    <th
-      className={`stats-th sortable ${active ? 'sort-active' : ''}`}
-      onClick={() => onSort(statKey)}
-      title={title || label}
-    >
-      {label}
-      {active && <span className="sort-arrow">{sortDir === 'desc' ? ' ↓' : ' ↑'}</span>}
-    </th>
-  )
-}
-
-// ── Team Offense Table ────────────────────────────────────────────────────────
-function TeamOffenseTable({ teams, squad }) {
-  // Flatten ESPN stats into display rows
-  const rows = (teams || []).map(t => {
-    const s = t.stats
-    const get = (key) => s[key]?.value ?? null
-    const disp = (key) => s[key]?.display ?? '—'
-    return {
-      abbr:     t.abbr,
-      // Core offense
-      ppg:      get('pointsPerGame')   ?? get('avgPoints')          ?? get('PTS/G') ?? 0,
-      ypg:      get('totalYardsPerGame') ?? get('yardsPerGame')      ?? get('YDS/G') ?? 0,
-      pypg:     get('netPassingYardsPerGame') ?? get('passYardsPerGame') ?? 0,
-      rypg:     get('rushingYardsPerGame') ?? get('rushYardsPerGame') ?? 0,
-      // Efficiency
-      thirdPct: get('thirdDownPct')    ?? get('thirdDownConvPct')    ?? 0,
-      rzPct:    get('redZonePct')      ?? get('redZoneConvPct')      ?? 0,
-      ypp:      get('yardsPerPlay')    ?? get('totalYardsPerPlay')   ?? 0,
-      // Scoring / possession
-      topMin:   get('possessionTime') ?? get('timeOfPossession')     ?? 0,
-      // Turnovers (lower is better for offense)
-      to:       get('turnovers')       ?? get('totalTurnovers')       ?? 0,
-      // Raw display strings for some
-      thirdPctD: disp('thirdDownPct')  ?? disp('thirdDownConvPct'),
-      rzPctD:    disp('redZonePct')    ?? disp('redZoneConvPct'),
-      topD:      disp('possessionTime') ?? disp('timeOfPossession'),
-    }
-  })
-
-  const { sorted, sortKey, sortDir, handleSort } = useSortable(rows, 'ppg')
-  const squadTeams = squad?.teams || []
-
-  const thProps = { sortKey, sortDir, onSort: handleSort }
+  // Upcoming games (next 4 not yet started)
+  const upcoming = events
+    .filter(ev => ev.status?.type?.state === 'pre')
+    .slice(0, 4)
+    .map(ev => {
+      const comps = ev.competitions?.[0]
+      const home  = comps?.competitors?.find(c => c.homeAway === 'home')
+      const away  = comps?.competitors?.find(c => c.homeAway === 'away')
+      const time  = ev.date ? new Date(ev.date).toLocaleDateString('en-US',
+        {weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit'}) : ''
+      const tv    = comps?.broadcasts?.[0]?.names?.[0] || ''
+      return {
+        home: home?.team?.abbreviation || '?',
+        away: away?.team?.abbreviation || '?',
+        time, tv,
+        isFav: squad?.teams?.includes(home?.team?.abbreviation) ||
+               squad?.teams?.includes(away?.team?.abbreviation),
+      }
+    })
 
   return (
-    <div className="stats-table-wrap">
-      <table className="stats-table">
-        <thead>
-          <tr>
-            <th className="stats-th stats-th-rank">#</th>
-            <th className="stats-th stats-th-team">Team</th>
-            <SortTH label="PTS/G"  statKey="ppg"      title="Points Per Game"              {...thProps} />
-            <SortTH label="YDS/G"  statKey="ypg"      title="Total Yards Per Game"         {...thProps} />
-            <SortTH label="PASS/G" statKey="pypg"     title="Net Passing Yards Per Game"   {...thProps} />
-            <SortTH label="RUSH/G" statKey="rypg"     title="Rushing Yards Per Game"       {...thProps} />
-            <SortTH label="YPP"    statKey="ypp"      title="Yards Per Play"               {...thProps} />
-            <SortTH label="3RD%"   statKey="thirdPct" title="3rd Down Conversion %"        {...thProps} />
-            <SortTH label="RZ%"    statKey="rzPct"    title="Red Zone TD %"                {...thProps} />
-            <SortTH label="TOP"    statKey="topMin"   title="Time of Possession (minutes)" {...thProps} />
-            <SortTH label="TO"     statKey="to"       title="Total Turnovers (lower = better)" {...thProps} />
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map((row, i) => {
-            const inSquad = squadTeams.includes(row.abbr)
-            return (
-              <tr key={row.abbr} className={`stats-row ${inSquad ? 'stats-squad-row' : ''} ${i < 5 ? 'stats-top5' : ''}`}>
-                <td className="stats-rank">{i + 1}</td>
-                <td className="stats-team-cell">
-                  <span className="stats-abbr">{row.abbr}</span>
-                  {inSquad && <span className="stats-squad-dot" title="My Squad" />}
-                </td>
-                <td className="stats-val stats-val-primary">{row.ppg > 0 ? row.ppg.toFixed(1) : '—'}</td>
-                <td className="stats-val">{row.ypg > 0 ? row.ypg.toFixed(1) : '—'}</td>
-                <td className="stats-val">{row.pypg > 0 ? row.pypg.toFixed(1) : '—'}</td>
-                <td className="stats-val">{row.rypg > 0 ? row.rypg.toFixed(1) : '—'}</td>
-                <td className="stats-val">{row.ypp > 0 ? row.ypp.toFixed(2) : '—'}</td>
-                <td className="stats-val">{row.thirdPctD !== '—' ? row.thirdPctD : (row.thirdPct > 0 ? (row.thirdPct * 100).toFixed(1) + '%' : '—')}</td>
-                <td className="stats-val">{row.rzPctD !== '—' ? row.rzPctD : (row.rzPct > 0 ? (row.rzPct * 100).toFixed(1) + '%' : '—')}</td>
-                <td className="stats-val">{row.topD !== '—' ? row.topD : (row.topMin > 0 ? row.topMin.toFixed(1) : '—')}</td>
-                <td className={`stats-val ${row.to > 2 ? 'stats-bad' : row.to <= 1 ? 'stats-good' : ''}`}>{row.to > 0 ? row.to : '—'}</td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-    </div>
-  )
-}
+    <aside className="sidebar">
 
-// ── Team Defense Table ────────────────────────────────────────────────────────
-function TeamDefenseTable({ teams, squad }) {
-  const rows = (teams || []).map(t => {
-    const s = t.stats
-    const get = (key) => s[key]?.value ?? null
-    const disp = (key) => s[key]?.display ?? '—'
-    return {
-      abbr:     t.abbr,
-      papg:     get('pointsAllowedPerGame') ?? get('ptspg') ?? 0,
-      yapg:     get('yardsAllowedPerGame')  ?? get('ydspg') ?? 0,
-      pyapg:    get('passingYardsAllowedPerGame') ?? 0,
-      ryapg:    get('rushingYardsAllowedPerGame') ?? 0,
-      sacks:    get('sacks')           ?? get('totalSacks')       ?? 0,
-      ints:     get('interceptions')   ?? get('totalInterceptions') ?? 0,
-      fFum:     get('forcedFumbles')   ?? get('fumbleRecoveries')  ?? 0,
-      tfl:      get('tacklesForLoss')  ?? get('totalTFL')          ?? 0,
-      pd:       get('passesDefended')  ?? get('totalPD')           ?? 0,
-      thirdPct: get('opponentThirdDownPct') ?? 0,
-      thirdPctD: disp('opponentThirdDownPct'),
-    }
-  })
+      {/* ── NEXT GAME COUNTDOWN ── */}
+      {nextGame && countdown && (
+        <div className="sb-widget sb-widget-dark">
+          <div className="sb-widget-title">⏱ Next Kickoff</div>
+          <div className="sb-countdown">{countdown}</div>
+          <div className="sb-countdown-game">
+            {(() => {
+              const comps = nextGame.competitions?.[0]
+              const home  = comps?.competitors?.find(c => c.homeAway === 'home')
+              const away  = comps?.competitors?.find(c => c.homeAway === 'away')
+              return `${away?.team?.abbreviation} @ ${home?.team?.abbreviation}`
+            })()}
+          </div>
+        </div>
+      )}
 
-  const { sorted, sortKey, sortDir, handleSort } = useSortable(rows, 'papg', 'asc')
-  const squadTeams = squad?.teams || []
-  const thProps = { sortKey, sortDir, onSort: handleSort }
+      {/* ── CONFERENCE LEADERS ── */}
+      {divLeaders.length > 0 && (
+        <div className="sb-widget">
+          <div className="sb-widget-title">🏆 Conf Leaders</div>
+          {divLeaders.map((t, i) => (
+            <div key={i} className="sb-leader-row">
+              <span className="sb-leader-conf">{t.name?.includes('AFC') ? 'AFC' : 'NFC'}</span>
+              <span className="sb-leader-team">{t.abbr}</span>
+              <span className="sb-leader-record">{t.w}–{t.l}</span>
+            </div>
+          ))}
+          <button className="sb-more-btn" onClick={() => setActiveView('Standings')}>
+            Full Standings →
+          </button>
+        </div>
+      )}
 
-  return (
-    <div className="stats-table-wrap">
-      <table className="stats-table">
-        <thead>
-          <tr>
-            <th className="stats-th stats-th-rank">#</th>
-            <th className="stats-th stats-th-team">Team</th>
-            <SortTH label="PTS/G"   statKey="papg"     title="Points Allowed Per Game"         {...thProps} />
-            <SortTH label="YDS/G"   statKey="yapg"     title="Total Yards Allowed Per Game"    {...thProps} />
-            <SortTH label="PASS/G"  statKey="pyapg"    title="Pass Yards Allowed Per Game"     {...thProps} />
-            <SortTH label="RUSH/G"  statKey="ryapg"    title="Rush Yards Allowed Per Game"     {...thProps} />
-            <SortTH label="SACKS"   statKey="sacks"    title="Total Sacks"                     {...thProps} />
-            <SortTH label="INT"     statKey="ints"     title="Interceptions"                   {...thProps} />
-            <SortTH label="FF"      statKey="fFum"     title="Forced Fumbles"                  {...thProps} />
-            <SortTH label="TFL"     statKey="tfl"      title="Tackles For Loss"                {...thProps} />
-            <SortTH label="PD"      statKey="pd"       title="Passes Defended"                 {...thProps} />
-            <SortTH label="OPP 3RD" statKey="thirdPct" title="Opponent 3rd Down Conversion %" {...thProps} />
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map((row, i) => {
-            const inSquad = squadTeams.includes(row.abbr)
-            return (
-              <tr key={row.abbr} className={`stats-row ${inSquad ? 'stats-squad-row' : ''} ${i < 5 ? 'stats-top5' : ''}`}>
-                <td className="stats-rank">{i + 1}</td>
-                <td className="stats-team-cell">
-                  <span className="stats-abbr">{row.abbr}</span>
-                  {inSquad && <span className="stats-squad-dot" title="My Squad" />}
-                </td>
-                <td className={`stats-val stats-val-primary ${row.papg < 18 ? 'stats-good' : row.papg > 28 ? 'stats-bad' : ''}`}>
-                  {row.papg > 0 ? row.papg.toFixed(1) : '—'}
-                </td>
-                <td className="stats-val">{row.yapg > 0 ? row.yapg.toFixed(1) : '—'}</td>
-                <td className="stats-val">{row.pyapg > 0 ? row.pyapg.toFixed(1) : '—'}</td>
-                <td className="stats-val">{row.ryapg > 0 ? row.ryapg.toFixed(1) : '—'}</td>
-                <td className={`stats-val ${row.sacks > 40 ? 'stats-good' : ''}`}>{row.sacks > 0 ? row.sacks : '—'}</td>
-                <td className={`stats-val ${row.ints > 15 ? 'stats-good' : ''}`}>{row.ints > 0 ? row.ints : '—'}</td>
-                <td className="stats-val">{row.fFum > 0 ? row.fFum : '—'}</td>
-                <td className="stats-val">{row.tfl > 0 ? row.tfl : '—'}</td>
-                <td className="stats-val">{row.pd > 0 ? row.pd : '—'}</td>
-                <td className="stats-val">{row.thirdPctD !== '—' ? row.thirdPctD : (row.thirdPct > 0 ? (row.thirdPct * 100).toFixed(1) + '%' : '—')}</td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-    </div>
-  )
-}
+      {/* ── UPCOMING GAMES ── */}
+      {upcoming.length > 0 && (
+        <div className="sb-widget">
+          <div className="sb-widget-title">📅 Upcoming</div>
+          {upcoming.map((g, i) => (
+            <div key={i} className={`sb-game-row ${g.isFav ? 'sb-game-fav' : ''}`}>
+              <div className="sb-game-teams">
+                {g.away} @ {g.home}
+                {g.isFav && <span className="sb-fav-dot" />}
+              </div>
+              <div className="sb-game-time">{g.time}</div>
+              {g.tv && <div className="sb-game-tv">{g.tv}</div>}
+            </div>
+          ))}
+          <button className="sb-more-btn" onClick={() => setActiveView('Schedule')}>
+            Full Schedule →
+          </button>
+        </div>
+      )}
 
-// ── Player Passing Table ──────────────────────────────────────────────────────
-function PassingTable({ athletes, squad }) {
-  const squadPlayers = squad?.players || []
+      {/* ── INJURY REPORT ── */}
+      {injuries.length > 0 && (
+        <div className="sb-widget">
+          <div className="sb-widget-title">🏥 Injury Report</div>
+          {injuries.map((inj, i) => (
+            <div key={i} className="sb-inj-row">
+              <div className="sb-inj-player">
+                {inj.name}
+                <span className="sb-inj-pos">{inj.pos}</span>
+                <span className="sb-inj-team">{inj.team}</span>
+              </div>
+              <div className={`sb-inj-status ${
+                inj.status.toLowerCase().includes('out')  ? 'sb-inj-out' :
+                inj.status.toLowerCase().includes('doubt') ? 'sb-inj-doubt' : 'sb-inj-qtb'
+              }`}>{inj.status}</div>
+            </div>
+          ))}
+          <button className="sb-more-btn" onClick={() => setActiveView('Injuries')}>
+            Full Report →
+          </button>
+        </div>
+      )}
 
-  const rows = (athletes || []).map(a => {
-    const s = a.stats
-    const v = (k) => s[k]?.value ?? 0
-    return {
-      name:    a.name,
-      team:    a.team,
-      pos:     a.pos,
-      yds:     v('YDS') || v('passingYards') || 0,
-      td:      v('TD')  || v('passingTouchdowns') || 0,
-      int:     v('INT') || v('interceptions') || 0,
-      cmp:     v('CMP') || v('completions') || 0,
-      att:     v('ATT') || v('passingAttempts') || 0,
-      cmpPct:  v('PCT') || v('completionPct') || (v('CMP') && v('ATT') ? (v('CMP')/v('ATT')*100) : 0),
-      ypa:     v('AVG') || v('yardsPerAttempt') || (v('YDS') && v('ATT') ? v('YDS')/v('ATT') : 0),
-      rating:  v('QBR') || v('QBRating') || v('passer_rating') || 0,
-      long:    v('LNG') || v('longPassing') || 0,
-      sacks:   v('SACK') || v('sacksTaken') || 0,
-      _fpts:   (v('YDS')||0)/25 + (v('TD')||0)*6 - (v('INT')||0)*2,
-    }
-  }).filter(r => r.yds > 0 || r.td > 0)
-
-  const { sorted, sortKey, sortDir, handleSort } = useSortable(rows, 'yds')
-  const thProps = { sortKey, sortDir, onSort: handleSort }
-
-  return (
-    <div className="stats-table-wrap">
-      <table className="stats-table stats-table-players">
-        <thead>
-          <tr>
-            <th className="stats-th stats-th-rank">#</th>
-            <th className="stats-th stats-th-player">Player</th>
-            <th className="stats-th">TM</th>
-            <SortTH label="YDS"   statKey="yds"    title="Passing Yards"         {...thProps} />
-            <SortTH label="TD"    statKey="td"     title="Touchdown Passes"       {...thProps} />
-            <SortTH label="INT"   statKey="int"    title="Interceptions Thrown"   {...thProps} />
-            <SortTH label="CMP%"  statKey="cmpPct" title="Completion Percentage"  {...thProps} />
-            <SortTH label="YPA"   statKey="ypa"    title="Yards Per Attempt"      {...thProps} />
-            <SortTH label="QBR"   statKey="rating" title="Passer Rating"          {...thProps} />
-            <SortTH label="LNG"   statKey="long"   title="Long Pass"              {...thProps} />
-            <SortTH label="FPTS"  statKey="_fpts"  title="Fantasy Points (STD)"   {...thProps} />
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map((row, i) => {
-            const inSquad = squadPlayers.some(p => row.name.toLowerCase().includes(p.toLowerCase()))
-            return (
-              <tr key={`${row.name}-${i}`} className={`stats-row ${inSquad ? 'stats-squad-row' : ''}`}>
-                <td className="stats-rank">{i + 1}</td>
-                <td className="stats-player-cell">
-                  {row.name}
-                  {inSquad && <span className="stats-squad-tag">⚡</span>}
-                </td>
-                <td className="stats-team-sm">{row.team}</td>
-                <td className="stats-val stats-val-primary">{row.yds > 0 ? row.yds.toLocaleString() : '—'}</td>
-                <td className={`stats-val ${row.td >= 25 ? 'stats-good' : ''}`}>{row.td || '—'}</td>
-                <td className={`stats-val ${row.int > 12 ? 'stats-bad' : row.int <= 5 ? 'stats-good' : ''}`}>{row.int || '—'}</td>
-                <td className="stats-val">{row.cmpPct > 0 ? row.cmpPct.toFixed(1) + '%' : '—'}</td>
-                <td className="stats-val">{row.ypa > 0 ? row.ypa.toFixed(1) : '—'}</td>
-                <td className={`stats-val ${row.rating >= 100 ? 'stats-good' : row.rating < 80 ? 'stats-bad' : ''}`}>
-                  {row.rating > 0 ? row.rating.toFixed(1) : '—'}
-                </td>
-                <td className="stats-val">{row.long || '—'}</td>
-                <td className="stats-val stats-fpts">{row._fpts > 0 ? row._fpts.toFixed(1) : '—'}</td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-// ── Player Rushing Table ──────────────────────────────────────────────────────
-function RushingTable({ athletes, squad }) {
-  const squadPlayers = squad?.players || []
-
-  const rows = (athletes || []).map(a => {
-    const s = a.stats
-    const v = (k) => s[k]?.value ?? 0
-    return {
-      name:  a.name,
-      team:  a.team,
-      pos:   a.pos,
-      yds:   v('YDS') || v('rushingYards') || 0,
-      att:   v('CAR') || v('ATT') || v('rushingAttempts') || 0,
-      td:    v('TD')  || v('rushingTouchdowns') || 0,
-      ypc:   v('AVG') || v('yardsPerRushAttempt') || (v('YDS') && v('CAR') ? v('YDS')/v('CAR') : 0),
-      long:  v('LNG') || v('longRushing') || 0,
-      fum:   v('FUM') || v('fumbles') || 0,
-      twent: v('20+') || v('rushingTwentyPlus') || 0,
-      ypg:   v('YDS/G') || v('rushYardsPerGame') || 0,
-      _fpts: (v('YDS')||0)/10 + (v('TD')||0)*6,
-    }
-  }).filter(r => r.yds > 0 || r.att > 0)
-
-  const { sorted, sortKey, sortDir, handleSort } = useSortable(rows, 'yds')
-  const thProps = { sortKey, sortDir, onSort: handleSort }
-
-  return (
-    <div className="stats-table-wrap">
-      <table className="stats-table stats-table-players">
-        <thead>
-          <tr>
-            <th className="stats-th stats-th-rank">#</th>
-            <th className="stats-th stats-th-player">Player</th>
-            <th className="stats-th">TM</th>
-            <SortTH label="YDS"   statKey="yds"  title="Rushing Yards"             {...thProps} />
-            <SortTH label="CAR"   statKey="att"  title="Carries"                   {...thProps} />
-            <SortTH label="TD"    statKey="td"   title="Rushing Touchdowns"         {...thProps} />
-            <SortTH label="YPC"   statKey="ypc"  title="Yards Per Carry"            {...thProps} />
-            <SortTH label="YPG"   statKey="ypg"  title="Rushing Yards Per Game"     {...thProps} />
-            <SortTH label="LNG"   statKey="long" title="Long Run"                   {...thProps} />
-            <SortTH label="20+"   statKey="twent" title="Runs of 20+ Yards"         {...thProps} />
-            <SortTH label="FUM"   statKey="fum"  title="Fumbles"                    {...thProps} />
-            <SortTH label="FPTS"  statKey="_fpts" title="Fantasy Points (STD)"      {...thProps} />
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map((row, i) => {
-            const inSquad = squadPlayers.some(p => row.name.toLowerCase().includes(p.toLowerCase()))
-            return (
-              <tr key={`${row.name}-${i}`} className={`stats-row ${inSquad ? 'stats-squad-row' : ''}`}>
-                <td className="stats-rank">{i + 1}</td>
-                <td className="stats-player-cell">
-                  {row.name}
-                  {inSquad && <span className="stats-squad-tag">⚡</span>}
-                </td>
-                <td className="stats-team-sm">{row.team}</td>
-                <td className="stats-val stats-val-primary">{row.yds > 0 ? row.yds.toLocaleString() : '—'}</td>
-                <td className="stats-val">{row.att || '—'}</td>
-                <td className={`stats-val ${row.td >= 10 ? 'stats-good' : ''}`}>{row.td || '—'}</td>
-                <td className={`stats-val ${row.ypc >= 5 ? 'stats-good' : row.ypc < 3.5 ? 'stats-bad' : ''}`}>
-                  {row.ypc > 0 ? row.ypc.toFixed(1) : '—'}
-                </td>
-                <td className="stats-val">{row.ypg > 0 ? row.ypg.toFixed(1) : '—'}</td>
-                <td className="stats-val">{row.long || '—'}</td>
-                <td className="stats-val">{row.twent || '—'}</td>
-                <td className={`stats-val ${row.fum > 3 ? 'stats-bad' : ''}`}>{row.fum || '—'}</td>
-                <td className="stats-val stats-fpts">{row._fpts > 0 ? row._fpts.toFixed(1) : '—'}</td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-// ── Player Receiving Table ────────────────────────────────────────────────────
-function ReceivingTable({ athletes, squad }) {
-  const squadPlayers = squad?.players || []
-
-  const rows = (athletes || []).map(a => {
-    const s = a.stats
-    const v = (k) => s[k]?.value ?? 0
-    return {
-      name:  a.name,
-      team:  a.team,
-      pos:   a.pos,
-      yds:   v('YDS') || v('receivingYards') || 0,
-      rec:   v('REC') || v('receptions') || 0,
-      tgt:   v('TGT') || v('targets') || 0,
-      td:    v('TD')  || v('receivingTouchdowns') || 0,
-      ypr:   v('AVG') || v('yardsPerReception') || (v('YDS') && v('REC') ? v('YDS')/v('REC') : 0),
-      ypg:   v('YDS/G') || v('receivingYardsPerGame') || 0,
-      long:  v('LNG') || v('longReception') || 0,
-      twent: v('20+') || v('receivingTwentyPlus') || 0,
-      tgtPct: v('TGT%') || (v('TGT') && v('TGT') > 0 ? null : 0),
-      _fpts_ppr: (v('YDS')||0)/10 + (v('TD')||0)*6 + (v('REC')||0),
-      _fpts_std: (v('YDS')||0)/10 + (v('TD')||0)*6,
-    }
-  }).filter(r => r.yds > 0 || r.rec > 0)
-
-  const { sorted, sortKey, sortDir, handleSort } = useSortable(rows, 'yds')
-  const thProps = { sortKey, sortDir, onSort: handleSort }
-
-  return (
-    <div className="stats-table-wrap">
-      <table className="stats-table stats-table-players">
-        <thead>
-          <tr>
-            <th className="stats-th stats-th-rank">#</th>
-            <th className="stats-th stats-th-player">Player</th>
-            <th className="stats-th">TM</th>
-            <th className="stats-th">POS</th>
-            <SortTH label="YDS"   statKey="yds"       title="Receiving Yards"         {...thProps} />
-            <SortTH label="REC"   statKey="rec"       title="Receptions"              {...thProps} />
-            <SortTH label="TGT"   statKey="tgt"       title="Targets"                 {...thProps} />
-            <SortTH label="TD"    statKey="td"        title="Receiving Touchdowns"    {...thProps} />
-            <SortTH label="YPR"   statKey="ypr"       title="Yards Per Reception"     {...thProps} />
-            <SortTH label="YPG"   statKey="ypg"       title="Receiving Yards Per Game"  {...thProps} />
-            <SortTH label="LNG"   statKey="long"      title="Long Reception"          {...thProps} />
-            <SortTH label="PPR"   statKey="_fpts_ppr" title="Fantasy Points (PPR)"    {...thProps} />
-            <SortTH label="STD"   statKey="_fpts_std" title="Fantasy Points (Standard)" {...thProps} />
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map((row, i) => {
-            const inSquad = squadPlayers.some(p => row.name.toLowerCase().includes(p.toLowerCase()))
-            return (
-              <tr key={`${row.name}-${i}`} className={`stats-row ${inSquad ? 'stats-squad-row' : ''}`}>
-                <td className="stats-rank">{i + 1}</td>
-                <td className="stats-player-cell">
-                  {row.name}
-                  {inSquad && <span className="stats-squad-tag">⚡</span>}
-                </td>
-                <td className="stats-team-sm">{row.team}</td>
-                <td className="stats-pos">{row.pos}</td>
-                <td className="stats-val stats-val-primary">{row.yds > 0 ? row.yds.toLocaleString() : '—'}</td>
-                <td className="stats-val">{row.rec || '—'}</td>
-                <td className="stats-val">{row.tgt || '—'}</td>
-                <td className={`stats-val ${row.td >= 8 ? 'stats-good' : ''}`}>{row.td || '—'}</td>
-                <td className={`stats-val ${row.ypr >= 14 ? 'stats-good' : ''}`}>{row.ypr > 0 ? row.ypr.toFixed(1) : '—'}</td>
-                <td className="stats-val">{row.ypg > 0 ? row.ypg.toFixed(1) : '—'}</td>
-                <td className="stats-val">{row.long || '—'}</td>
-                <td className="stats-val stats-fpts">{row._fpts_ppr > 0 ? row._fpts_ppr.toFixed(1) : '—'}</td>
-                <td className="stats-val stats-fpts">{row._fpts_std > 0 ? row._fpts_std.toFixed(1) : '—'}</td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-// ── Player Defense Table ──────────────────────────────────────────────────────
-function DefensePlayerTable({ athletes, squad }) {
-  const squadPlayers = squad?.players || []
-
-  const rows = (athletes || []).map(a => {
-    const s = a.stats
-    const v = (k) => s[k]?.value ?? 0
-    return {
-      name:   a.name,
-      team:   a.team,
-      pos:    a.pos,
-      tot:    v('TOT') || v('totalTackles') || v('tackles') || 0,
-      solo:   v('SOLO') || v('soloTackles') || 0,
-      ast:    v('AST') || v('assistedTackles') || 0,
-      sacks:  v('SACKS') || v('sacks') || 0,
-      tfl:    v('TFL') || v('tacklesForLoss') || 0,
-      int:    v('INT') || v('interceptions') || 0,
-      pd:     v('PD') || v('passesDefended') || 0,
-      ff:     v('FF') || v('forcedFumbles') || 0,
-      fr:     v('FR') || v('fumbleRecoveries') || 0,
-      td:     v('TD') || v('defensiveTouchdowns') || 0,
-    }
-  }).filter(r => r.tot > 0 || r.sacks > 0 || r.int > 0)
-
-  const { sorted, sortKey, sortDir, handleSort } = useSortable(rows, 'tot')
-  const thProps = { sortKey, sortDir, onSort: handleSort }
-
-  return (
-    <div className="stats-table-wrap">
-      <table className="stats-table stats-table-players">
-        <thead>
-          <tr>
-            <th className="stats-th stats-th-rank">#</th>
-            <th className="stats-th stats-th-player">Player</th>
-            <th className="stats-th">TM</th>
-            <th className="stats-th">POS</th>
-            <SortTH label="TOT"   statKey="tot"   title="Total Tackles"        {...thProps} />
-            <SortTH label="SOLO"  statKey="solo"  title="Solo Tackles"         {...thProps} />
-            <SortTH label="AST"   statKey="ast"   title="Assisted Tackles"     {...thProps} />
-            <SortTH label="SACKS" statKey="sacks" title="Sacks"                {...thProps} />
-            <SortTH label="TFL"   statKey="tfl"   title="Tackles For Loss"     {...thProps} />
-            <SortTH label="INT"   statKey="int"   title="Interceptions"        {...thProps} />
-            <SortTH label="PD"    statKey="pd"    title="Passes Defended"      {...thProps} />
-            <SortTH label="FF"    statKey="ff"    title="Forced Fumbles"       {...thProps} />
-            <SortTH label="FR"    statKey="fr"    title="Fumble Recoveries"    {...thProps} />
-            <SortTH label="TD"    statKey="td"    title="Defensive Touchdowns" {...thProps} />
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map((row, i) => {
-            const inSquad = squadPlayers.some(p => row.name.toLowerCase().includes(p.toLowerCase()))
-            return (
-              <tr key={`${row.name}-${i}`} className={`stats-row ${inSquad ? 'stats-squad-row' : ''}`}>
-                <td className="stats-rank">{i + 1}</td>
-                <td className="stats-player-cell">
-                  {row.name}
-                  {inSquad && <span className="stats-squad-tag">⚡</span>}
-                </td>
-                <td className="stats-team-sm">{row.team}</td>
-                <td className="stats-pos">{row.pos}</td>
-                <td className="stats-val stats-val-primary">{row.tot || '—'}</td>
-                <td className="stats-val">{row.solo || '—'}</td>
-                <td className="stats-val">{row.ast || '—'}</td>
-                <td className={`stats-val ${row.sacks >= 8 ? 'stats-good' : ''}`}>{row.sacks > 0 ? row.sacks.toFixed(1) : '—'}</td>
-                <td className="stats-val">{row.tfl > 0 ? row.tfl.toFixed(1) : '—'}</td>
-                <td className={`stats-val ${row.int >= 4 ? 'stats-good' : ''}`}>{row.int || '—'}</td>
-                <td className="stats-val">{row.pd || '—'}</td>
-                <td className="stats-val">{row.ff || '—'}</td>
-                <td className="stats-val">{row.fr || '—'}</td>
-                <td className={`stats-val ${row.td > 0 ? 'stats-good' : ''}`}>{row.td || '—'}</td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-// ── Loading + Error states ────────────────────────────────────────────────────
-function StatsLoading({ label }) {
-  return (
-    <div className="stats-loading">
-      <div className="stats-loading-icon">📊</div>
-      <div className="stats-loading-text">Loading {label}…</div>
-      <div className="stats-loading-sub">Pulling from ESPN · Takes a moment</div>
-    </div>
-  )
-}
-
-function StatsEmpty({ label }) {
-  return (
-    <div className="stats-empty">
-      <div className="stats-empty-icon">📋</div>
-      <div className="stats-empty-title">No {label} data yet</div>
-      <div className="stats-empty-sub">Stats populate once the 2026 season kicks off Sep 9.</div>
-    </div>
-  )
-}
-
-// ── Main StatsView ─────────────────────────────────────────────────────────────
-function StatsView({ squad }) {
-  const SEASON = '2026'
-
-  // Sub-tabs: team offense/defense, player categories
-  const TABS = [
-    { id:'team-offense',  label:'Team Offense',   group:'team'   },
-    { id:'team-defense',  label:'Team Defense',   group:'team'   },
-    { id:'passing',       label:'Passing',         group:'player' },
-    { id:'rushing',       label:'Rushing',         group:'player' },
-    { id:'receiving',     label:'Receiving',       group:'player' },
-    { id:'defensive',     label:'Defense',         group:'player' },
-  ]
-
-  const [tab, setTab] = useState('team-offense')
-  const activeTab = TABS.find(t => t.id === tab)
-
-  // Team stats (shared for both team tabs)
-  const { teams, loading: teamLoading, error: teamError } = useTeamStats(SEASON)
-
-  // Player stats (lazy — only fetches when a player tab is selected)
-  const playerCategory = activeTab?.group === 'player' ? tab : null
-  const { athletes, loading: playerLoading, error: playerError } = usePlayerStats(SEASON, playerCategory)
-
-  const seasonStarted = new Date() >= new Date('2026-09-09T00:00:00-04:00')
-
-  return (
-    <div>
-      {/* Section bar */}
-      <div className="section-bar">
-        <h2>2026 NFL Stats</h2>
-        <div className="sb-rule" />
-        <span className="sb-ct">
-          {seasonStarted ? `Live · ${SEASON} Regular Season` : 'Season opens Sep 9'}
-        </span>
+      {/* ── QUICK LINKS ── */}
+      <div className="sb-widget">
+        <div className="sb-widget-title">⚡ Quick Nav</div>
+        {[
+          { label:'Box Scores',    view:'Scores'   },
+          { label:'Fantasy Hub',   view:'Fantasy'  },
+          { label:'Stats Hub',     view:'Stats'    },
+          { label:'NFL News',      view:'News'     },
+          { label:'TV Guide',      view:'TV Guide' },
+          { label:'Draft 2026',    view:'Draft'    },
+        ].map(({ label, view }) => (
+          <button key={view} className="sb-quicklink" onClick={() => setActiveView(view)}>
+            {label}
+          </button>
+        ))}
       </div>
 
-      {/* Tab bar */}
-      <div className="stats-tabs">
-        <div className="stats-tab-group">
-          <span className="stats-tab-label">Teams</span>
-          {TABS.filter(t => t.group === 'team').map(t => (
-            <button
-              key={t.id}
-              className={`stats-tab ${tab === t.id ? 'on' : ''}`}
-              onClick={() => setTab(t.id)}
-            >{t.label}</button>
-          ))}
+      {/* ── NY SPORTS DAILY PROMO ── */}
+      <div className="sb-widget sb-widget-promo">
+        <div className="sb-promo-title">🗽 NY Sports Daily</div>
+        <div className="sb-promo-text">
+          Mets · Yankees · Jets · Knicks · Giants · Islanders
         </div>
-        <div className="stats-tab-group">
-          <span className="stats-tab-label">Players</span>
-          {TABS.filter(t => t.group === 'player').map(t => (
-            <button
-              key={t.id}
-              className={`stats-tab ${tab === t.id ? 'on' : ''}`}
-              onClick={() => setTab(t.id)}
-            >{t.label}</button>
-          ))}
-        </div>
+        <a
+          href="https://nysportsdaily.com"
+          target="_blank"
+          rel="noopener"
+          className="sb-promo-btn"
+        >
+          Read Today's Issue →
+        </a>
       </div>
 
-      {/* Off-season gate */}
-      {!seasonStarted && (
-        <div className="leaders-coming-soon">
-          <div className="cs-icon">📊</div>
-          <div className="cs-title">Full Stats Hub — Live Sep 9</div>
-          <div className="cs-text">
-            Team offense & defense rankings · Individual leaders in every category ·
-            Passing, rushing, receiving, defense · All sortable · Live from ESPN.
-          </div>
-          <div className="cs-date">Season opens Sep 9, 2026 · SEA vs NE · 8:20 PM ET</div>
-        </div>
-      )}
-
-      {/* ── TEAM OFFENSE ── */}
-      {seasonStarted && tab === 'team-offense' && (
-        <>
-          <div className="stats-info-bar">
-            Click any column header to sort. Green = top 5, red = bottom 5 for that stat.
-            Squad teams highlighted in gold.
-          </div>
-          {teamLoading && <StatsLoading label="team offense stats" />}
-          {teamError && <div className="sch-error">Could not load team stats: {teamError}</div>}
-          {!teamLoading && !teamError && (!teams || teams.length === 0) && <StatsEmpty label="team offense" />}
-          {!teamLoading && teams?.length > 0 && <TeamOffenseTable teams={teams} squad={squad} />}
-        </>
-      )}
-
-      {/* ── TEAM DEFENSE ── */}
-      {seasonStarted && tab === 'team-defense' && (
-        <>
-          <div className="stats-info-bar">
-            Click any column header to sort. Default sorted by fewest points allowed.
-            Squad teams highlighted in gold.
-          </div>
-          {teamLoading && <StatsLoading label="team defense stats" />}
-          {teamError && <div className="sch-error">Could not load team stats: {teamError}</div>}
-          {!teamLoading && !teamError && (!teams || teams.length === 0) && <StatsEmpty label="team defense" />}
-          {!teamLoading && teams?.length > 0 && <TeamDefenseTable teams={teams} squad={squad} />}
-        </>
-      )}
-
-      {/* ── PASSING ── */}
-      {seasonStarted && tab === 'passing' && (
-        <>
-          <div className="stats-info-bar">
-            Top 50 passers · Click to sort · Squad players highlighted ⚡ · FPTS = Standard scoring
-          </div>
-          {playerLoading && <StatsLoading label="passing stats" />}
-          {playerError && <div className="sch-error">Could not load passing stats: {playerError}</div>}
-          {!playerLoading && !playerError && (!athletes || athletes.length === 0) && <StatsEmpty label="passing" />}
-          {!playerLoading && athletes?.length > 0 && <PassingTable athletes={athletes} squad={squad} />}
-        </>
-      )}
-
-      {/* ── RUSHING ── */}
-      {seasonStarted && tab === 'rushing' && (
-        <>
-          <div className="stats-info-bar">
-            Top 50 rushers · Click to sort · Squad players highlighted ⚡
-          </div>
-          {playerLoading && <StatsLoading label="rushing stats" />}
-          {playerError && <div className="sch-error">Could not load rushing stats: {playerError}</div>}
-          {!playerLoading && !playerError && (!athletes || athletes.length === 0) && <StatsEmpty label="rushing" />}
-          {!playerLoading && athletes?.length > 0 && <RushingTable athletes={athletes} squad={squad} />}
-        </>
-      )}
-
-      {/* ── RECEIVING ── */}
-      {seasonStarted && tab === 'receiving' && (
-        <>
-          <div className="stats-info-bar">
-            Top 50 receivers · Click to sort · Both PPR and Standard fantasy points shown · Squad players highlighted ⚡
-          </div>
-          {playerLoading && <StatsLoading label="receiving stats" />}
-          {playerError && <div className="sch-error">Could not load receiving stats: {playerError}</div>}
-          {!playerLoading && !playerError && (!athletes || athletes.length === 0) && <StatsEmpty label="receiving" />}
-          {!playerLoading && athletes?.length > 0 && <ReceivingTable athletes={athletes} squad={squad} />}
-        </>
-      )}
-
-      {/* ── DEFENSIVE PLAYERS ── */}
-      {seasonStarted && tab === 'defensive' && (
-        <>
-          <div className="stats-info-bar">
-            Top 50 defenders · Click to sort · Squad players highlighted ⚡
-          </div>
-          {playerLoading && <StatsLoading label="defensive stats" />}
-          {playerError && <div className="sch-error">Could not load defensive stats: {playerError}</div>}
-          {!playerLoading && !playerError && (!athletes || athletes.length === 0) && <StatsEmpty label="defense" />}
-          {!playerLoading && athletes?.length > 0 && <DefensePlayerTable athletes={athletes} squad={squad} />}
-        </>
-      )}
-
-      {/* Footer note */}
-      {seasonStarted && (
-        <div className="stats-footer-note">
-          Data via ESPN · Updates after each game · Season {SEASON} Regular Season ·
-          Click column headers to sort ascending or descending
-        </div>
-      )}
-    </div>
+    </aside>
   )
 }
 
