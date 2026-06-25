@@ -26,11 +26,12 @@ function getAutoWeek() {
 }
 
 // ── TOP-LEVEL NAV VIEWS ───────────────────────────────────────────────────────
-const VIEWS = ['Scores', 'Schedule', 'Standings', 'TV Guide', 'News', 'Injuries', 'Leaders', 'Fantasy', 'Draft', 'History']
+const VIEWS = ['Scores', 'Schedule', 'Standings', 'TV Guide', 'News', 'Injuries', 'Stats', 'Leaders', 'Fantasy', 'Draft', 'History', 'Playroom', 'Resources']
 
 export default function App() {
   const [activeView,    setActiveView]    = useState('Scores')
   const [activeWeek,    setActiveWeek]    = useState(getAutoWeek)
+  const [drawerOpen,    setDrawerOpen]    = useState(false)
   const [openCardId,    setOpenCardId]    = useState(null)
   const [teamFilter,    setTeamFilter]    = useState('All')
   const [weekFilter,    setWeekFilter]    = useState('All')
@@ -106,8 +107,79 @@ export default function App() {
 
   return (
     <div className="app">
+      {/* ── MOBILE DRAWER OVERLAY ── */}
+      {drawerOpen && (
+        <div className="mob-overlay" onClick={() => setDrawerOpen(false)} />
+      )}
+
+      {/* ── MOBILE SLIDE-OUT DRAWER ── */}
+      <nav className={`mob-drawer ${drawerOpen ? 'open' : ''}`}>
+        <div className="mob-drawer-head">
+          <div className="mob-drawer-logo">THE FINAL WHISTLE</div>
+          <button className="mob-drawer-close" onClick={() => setDrawerOpen(false)}>✕</button>
+        </div>
+
+        <div className="mob-drawer-section-label">MAIN</div>
+        {[
+          { view:'Scores',    icon:'🏈', label:'Scores'    },
+          { view:'Schedule',  icon:'📅', label:'Schedule'  },
+          { view:'Standings', icon:'🏆', label:'Standings' },
+          { view:'TV Guide',  icon:'📺', label:'TV Guide'  },
+          { view:'News',      icon:'📰', label:'News'      },
+          { view:'Injuries',  icon:'🏥', label:'Injuries'  },
+        ].map(({ view, icon, label }) => (
+          <button
+            key={view}
+            className={`mob-drawer-item ${activeView === view ? 'on' : ''}`}
+            onClick={() => { setActiveView(view); setDrawerOpen(false) }}
+          >
+            <span className="mob-drawer-icon">{icon}</span>
+            <span className="mob-drawer-label">{label}</span>
+          </button>
+        ))}
+
+        <div className="mob-drawer-section-label">FANTASY & STATS</div>
+        {[
+          { view:'Fantasy',   icon:'⚡', label:'Fantasy Hub' },
+          { view:'Stats',     icon:'📊', label:'Stats Hub'   },
+          { view:'Leaders',   icon:'🥇', label:'Leaders'     },
+          { view:'Draft',     icon:'🎯', label:'Draft 2026'  },
+        ].map(({ view, icon, label }) => (
+          <button
+            key={view}
+            className={`mob-drawer-item ${activeView === view ? 'on' : ''}`}
+            onClick={() => { setActiveView(view); setDrawerOpen(false) }}
+          >
+            <span className="mob-drawer-icon">{icon}</span>
+            <span className="mob-drawer-label">{label}</span>
+          </button>
+        ))}
+
+        <div className="mob-drawer-section-label">EXPLORE</div>
+        {[
+          { view:'History',   icon:'📼', label:'History'     },
+          { view:'Playroom',  icon:'🎮', label:'Playroom'    },
+          { view:'Resources', icon:'🔗', label:'Resources'   },
+        ].map(({ view, icon, label }) => (
+          <button
+            key={view}
+            className={`mob-drawer-item mob-drawer-item-gold ${activeView === view ? 'on' : ''}`}
+            onClick={() => { setActiveView(view); setDrawerOpen(false) }}
+          >
+            <span className="mob-drawer-icon">{icon}</span>
+            <span className="mob-drawer-label">{label}</span>
+          </button>
+        ))}
+
+        <div className="mob-drawer-footer">
+          <a href="https://nysportsdaily.com" target="_blank" rel="noopener" className="mob-drawer-promo">
+            🗽 NY Sports Daily
+          </a>
+        </div>
+      </nav>
+
       {/* ── MASTHEAD ── */}
-      <Masthead lastUpdated={lastUpdated} hasLiveGame={hasLiveGame} onRefresh={refresh} fontTheme={fontTheme} setFontTheme={setFontTheme} />
+      <Masthead lastUpdated={lastUpdated} hasLiveGame={hasLiveGame} onRefresh={refresh} fontTheme={fontTheme} setFontTheme={setFontTheme} onHamburger={() => setDrawerOpen(true)} />
       <SquadBar squad={squad} onOpen={() => setSquadModalOpen(true)} onToggle={(on) => saveSquad({teams:squad.teams||[], players:squad.players||[], on})} />
       {squadModalOpen && <SquadModal squad={squad} onSave={(sq) => { saveSquad(sq); setSquadModalOpen(false) }} onClose={() => setSquadModalOpen(false)} />}
 
@@ -170,11 +242,40 @@ export default function App() {
         )}
         {activeView === 'Draft'     && <DraftView />}
         {activeView === 'History'   && <HistoryView />}
+        {activeView === 'Stats'     && <StatsView squad={squad} />}
+        {activeView === 'Playroom'  && <PlayroomView />}
+        {activeView === 'Resources' && <ResourcesView />}
         </main>
         <Sidebar activeWeek={activeWeek} setActiveView={setActiveView} squad={squad} />
       </div>
 
       <Footer squad={squad} favTeam={teamFilter} />
+
+      {/* ── MOBILE BOTTOM TAB BAR ── */}
+      <nav className="mob-tab-bar">
+        {[
+          { view:'Scores',  icon:'🏈', label:'Scores'  },
+          { view:'Fantasy', icon:'⚡', label:'Fantasy' },
+          { view:'Stats',   icon:'📊', label:'Stats'   },
+          { view:'News',    icon:'📰', label:'News'    },
+        ].map(({ view, icon, label }) => (
+          <button
+            key={view}
+            className={`mob-tab ${activeView === view ? 'on' : ''}`}
+            onClick={() => setActiveView(view)}
+          >
+            <span className="mob-tab-icon">{icon}</span>
+            <span className="mob-tab-label">{label}</span>
+          </button>
+        ))}
+        <button
+          className="mob-tab"
+          onClick={() => setDrawerOpen(true)}
+        >
+          <span className="mob-tab-icon">☰</span>
+          <span className="mob-tab-label">More</span>
+        </button>
+      </nav>
       {/* Newsletter confirmation toast */}
       {typeof window !== "undefined" && new URLSearchParams(window.location.search).get("nl") === "confirmed" && (
         <div className="nl-toast">✓ Subscription confirmed — see you Week 1!</div>
@@ -250,7 +351,7 @@ function useNFLNews() {
 }
 
 // ── MASTHEAD ──────────────────────────────────────────────────────────────────
-function Masthead({ lastUpdated, hasLiveGame, onRefresh, fontTheme, setFontTheme }) {
+function Masthead({ lastUpdated, hasLiveGame, onRefresh, fontTheme, setFontTheme, onHamburger }) {
   const now = new Date()
   const dateStr = now.toLocaleDateString('en-US', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
@@ -281,6 +382,10 @@ function Masthead({ lastUpdated, hasLiveGame, onRefresh, fontTheme, setFontTheme
 
   return (
     <header className="masthead">
+      {/* Hamburger — mobile only, hidden on desktop via CSS */}
+      <button className="mob-hamburger" onClick={onHamburger} aria-label="Open menu">
+        <span /><span /><span />
+      </button>
       <div className="edition-line">
         <span>{vol}</span>
         <div className="font-switcher">
