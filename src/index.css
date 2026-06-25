@@ -972,98 +972,229 @@ body::before {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   STATS VIEW — The Newspaper Back Page
+   MOBILE-FIRST OPTIMIZATION
+   Targeting 375px–430px (iPhone SE through iPhone 15 Pro Max)
+   and 430px–768px (larger phones / small tablets)
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* Tab bar */
-.stats-tabs{display:flex;flex-wrap:wrap;gap:0;border-bottom:2px solid var(--rule-hvy);padding:0 16px;background:var(--paper-mid)}
-.stats-tab-group{display:flex;align-items:center;gap:0;padding:6px 0}
-.stats-tab-group+.stats-tab-group{padding-left:16px;border-left:1px solid var(--rule)}
-.stats-tab-label{font-family:var(--font-mono);font-size:7px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--muted-lt);padding:0 8px 0 0;white-space:nowrap}
-.stats-tab{font-family:var(--font-mono);font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:8px 12px;background:none;border:none;color:var(--muted);cursor:pointer;transition:all .12s;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap}
-.stats-tab:hover{color:var(--ink);background:rgba(42,31,14,.05)}
-.stats-tab.on{color:var(--ink);border-bottom-color:var(--accent);background:var(--paper)}
+/* ── Viewport meta safety net ─────────────────────────────────────────────── */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 
-/* Info bar */
-.stats-info-bar{font-family:var(--font-mono);font-size:8px;color:var(--muted-lt);letter-spacing:.06em;padding:7px 18px;border-bottom:1px solid var(--rule);background:var(--paper-mid)}
+/* ── Masthead ─────────────────────────────────────────────────────────────── */
+@media(max-width:480px){
+  .masthead { padding: 12px 12px 0; }
+  .logo { font-size: clamp(32px, 11vw, 56px); padding: 4px 0 2px; }
+  .tagline { font-size: 9px; letter-spacing: .06em; padding-bottom: 5px; }
+  .edition-line { font-size: 7px; letter-spacing: .1em; }
+  .support-bar { padding: 5px 0 6px; gap: 5px; }
+  .support-text { font-size: 9px; }
+  .support-link { font-size: 8px; letter-spacing: .08em; }
+  .font-switcher { display: none; } /* hide font switcher on mobile — not needed */
+}
 
-/* Table wrapper — horizontal scroll on mobile */
-.stats-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;padding:0;margin:0}
-.stats-table-wrap::-webkit-scrollbar{height:3px}
-.stats-table-wrap::-webkit-scrollbar-thumb{background:var(--rule-hvy);border-radius:2px}
+/* ── Top nav — horizontal scroll, bigger tap targets ─────────────────────── */
+@media(max-width:480px){
+  .top-nav { padding: 0 4px; -webkit-overflow-scrolling: touch; }
+  .tnav-btn { font-size: 9px; padding: 10px 10px; letter-spacing: .08em; min-height: 40px; }
+}
 
-/* The table itself */
-.stats-table{width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:11px;min-width:600px}
-
-/* Headers */
-.stats-th{padding:7px 8px;background:var(--ink);color:rgba(255,255,255,.5);font-size:7px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;text-align:center;white-space:nowrap;border-right:1px solid rgba(255,255,255,.06)}
-.stats-th:last-child{border-right:none}
-.stats-th-rank{width:28px;padding:7px 4px}
-.stats-th-team{text-align:left;padding-left:12px;width:56px}
-.stats-th-player{text-align:left;padding-left:10px;min-width:150px}
-
-/* Sortable headers */
-.stats-th.sortable{cursor:pointer;user-select:none}
-.stats-th.sortable:hover{color:rgba(255,255,255,.85);background:#2a1f0e}
-.stats-th.sort-active{color:var(--gold)}
-.sort-arrow{color:var(--gold);font-size:9px}
-
-/* Rows */
-.stats-row td{padding:6px 8px;border-bottom:1px solid var(--rule);text-align:center;vertical-align:middle}
-.stats-row:last-child td{border-bottom:none}
-.stats-row:hover td{background:rgba(42,31,14,.04)}
-
-/* Top 5 subtle highlight */
-.stats-top5 td{background:rgba(200,168,75,.04)}
-.stats-top5:hover td{background:rgba(200,168,75,.08)}
-
-/* Squad highlight */
-.stats-squad-row td{background:rgba(200,168,75,.09) !important;border-left:3px solid var(--gold)}
-.stats-squad-row:hover td{background:rgba(200,168,75,.14) !important}
-
-/* Cell types */
-.stats-rank{color:var(--muted-lt);font-size:9px;text-align:center;width:28px}
-.stats-team-cell{text-align:left;padding-left:12px;white-space:nowrap}
-.stats-abbr{font-weight:700;font-size:11px;color:var(--ink);letter-spacing:.04em}
-.stats-squad-dot{display:inline-block;width:6px;height:6px;background:var(--gold);border-radius:50%;margin-left:5px;vertical-align:middle}
-.stats-val{text-align:center;color:var(--ink);font-variant-numeric:tabular-nums}
-.stats-val-primary{font-weight:700;color:var(--ink)}
-.stats-player-cell{text-align:left;padding-left:10px;font-weight:600;color:var(--ink);font-family:var(--font-body);font-size:11px;white-space:nowrap}
-.stats-squad-tag{color:var(--gold);margin-left:4px;font-size:9px}
-.stats-team-sm{color:var(--muted);font-size:9px;white-space:nowrap}
-.stats-pos{color:var(--muted);font-size:9px;font-weight:700;letter-spacing:.06em}
-.stats-fpts{color:#1a5c1a;font-weight:700}
-
-/* Good / bad coloring */
-.stats-good{color:#1a5c1a !important;font-weight:700}
-.stats-bad{color:#8b1a1a !important}
-
-/* Player table min-width wider */
-.stats-table-players{min-width:720px}
-
-/* Loading state */
-.stats-loading{text-align:center;padding:48px 20px}
-.stats-loading-icon{font-size:32px;margin-bottom:10px}
-.stats-loading-text{font-family:var(--font-display);font-size:18px;font-weight:700;color:var(--ink);margin-bottom:4px}
-.stats-loading-sub{font-family:var(--font-mono);font-size:9px;color:var(--muted-lt);letter-spacing:.08em}
-
-/* Empty state */
-.stats-empty{text-align:center;padding:40px 20px}
-.stats-empty-icon{font-size:28px;margin-bottom:8px}
-.stats-empty-title{font-family:var(--font-display);font-size:16px;font-weight:700;color:var(--ink);margin-bottom:4px}
-.stats-empty-sub{font-family:var(--font-mono);font-size:9px;color:var(--muted-lt);letter-spacing:.06em}
-
-/* Footer note */
-.stats-footer-note{font-family:var(--font-mono);font-size:7px;letter-spacing:.08em;color:var(--muted-lt);padding:10px 18px;border-top:1px solid var(--rule);text-align:center}
-
-/* Mobile */
+/* ── Scores grid — single column on phone ────────────────────────────────── */
 @media(max-width:600px){
-  .stats-tabs{padding:0 8px}
-  .stats-tab{font-size:8px;padding:7px 8px;letter-spacing:.06em}
-  .stats-tab-label{display:none}
-  .stats-tab-group+.stats-tab-group{padding-left:8px}
-  .stats-table{font-size:10px}
-  .stats-player-cell{font-size:10px}
-  .stats-th{font-size:6px;padding:6px 5px;letter-spacing:.08em}
-  .stats-row td{padding:5px 5px}
+  .games-grid { grid-template-columns: 1fr; border-left: none; }
+  .game-card { border-right: none; }
+  .game-card.featured { grid-column: 1; }
+}
+
+/* ── Game card — more breathing room on mobile ───────────────────────────── */
+@media(max-width:480px){
+  .card-head { padding: 10px 12px 5px; }
+  .team-abv { font-size: 24px; }
+  .team-score { font-size: 28px; min-width: 48px; }
+  .team-city { font-size: 7px; }
+  .card-status { font-size: 8px; }
+  .card-note { font-size: 7px; }
+  /* Linescore horizontal scroll */
+  .linescore-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .ls-table { font-size: 9px; min-width: 260px; }
+}
+
+/* ── Box score drawer tabs — horizontal scroll ────────────────────────────── */
+@media(max-width:480px){
+  .drawer-tabs { -webkit-overflow-scrolling: touch; }
+  .dtab { font-size: 8px; padding: 7px 10px; letter-spacing: .06em; }
+  /* Box score player rows */
+  .bs-table { font-size: 9px; }
+  .bs-table th, .bs-table td { padding: 4px 5px; }
+  /* Scoring plays */
+  .sp-text { font-size: 9px; }
+  .sp-clock { font-size: 8px; }
+}
+
+/* ── Section bar ──────────────────────────────────────────────────────────── */
+@media(max-width:480px){
+  .section-bar { padding: 10px 12px 8px; }
+  .section-bar h2 { font-size: 18px; }
+  .sb-ct { font-size: 8px; }
+}
+
+/* ── Schedule view ────────────────────────────────────────────────────────── */
+@media(max-width:480px){
+  .sch-filters { flex-wrap: wrap; gap: 6px; padding: 8px 12px; }
+  .sch-filter-group { flex: 1; min-width: 120px; }
+  .sg-teams { font-size: 13px; }
+  .sg-city { font-size: 8px; }
+  .sg-scores { font-size: 17px; }
+  .sg-meta { font-size: 8px; }
+}
+
+/* ── Standings ────────────────────────────────────────────────────────────── */
+@media(max-width:480px){
+  .std-table { font-size: 10px; }
+  .std-table th, .std-table td { padding: 5px 5px; }
+  /* Hide less important columns on small screens */
+  .std-col-pf, .std-col-pa, .std-col-diff { display: none; }
+}
+
+/* ── Fantasy tab bar ──────────────────────────────────────────────────────── */
+@media(max-width:480px){
+  .fantab-bar { -webkit-overflow-scrolling: touch; }
+  .fantab { font-size: 8px; padding: 8px 8px; letter-spacing: .06em; }
+  .fw-pos-bar { flex-wrap: wrap; gap: 4px; padding: 8px 10px; }
+}
+
+/* ── FW Formula table ─────────────────────────────────────────────────────── */
+@media(max-width:480px){
+  .fw-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .fw-table { font-size: 9px; }
+  .fw-table th, .fw-table td { padding: 5px 4px; }
+  .fw-score-cell { min-width: 46px; }
+  .fw-score-num { font-size: 13px; }
+  .fw-score-lbl { font-size: 5px; }
+  .fw-name { font-size: 10px; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fw-hide-mobile { display: none; }
+}
+
+/* ── Trends table ─────────────────────────────────────────────────────────── */
+@media(max-width:480px){
+  .trends-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .trends-table { font-size: 10px; }
+  .trends-table th, .trends-table td { padding: 5px 5px; }
+  .tt-avg, .tt-delta-cell { display: none; }
+  .tt-name { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+
+/* ── Stats tables ─────────────────────────────────────────────────────────── */
+@media(max-width:480px){
+  .stats-tabs { padding: 0 6px; }
+  .stats-tab { font-size: 8px; padding: 8px 7px; letter-spacing: .04em; }
+  .stats-tab-label { display: none; }
+  .stats-tab-group + .stats-tab-group { padding-left: 6px; }
+  .stats-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .stats-table { font-size: 9px; }
+  .stats-th, .stats-table td { padding: 5px 4px; }
+  .stats-th { font-size: 6px; letter-spacing: .06em; }
+  .stats-player-cell { font-size: 10px; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+
+/* ── News view ────────────────────────────────────────────────────────────── */
+@media(max-width:480px){
+  .news-filters { flex-wrap: wrap; gap: 5px; padding: 8px 10px; }
+  .news-item { padding: 10px 12px; }
+  .news-headline { font-size: 14px; line-height: 1.4; }
+  .news-meta { font-size: 8px; }
+  /* News ticker */
+  .ticker-label { display: none; }
+}
+
+/* ── TV Guide ─────────────────────────────────────────────────────────────── */
+@media(max-width:480px){
+  .tvg-game { padding: 10px 12px; }
+  .tvg-teams { font-size: 15px; }
+  .tvg-network { font-size: 10px; }
+  .tvg-time { font-size: 9px; }
+}
+
+/* ── Injuries ─────────────────────────────────────────────────────────────── */
+@media(max-width:480px){
+  .inj-table { font-size: 10px; }
+  .inj-table th, .inj-table td { padding: 5px 6px; }
+  .inj-col-update { display: none; }
+}
+
+/* ── History / Draft ──────────────────────────────────────────────────────── */
+@media(max-width:480px){
+  .hist-tabs { flex-wrap: wrap; }
+  .htab { font-size: 9px; padding: 7px 10px; }
+  .sb-table { font-size: 9px; }
+  .sb-table th, .sb-table td { padding: 5px 5px; }
+  .sbt-loser, .sbt-mvp, .sbt-site { display: none; }
+  .hof-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Squad bar ────────────────────────────────────────────────────────────── */
+@media(max-width:480px){
+  .squad-bar { padding: 5px 10px; flex-wrap: wrap; gap: 4px; }
+  .squad-bar-label { font-size: 8px; }
+  .squad-pill { font-size: 8px; padding: 2px 6px; }
+}
+
+/* ── Newsletter widget ────────────────────────────────────────────────────── */
+@media(max-width:480px){
+  .nl-widget { padding: 14px 12px; }
+  .nl-teaser-title { font-size: 13px; }
+  .nl-teaser-sub { font-size: 8px; }
+  .nl-teaser-row { flex-direction: column; gap: 6px; }
+  .nl-submit-btn { width: 100%; text-align: center; }
+  .nl-sends { flex-wrap: wrap; gap: 4px; }
+  .nl-send-btn { font-size: 7px; padding: 4px 7px; }
+  .nl-expanded { padding: 0; }
+}
+
+/* ── Playroom ─────────────────────────────────────────────────────────────── */
+@media(max-width:480px){
+  .pr-card { margin: 8px 0; padding: 14px 12px; }
+  .pr-emoji-display { font-size: 36px; letter-spacing: 4px; }
+  .pr-classic-title, .pr-hof-player { font-size: 20px; }
+  .pr-fact, .pr-classic-headline { font-size: 14px; }
+  .pr-prompt { font-size: 16px; }
+  .pr-hof-pts { font-size: 30px; }
+}
+
+/* ── Resources ────────────────────────────────────────────────────────────── */
+@media(max-width:480px){
+  .res-grid { padding: 0 6px; margin: 10px auto; }
+  .res-cat-header { font-size: 9px; padding: 10px 10px; }
+  .res-link { font-size: 12px; padding: 8px 10px; }
+}
+
+/* ── Footer ───────────────────────────────────────────────────────────────── */
+@media(max-width:480px){
+  .footer-bottom { flex-direction: column; align-items: flex-start; gap: 4px; padding: 10px 12px; font-size: 8px; }
+  .footer-bmac { font-size: 10px; }
+  .footer-disclaimer { padding: 6px 12px; }
+  .footer-disc-text { font-size: 9px; }
+}
+
+/* ── General touch-friendly improvements ─────────────────────────────────── */
+@media(max-width:600px){
+  /* Minimum 44px tap targets on all buttons */
+  button, .tnav-btn, .htab, .ltab, .tc-btn, .nl-submit-btn {
+    min-height: 40px;
+  }
+  /* Prevent text selection flash on tap */
+  button { -webkit-tap-highlight-color: transparent; user-select: none; }
+  /* Smoother scrolling everywhere */
+  * { -webkit-overflow-scrolling: touch; }
+  /* Reduce motion for battery/performance */
+  @media(prefers-reduced-motion: reduce){
+    * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+}
+
+/* ── Tablet (481px–768px) — two column where it helps ────────────────────── */
+@media(min-width:481px) and (max-width:768px){
+  .games-grid { grid-template-columns: repeat(2, 1fr); }
+  .game-card.featured { grid-column: 1 / -1; }
+  .tnav-btn { font-size: 9px; padding: 9px 11px; }
+  .stats-tab { font-size: 9px; padding: 7px 10px; }
 }
