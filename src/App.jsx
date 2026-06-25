@@ -7,21 +7,24 @@ import { ti, networkColor, fmt, TEAMS } from './utils/teams'
 const ROUND_ORDER = ['Super Bowl','Conf Champs','Divisional','Wild Card']
 const ALL_WEEKS   = [...Array(18)].map((_,i) => i + 1)
 
-// Auto-detect current NFL week from the calendar
-// Season starts Sep 9, 2026 — each week is 7 days
+// Season gates
+// Preseason starts ~Aug 7, regular season Sep 9
+// Both gates open ESPN data — preseason shows with a "Preseason" label
+const PRESEASON_START  = new Date('2026-08-07T00:00:00-04:00')
+const REGULAR_SEASON   = new Date('2026-09-09T00:00:00-04:00')
+const isPreseason      = () => new Date() >= PRESEASON_START && new Date() < REGULAR_SEASON
+const isRegularSeason  = () => new Date() >= REGULAR_SEASON
+const isGameSeason     = () => new Date() >= PRESEASON_START  // either preseason OR regular
+const seasonLabel      = () => isRegularSeason() ? 'Regular Season' : isPreseason() ? 'Preseason' : 'Preseason opens Aug 7'
+const espnSeasonType   = () => isRegularSeason() ? 2 : 1  // ESPN: 1=preseason, 2=regular
 function getAutoWeek() {
   const now = new Date()
-  const seasonStart = new Date('2026-09-09T00:00:00')
-  const offseasonEnd = new Date('2026-09-08T23:59:59')
-
-  // Before season starts — show Week 1 preview
-  if (now <= offseasonEnd) return 1
-
-  // After season starts — calculate week number
-  const msPerWeek = 7 * 24 * 60 * 60 * 1000
-  const weekNum = Math.floor((now - seasonStart) / msPerWeek) + 1
-
-  // Cap at 18 regular season weeks
+  if (now >= PRESEASON_START && now < REGULAR_SEASON) {
+    const weekNum = Math.floor((now - PRESEASON_START) / (7*24*60*60*1000)) + 1
+    return Math.min(Math.max(weekNum, 1), 4)
+  }
+  if (now < PRESEASON_START) return 1
+  const weekNum = Math.floor((now - REGULAR_SEASON) / (7*24*60*60*1000)) + 1
   return Math.min(Math.max(weekNum, 1), 18)
 }
 
@@ -63,8 +66,8 @@ export default function App() {
   }
   const [squadModalOpen, setSquadModalOpen] = useState(false)
 
-  // Season gate — no ESPN calls before Sep 9 2026
-  const seasonStarted = new Date() >= new Date('2026-09-09T00:00:00-04:00')
+  // Season gate — open for preseason (Aug 7) and regular season (Sep 9)
+  const seasonStarted = isGameSeason()
 
   // Also ask ESPN what the current week is and sync if different
   useEffect(() => {
@@ -1173,7 +1176,7 @@ function LiveDrawer({ game: g, espnData, loading }) {
 
 function GameInfoDrawer({ game: g }) {
   // Season gate defined locally for this component
-  const seasonStarted = new Date() >= new Date('2026-09-09T00:00:00-04:00')
+  const seasonStarted = isGameSeason()
   // Weather for outdoor stadiums during season
   const homeTeam = g.home
   const isOutdoor = OUTDOOR_STADIUMS.includes(homeTeam)
@@ -1254,7 +1257,7 @@ function ScheduleView({ teamFilter, setTeamFilter, weekFilter, setWeekFilter }) 
   const isAllView  = !isTeamView && weekFilter === 'All'
 
   // Only fetch from ESPN after season starts
-  const seasonStarted = new Date() >= new Date('2026-09-09T00:00:00-04:00')
+  const seasonStarted = isGameSeason()
 
   // Team view — fetch from ESPN only during season, otherwise use static immediately
   const { games: espnTeamGames, loading: teamLoading } = useTeamSchedule(
@@ -1547,7 +1550,7 @@ function StandingsView() {
       <div className="section-bar">
         <h2>2026 Standings</h2>
         <div className="sb-rule" />
-        <span className="sb-ct">{loading ? 'Loading…' : 'Regular Season'}</span>
+        <span className="sb-ct">{loading ? 'Loading…' : seasonLabel()}</span>
       </div>
       <div className="standings-grid">
         {DIVISIONS.map(([divName, teams]) => (
@@ -1693,7 +1696,7 @@ const DEF_BASELINE = { QB:22, RB:24, WR:28, TE:12, K:8 }
 
 function useLiveDefenseRankings(currentWeek) {
   const [rankings, setRankings] = useState({})
-  const seasonStarted = currentWeek > 1 || new Date() >= new Date('2026-09-09')
+  const seasonStarted = currentWeek > 1 || isGameSeason()
 
   useEffect(() => {
     if (!seasonStarted) return
@@ -1704,7 +1707,7 @@ function useLiveDefenseRankings(currentWeek) {
 
     Promise.all(
       weeksToFetch.map(w =>
-        fetch(`/api/espn/scoreboard?week=${w}&seasontype=2&limit=20`)
+        fetch(`/api/espn/scoreboard?week=${w}&seasontype=${espnSeasonType()}&limit=20`)
           .then(r => r.json()).catch(() => null)
       )
     ).then(scoreboards => {
@@ -1772,7 +1775,7 @@ function useFWFantasyScores(currentWeek, mode) {
   const [players,  setPlayers]  = useState([])
   const [loading,  setLoading]  = useState(true)
   const defRankings = useLiveDefenseRankings(currentWeek)
-  const seasonStarted = currentWeek > 1 || new Date() >= new Date('2026-09-09')
+  const seasonStarted = currentWeek > 1 || isGameSeason()
 
   useEffect(() => {
     if (!seasonStarted) { setLoading(false); return }
@@ -1784,7 +1787,7 @@ function useFWFantasyScores(currentWeek, mode) {
 
     Promise.all(
       weeksToFetch.map(w =>
-        fetch(`/api/espn/scoreboard?week=${w}&seasontype=2&limit=20`)
+        fetch(`/api/espn/scoreboard?week=${w}&seasontype=${espnSeasonType()}&limit=20`)
           .then(r => r.json()).catch(() => null)
       )
     ).then(async scoreboards => {
@@ -1843,7 +1846,7 @@ function useFWFantasyScores(currentWeek, mode) {
       })
 
       // Step 3 — find next opponent from upcoming schedule
-      const upcomingSb = await fetch(`/api/espn/scoreboard?week=${currentWeek + 1}&seasontype=2&limit=20`)
+      const upcomingSb = await fetch(`/api/espn/scoreboard?week=${currentWeek + 1}&seasontype=${espnSeasonType()}&limit=20`)
         .then(r => r.json()).catch(() => null)
       const nextOpp = {} // { TEAM: OPP_TEAM }
       upcomingSb?.events?.forEach(ev => {
@@ -1935,7 +1938,7 @@ function useFWFantasyScores(currentWeek, mode) {
 function FWFormulaView({ currentWeek, mode }) {
   const [pos, setPos]           = useState('ALL')
   const [showBreakdown, setShowBreakdown] = useState(false)
-  const seasonStarted = new Date() >= new Date('2026-09-09T00:00:00-04:00')
+  const seasonStarted = isGameSeason()
   const { players, loading }    = useFWFantasyScores(currentWeek, mode)
 
   const POSITIONS = ['ALL','QB','RB','WR','TE','K']
@@ -2645,7 +2648,7 @@ const FANTASY_LEADERS_2025 = {
 
 function FantasyLeadersView({ mode, squad }) {
   const [pos, setPos] = useState('QB')
-  const seasonStarted = new Date() >= new Date('2026-09-09T00:00:00-04:00')
+  const seasonStarted = isGameSeason()
   const data = FANTASY_LEADERS_2025[pos] || []
   const scoreKey = mode === 'ppr' ? 'ppr' : 'std'
 
@@ -2758,7 +2761,7 @@ function FantasyLeadersView({ mode, squad }) {
 function useWaiverTargets() {
   const [targets, setTargets] = useState([])
   const [loading, setLoading] = useState(true)
-  const seasonStarted = new Date() >= new Date('2026-09-09T00:00:00-04:00')
+  const seasonStarted = isGameSeason()
 
   useEffect(() => {
     if (!seasonStarted) { setLoading(false); return }
@@ -2939,7 +2942,7 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos }
     { label: 'Season',    value: 'season' },
   ]
 
-  const seasonStarted = currentWeek > 1 || new Date() >= new Date('2026-09-09')
+  const seasonStarted = currentWeek > 1 || isGameSeason()
 
   useEffect(() => {
     if (!seasonStarted) return
@@ -2962,7 +2965,7 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos }
       // Fetch all scoreboards in parallel
       const scoreboards = await Promise.all(
         weeksToFetch.map(w =>
-          fetch(`/api/espn/scoreboard?week=${w}&seasontype=2&limit=20`)
+          fetch(`/api/espn/scoreboard?week=${w}&seasontype=${espnSeasonType()}&limit=20`)
             .then(r => r.json())
             .catch(() => null)
         )
@@ -4078,7 +4081,7 @@ const STREAMING_SERVICES = [
 
 function TVGuideView({ currentWeek }) {
   const [weekFilter, setWeekFilter] = useState(currentWeek || 1)
-  const seasonStarted = new Date() >= new Date('2026-09-09T00:00:00-04:00')
+  const seasonStarted = isGameSeason()
 
   // Get games for selected week with network info
   const weekGames = SCHEDULE_2026.filter(g => g.week === weekFilter)
@@ -5029,14 +5032,14 @@ function StatsView({ squad }) {
   const { teams, loading: teamLoading, error: teamError } = useTeamStats(SEASON)
   const playerCat = activeTab?.group === 'player' ? tab : null
   const { athletes, loading: playerLoading, error: playerError } = usePlayerStats(SEASON, playerCat)
-  const seasonStarted = new Date() >= new Date('2026-09-09T00:00:00-04:00')
+  const seasonStarted = isGameSeason()
 
   return (
     <div>
       <div className="section-bar">
         <h2>2026 NFL Stats</h2>
         <div className="sb-rule" />
-        <span className="sb-ct">{seasonStarted ? 'Live · Regular Season' : 'Opens Sep 9'}</span>
+        <span className="sb-ct">{seasonStarted ? `Live · ${seasonLabel()}` : 'Preseason opens Aug 7'}</span>
       </div>
       <div className="stats-tabs">
         <div className="stats-tab-group">
@@ -5616,7 +5619,7 @@ function Sidebar({ activeWeek, setActiveView, squad }) {
 
   // Next few games
   useEffect(() => {
-    fetch(`/api/espn/scoreboard?week=${activeWeek}&seasontype=2&limit=20`)
+    fetch(`/api/espn/scoreboard?week=${activeWeek}&seasontype=${espnSeasonType()}&limit=20`)
       .then(r => r.json())
       .then(d => setEvents(d.events || []))
       .catch(() => {})
@@ -5789,7 +5792,7 @@ function Sidebar({ activeWeek, setActiveView, squad }) {
       <div className="sb-widget sb-widget-promo">
         <div className="sb-promo-title">🗽 NY Sports Daily</div>
         <div className="sb-promo-text">
-          Mets · Yankees · Jets · Knicks · Giants · Islanders
+          All New York sports, all the time.
         </div>
         <a
           href="https://nysportsdaily.com"
@@ -5797,7 +5800,7 @@ function Sidebar({ activeWeek, setActiveView, squad }) {
           rel="noopener"
           className="sb-promo-btn"
         >
-          Read Today's Issue →
+          nysportsdaily.com →
         </a>
       </div>
 
