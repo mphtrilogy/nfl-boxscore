@@ -1740,3 +1740,354 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   flex: 1;
   text-align: right;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   VISUAL POLISH — nflboxscore.com
+   Pure CSS overrides — no existing rules removed, no JS changes
+   Applied after all existing rules so specificity wins cleanly
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. CSS TOKENS — refined values ──────────────────────────────────────── */
+:root {
+  /* Slightly warmer shadow for depth */
+  --shadow-card: 0 1px 3px rgba(42,31,14,.08), 0 2px 8px rgba(42,31,14,.04);
+  --shadow-lift: 0 2px 8px rgba(42,31,14,.12), 0 4px 16px rgba(42,31,14,.06);
+  /* Tighter border radius — more modern */
+  --r: 3px;
+  /* Transition standard */
+  --t: all .15s cubic-bezier(.4,0,.2,1);
+}
+
+/* ── 2. GAME CARDS — depth, spacing, score hierarchy ─────────────────────── */
+
+/* Subtle card lift */
+.game-card {
+  box-shadow: var(--shadow-card);
+  border-radius: 0; /* keep grid-aligned */
+  transition: var(--t);
+}
+.game-card:hover {
+  box-shadow: var(--shadow-lift);
+  z-index: 1;
+  position: relative;
+}
+
+/* Score is the hero — make it bigger */
+.team-score {
+  font-size: 30px;
+  font-weight: 700;
+  min-width: 52px;
+  letter-spacing: -.02em;
+}
+
+/* Team abbreviation — slightly larger */
+.team-abv { font-size: 23px; }
+
+/* Winner score pops gold on featured card */
+.game-card.featured .team-row.winner .team-score { color: var(--gold); }
+
+/* More padding in card head */
+.card-head { padding: 14px 16px 8px; }
+
+/* Row spacing */
+.matchup { gap: 5px; }
+
+/* Loser treatment — more contrast */
+.team-row.loser .team-abv {
+  color: var(--muted-lt);
+  font-style: normal; /* remove italic — it reads as broken */
+}
+.team-row.loser .team-score { color: var(--rule-hvy); opacity: .45; }
+
+/* Toggle hint — more inviting */
+.card-toggle-hint {
+  color: var(--accent);
+  font-weight: 600;
+  letter-spacing: .1em;
+  padding: 4px 16px 10px;
+}
+.card-toggle-hint .tog-arr { font-size: 10px; }
+
+/* Linescore — better row height */
+.ls-table th, .ls-table td { padding: 3px 6px; }
+.ls-table { font-size: 11px; }
+
+/* ── 3. BOX SCORE TABLES — scannable, readable ───────────────────────────── */
+
+/* Alternating row stripes */
+.player-table tbody tr:nth-child(even) td { background: rgba(42,31,14,.025); }
+.player-table tbody tr:hover td { background: rgba(200,168,75,.07) !important; }
+
+/* Bigger player names */
+.player-table td.pt-name { font-size: 11px; font-weight: 500; }
+
+/* Stat values — slightly larger */
+.player-table td { font-size: 11px; padding: 5px 8px; }
+.player-table th { padding: 6px 8px; font-size: 8.5px; }
+
+/* Squad player highlight — unmistakable gold left border */
+.player-table tr.squad-highlight td {
+  background: rgba(200,168,75,.08) !important;
+  border-left: 3px solid var(--gold);
+}
+.player-table tr.squad-highlight td.pt-name { color: var(--gold); font-weight: 700; }
+
+/* Scoring plays — better readability */
+.play-row { padding: 6px 16px; }
+.play-text { font-size: 11px; color: var(--ink); line-height: 1.5; }
+.play-q    { font-size: 10px; padding-top: 1px; }
+.play-clock{ font-size: 10px; padding-top: 1px; }
+.play-score { font-size: 11px; font-weight: 700; color: var(--ink); }
+
+/* Team stats — cleaner grid */
+.ts-val { font-size: 13px; font-weight: 700; color: var(--ink); }
+.ts-label { font-size: 8px; color: var(--muted); letter-spacing: .06em; }
+
+/* Drawer tabs — tighter, cleaner */
+.dtab { padding: 8px 14px; font-size: 9px; }
+
+/* ── 4. SECTION BARS — color-coded by area ───────────────────────────────── */
+
+/* Fantasy section bar gets green accent */
+.fant-mode-bar { border-left: 3px solid var(--green-lt); }
+
+/* Scores section bar left border */
+.week-selector { border-left: 3px solid var(--accent); }
+
+/* Section bar h2 — slightly larger */
+.section-bar h2 { font-size: 11px; letter-spacing: .22em; }
+
+/* ── 5. STANDINGS — card depth and winner callout ────────────────────────── */
+.div-block {
+  box-shadow: var(--shadow-card);
+  border-radius: var(--r);
+  transition: var(--t);
+}
+.div-block:hover { box-shadow: var(--shadow-lift); }
+
+/* Division leader row — more prominent */
+.std-table tr.div-leader td { background: rgba(26,74,26,.08); }
+.std-table tr.div-leader .std-abv { color: var(--green); font-size: 13px; }
+.std-table tr.div-leader .std-w  { color: var(--green); font-size: 11px; }
+
+/* Row hover */
+.std-table tr:hover td { background: rgba(200,168,75,.06); }
+
+/* ── 6. NAV — active state more prominent ────────────────────────────────── */
+.tnav-btn {
+  font-size: 9.5px;
+  padding: 10px 13px;
+  transition: var(--t);
+}
+.tnav-btn.on {
+  color: var(--ink);
+  font-weight: 700;
+  background: rgba(42,31,14,.04);
+}
+
+/* Fantasy nav button special green */
+.tnav-btn.tnav-fantasy.on {
+  background: rgba(26,74,26,.06);
+}
+
+/* Stats tab active gets gold */
+.tnav-btn.tnav-stats.on, .stats-tab.on {
+  border-bottom-color: var(--gold);
+  color: var(--gold);
+}
+
+/* ── 7. FILTER PILLS & BUTTONS — unified system ──────────────────────────── */
+.fpill, .ws-btn, .tc-btn {
+  border-radius: var(--r);
+  font-size: 8.5px;
+  transition: var(--t);
+}
+.fpill:hover, .ws-btn:hover, .tc-btn:hover {
+  background: rgba(42,31,14,.06);
+  border-color: var(--muted);
+}
+.fpill.on, .ws-btn.on, .tc-btn.on {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+  box-shadow: 0 1px 3px rgba(42,31,14,.2);
+}
+
+/* ── 8. FW FORMULA — score cell prominence ───────────────────────────────── */
+.fw-score-cell {
+  border-radius: var(--r);
+  min-width: 58px;
+  padding: 4px 6px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.15);
+}
+.fw-score-num { font-size: 16px; font-weight: 800; }
+.fw-score-lbl { font-size: 5.5px; letter-spacing: .14em; margin-top: 1px; }
+
+/* FW table rows — better hover */
+.fw-table .fw-row:hover td { background: rgba(200,168,75,.06); }
+.fw-table .fw-squad-row td { border-left: 3px solid var(--gold) !important; }
+
+/* ── 9. INJURY REPORT — status badges with color ────────────────────────── */
+.inj-status-badge {
+  border-radius: var(--r);
+  font-size: 7.5px;
+  font-weight: 800;
+  letter-spacing: .1em;
+}
+/* Override status badge colors clearly */
+[class*="inj-out"]  .inj-status-badge,
+.inj-status-badge.out  { background: #8b1a1a; color: #fff; }
+.inj-status-badge.qtb  { background: rgba(200,168,75,.2); color: #9a7a2e; border: 1px solid rgba(200,168,75,.4); }
+.inj-status-badge.prob { background: rgba(26,74,26,.15); color: #1a4a1a; }
+.inj-status-badge.ir   { background: #1a1209; color: rgba(245,240,232,.7); }
+
+/* ── 10. FANTASY HUB TABS — cleaner, more distinct ──────────────────────── */
+.hist-tabs { background: var(--paper-dark); border-bottom: 2px solid var(--rule-hvy); }
+.htab {
+  font-size: 9px;
+  padding: 10px 14px;
+  transition: var(--t);
+}
+.htab.on {
+  background: var(--paper);
+  border-bottom-color: var(--gold);
+  font-weight: 700;
+}
+
+/* ── 11. SCHEDULE GAME ROWS — squad highlight ────────────────────────────── */
+.sch-game.squad-game { border-left: 3px solid var(--gold); background: rgba(200,168,75,.03); }
+.sch-game.squad-game:hover { background: rgba(200,168,75,.07); }
+
+/* ── 12. NEWS ITEMS — card-like with hover ───────────────────────────────── */
+.news-item {
+  transition: var(--t);
+  border-radius: 0;
+}
+.news-item:hover { background: var(--paper-mid); }
+.news-headline { font-size: 14px; line-height: 1.45; font-weight: 600; }
+
+/* ── 13. DRAFT CARDS — readability ──────────────────────────────────────── */
+.dt-card {
+  box-shadow: var(--shadow-card);
+  transition: var(--t);
+  border-radius: var(--r);
+}
+.dt-card:hover { box-shadow: var(--shadow-lift); }
+.dt-player { font-size: 13px; }
+.dt-grade  { font-size: 16px; }
+
+/* ── 14. FOOTER — cleaner spacing ────────────────────────────────────────── */
+.footer {
+  border-top: 2px solid var(--rule-hvy);
+}
+.footer-bottom { padding: 12px 20px; }
+
+/* ── 15. HISTORY TABLE — better row heights ─────────────────────────────── */
+.sb-table td { padding: 8px 10px; }
+.sb-num { font-size: 14px; }
+.sb-winner { font-size: 12px; }
+
+/* HOF grid cards */
+.hof-card {
+  box-shadow: var(--shadow-card);
+  transition: var(--t);
+  border-radius: var(--r);
+}
+.hof-card:hover { box-shadow: var(--shadow-lift); }
+
+/* All-time leaders table */
+.atl-table tbody tr:nth-child(even) td { background: rgba(42,31,14,.025); }
+.atl-table tbody tr:hover td { background: rgba(200,168,75,.06) !important; }
+
+/* ── 16. SQUAD BAR — more prominent ─────────────────────────────────────── */
+.squad-bar {
+  border-bottom: 2px solid rgba(200,168,75,.3);
+  background: rgba(200,168,75,.05);
+}
+.squad-bar.active { background: rgba(200,168,75,.1); }
+.squad-pill {
+  background: rgba(200,168,75,.15);
+  border: 1px solid rgba(200,168,75,.3);
+  color: var(--gold);
+  font-weight: 700;
+  border-radius: var(--r);
+}
+.squad-toggle-btn {
+  border-radius: var(--r);
+  transition: var(--t);
+}
+.squad-toggle-btn.on {
+  background: var(--gold);
+  color: var(--ink);
+  border-color: var(--gold);
+}
+
+/* ── 17. STATS TABLES — scannable ────────────────────────────────────────── */
+.stats-table tbody tr:nth-child(even) td { background: rgba(42,31,14,.02); }
+.stats-table tbody tr:hover td { background: rgba(200,168,75,.06) !important; }
+.stats-val-primary { font-size: 12px; }
+.stats-th.sort-active { background: rgba(200,168,75,.12); }
+
+/* ── 18. MASTHEAD — tighter on desktop ──────────────────────────────────── */
+@media(min-width:901px){
+  .masthead { padding: 16px 20px 0; }
+  .logo { font-size: clamp(36px, 6vw, 72px); }
+  .support-bar { padding: 6px 0 7px; }
+}
+
+/* ── 19. SIDEBAR REFINEMENTS ─────────────────────────────────────────────── */
+.sb-widget { border-bottom: 1px solid rgba(42,31,14,.1); }
+.sb-widget-title { letter-spacing: .16em; }
+.sb-leader-row { padding: 5px 0; font-size: 10.5px; }
+.sb-game-teams { font-size: 11.5px; }
+.sb-quicklink { font-size: 10.5px; }
+.sb-more-btn { color: var(--accent); font-weight: 700; }
+.sb-more-btn:hover { color: var(--ink); }
+
+/* ── 20. MOBILE BOTTOM TAB BAR — tighter labels ─────────────────────────── */
+@media(max-width:900px){
+  .mob-tab-label { font-size: 8px; letter-spacing: .06em; }
+  .mob-tab.on .mob-tab-icon { transform: translateY(-1px); }
+  .mob-tab { transition: background .12s; }
+
+  /* Drawer item transitions */
+  .mob-drawer-item { transition: background .12s, color .12s; }
+
+  /* Cards full bleed on mobile */
+  .game-card { box-shadow: none; }
+  .div-block  { box-shadow: none; }
+}
+
+/* ── 21. MISC POLISH ──────────────────────────────────────────────────────── */
+
+/* Smoother page transitions */
+.games-grid, .standings-grid, .injury-grid {
+  animation: gridFadeIn .25s ease both;
+}
+@keyframes gridFadeIn { from { opacity:.7 } to { opacity:1 } }
+
+/* Loading states — centered and consistent */
+.sch-loading, .trends-loading, .drawer-loading {
+  letter-spacing: .12em;
+  font-size: 9.5px;
+}
+
+/* Coming soon screens */
+.cs-icon  { font-size: 44px; margin-bottom: 4px; }
+.cs-title { font-size: 22px; letter-spacing: -.02em; }
+.cs-text  { font-size: 14px; max-width: 460px; }
+
+/* Scrollbar styling — desktop only */
+@media(min-width:901px){
+  ::-webkit-scrollbar       { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--paper-dark); }
+  ::-webkit-scrollbar-thumb { background: var(--rule-hvy); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+}
+
+/* Focus rings — accessibility */
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
