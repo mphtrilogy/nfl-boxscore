@@ -741,13 +741,37 @@ function SquadModal({ squad, onSave, onClose }) {
   const togglePlayer = (p) =>
     setPendingPlayers(prev => prev.includes(p) ? prev.filter(x=>x!==p) : [...prev,p])
 
-  const handleSave = () => {
+  const [syncStatus, setSyncStatus] = useState(null) // null | 'syncing' | 'synced' | 'no-sub'
+
+  const handleSave = async () => {
     const hasSquad = pendingTeams.length > 0 || pendingPlayers.length > 0
-    onSave({
+    const newSquad = {
       teams:   [...pendingTeams],
       players: [...pendingPlayers],
       on:      hasSquad,
-    })
+    }
+    onSave(newSquad)
+
+    // Auto-sync to newsletter if they're subscribed
+    // Silently updates squad_players in Supabase so emails stay current
+    const email = localStorage.getItem('fw-nl-email')
+    if (email && pendingPlayers.length > 0) {
+      setSyncStatus('syncing')
+      try {
+        const r = await fetch('/api/newsletter/update-squad', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email,
+            squadPlayers: pendingPlayers.join(','),
+            favTeam:      pendingTeams[0] || 'All',
+          }),
+        })
+        setSyncStatus(r.ok ? 'synced' : 'no-sub')
+      } catch {
+        setSyncStatus('no-sub')
+      }
+    }
   }
 
   return (
@@ -840,7 +864,11 @@ function SquadModal({ squad, onSave, onClose }) {
         <div className="squad-modal-foot">
           <button className="squad-foot-btn danger" onClick={() => { setPendingTeams([]); setPendingPlayers([]) }}>Clear All</button>
           <button className="squad-foot-btn secondary" onClick={onClose}>Cancel</button>
-          <button className="squad-foot-btn primary" onClick={handleSave}>Save Squad ✓</button>
+          <button className="squad-foot-btn primary" onClick={handleSave}>
+            {syncStatus === 'syncing' ? 'Saving…' : 'Save Squad ✓'}
+          </button>
+          {syncStatus === 'synced'  && <span className="squad-sync-ok">⚡ Newsletter synced</span>}
+          {syncStatus === 'no-sub' && <span className="squad-sync-hint">Subscribe in footer to sync with newsletter</span>}
         </div>
       </div>
     </div>
@@ -5433,6 +5461,8 @@ function NewsletterSignup({ squad, favTeam }) {
       if (r.ok) {
         setStatus('ok')
         setMessage('Check your email to confirm. See you Week 1.')
+        // Store email so squad modal can auto-sync to newsletter
+        localStorage.setItem('fw-nl-email', email.toLowerCase().trim())
       } else {
         setStatus('error')
         setMessage(data.error || 'Something went wrong.')
