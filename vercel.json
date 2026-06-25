@@ -57,5 +57,11 @@
         { "key": "Accept", "value": "application/rss+xml, application/xml, text/xml" }
       ]
     }
+  ],
+  "crons": [
+    { "path": "/api/newsletter/send?type=monday",   "schedule": "0 12 * * 1" },
+    { "path": "/api/newsletter/send?type=tuesday",  "schedule": "0 12 * * 2" },
+    { "path": "/api/newsletter/send?type=thursday", "schedule": "0 16 * * 4" },
+    { "path": "/api/newsletter/send?type=friday",   "schedule": "0 12 * * 5" }
   ]
 }
