@@ -1658,7 +1658,7 @@ function LeadersView({ tab, setTab }) {
           Individual player leaderboards will populate automatically as the 2026 season kicks off September 9.
           Stats pull live from ESPN after each game.
         </div>
-        <div className="cs-date">Kickoff: Sep 9, 2026 · SEA vs NE · 8:20 PM ET</div>
+        <div className="cs-date">Preseason Aug 7 · Regular season Sep 9, 2026 · SEA vs NE</div>
       </div>
     </div>
   )
@@ -1985,7 +1985,7 @@ function FWFormulaView({ currentWeek, mode }) {
   if (!seasonStarted) return (
     <div className="leaders-coming-soon">
       <div className="cs-icon">⚡</div>
-      <div className="cs-title">FW Formula — Live Sep 9</div>
+      <div className="cs-title">FW Formula — Live Aug 7</div>
       <div className="cs-text">
         The Final Whistle Fantasy Score pulls live from ESPN box scores,
         defensive matchup data, and weather to rank every player automatically.
@@ -1998,7 +1998,7 @@ function FWFormulaView({ currentWeek, mode }) {
           🔄 Updates: Every time you load the page — zero manual work
         </div>
       </div>
-      <div className="cs-date">Season opens Sep 9 · SEA vs NE</div>
+      <div className="cs-date">Preseason opens Aug 7 · Regular season Sep 9</div>
     </div>
   )
 
@@ -2715,13 +2715,13 @@ function FantasyLeadersView({ mode, squad }) {
         </div>
         <div className="fl-scoring-note">
           Showing {mode === 'ppr' ? 'PPR' : 'Standard'} · Full 2025 season totals ·
-          {seasonStarted ? ' Live 2026 data updating' : ' 2026 season data loads Sep 9'}
+          {seasonStarted ? ' Live 2026 data updating' : ' 2026 preseason data loads Aug 7'}
         </div>
       </div>
 
       {!seasonStarted && (
         <div className="fl-offseason-banner">
-          📊 Showing 2025 final season totals. 2026 live rankings update weekly starting Sep 9.
+          📊 Showing 2025 final season totals. 2026 live rankings update weekly starting Aug 7.
         </div>
       )}
 
@@ -3148,7 +3148,7 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos }
             will populate automatically once the season gets rolling. Standard and PPR
             scoring, all positions including K and DEF, top 10+ per position.
           </div>
-          <div className="cs-date">Season opens Sep 9 · SEA vs NE · Need 3 weeks for full trends</div>
+          <div className="cs-date">Preseason opens Aug 7 · Regular season Sep 9 · Trends need 3 weeks of data</div>
         </div>
       )}
 
@@ -3601,7 +3601,7 @@ function InjuriesView() {
           <div className="cs-icon">🏥</div>
           <div className="cs-title">No injuries reported yet</div>
           <div className="cs-text">Injury reports populate during the season, typically Wednesday–Friday each week.</div>
-          <div className="cs-date">Season opens Sep 9 · SEA vs NE</div>
+          <div className="cs-date">Preseason opens Aug 7 · Regular season Sep 9</div>
         </div>
       )}
 
@@ -3664,7 +3664,7 @@ function InjuriesView() {
             Out, Doubtful, Questionable, IR, and PUP designations. Filter by team or status.
             Reports are published Wednesday–Friday each week during the season.
           </div>
-          <div className="cs-date">Season opens Sep 9 · SEA vs NE</div>
+          <div className="cs-date">Preseason opens Aug 7 · Regular season Sep 9</div>
         </div>
       )}
     </div>
@@ -5086,9 +5086,9 @@ function StatsView({ squad }) {
       {!seasonStarted && (
         <div className="leaders-coming-soon">
           <div className="cs-icon">📊</div>
-          <div className="cs-title">Stats Hub — Live Sep 9</div>
-          <div className="cs-text">Team offense & defense rankings · Individual leaders in every category · All sortable · Live from ESPN.</div>
-          <div className="cs-date">Season opens Sep 9, 2026 · SEA vs NE · 8:20 PM ET</div>
+          <div className="cs-title">Stats Hub — Live Aug 7</div>
+          <div className="cs-text">Team offense & defense rankings · Individual leaders in every category · All sortable · Live from ESPN. Opens with preseason Week 1.</div>
+          <div className="cs-date">Preseason opens Aug 7, 2026 · Regular season Sep 9 · SEA vs NE</div>
         </div>
       )}
       {seasonStarted && tab === 'team-offense' && (<>
@@ -5478,7 +5478,7 @@ function NewsletterSignup({ squad, favTeam }) {
       <div className="nl-widget nl-success">
         <div className="nl-success-icon">✓</div>
         <div className="nl-success-text">You're in. Confirm email to activate.</div>
-        <div className="nl-success-sub">First issue drops Week 1, Sep 9.</div>
+        <div className="nl-success-sub">First issue drops preseason Week 1, Aug 11.</div>
       </div>
     )
   }
