@@ -1050,33 +1050,49 @@ function Linescore({ game: g }) {
 // ── BOX SCORE DRAWER ──────────────────────────────────────────────────────────
 function BoxScoreDrawer({ espnData, loading, game }) {
   const [drawerTab, setDrawerTab] = useState('scoring')
-
   if (loading) return <div className="drawer-loading">Loading box score…</div>
   if (!espnData) return <div className="drawer-loading">Box score not available</div>
-
-  const tabs = ['Scoring', 'Team Stats', 'Passing', 'Rushing', 'Receiving', 'Defense']
-
+  const tabs = [
+    { id:'scoring',   label:'Scoring Plays' },
+    { id:'team_stats',label:'Team Stats'    },
+    { id:'passing',   label:'Passing'       },
+    { id:'rushing',   label:'Rushing'       },
+    { id:'receiving', label:'Receiving'     },
+    { id:'defense',   label:'Defense'       },
+    { id:'kicking',   label:'Kicking'       },
+    { id:'returns',   label:'Returns'       },
+  ]
   return (
     <div className="box-drawer">
       <div className="drawer-tabs">
         {tabs.map(t => (
-          <button
-            key={t}
-            className={`dtab ${drawerTab === t.toLowerCase().replace(' ', '_') ? 'on' : ''}`}
-            onClick={() => setDrawerTab(t.toLowerCase().replace(' ', '_'))}
-          >{t}</button>
+          <button key={t.id} className={`dtab ${drawerTab === t.id ? 'on' : ''}`}
+            onClick={() => setDrawerTab(t.id)}>{t.label}</button>
         ))}
       </div>
       <div className="drawer-panel">
-        {drawerTab === 'scoring'     && <ScoringPlays espnData={espnData} />}
-        {drawerTab === 'team_stats'  && <TeamStats espnData={espnData} game={game} />}
-        {drawerTab === 'passing'     && <PlayerStats espnData={espnData} cat="passing" />}
-        {drawerTab === 'rushing'     && <PlayerStats espnData={espnData} cat="rushing" />}
-        {drawerTab === 'receiving'   && <PlayerStats espnData={espnData} cat="receiving" />}
-        {drawerTab === 'defense'     && <PlayerStats espnData={espnData} cat="defensive" />}
+        {drawerTab === 'scoring'    && <ScoringPlays  espnData={espnData} />}
+        {drawerTab === 'team_stats' && <TeamStats      espnData={espnData} game={game} />}
+        {drawerTab === 'passing'    && <PlayerStats    espnData={espnData} cat="passing"   game={game} />}
+        {drawerTab === 'rushing'    && <PlayerStats    espnData={espnData} cat="rushing"   game={game} />}
+        {drawerTab === 'receiving'  && <PlayerStats    espnData={espnData} cat="receiving" game={game} />}
+        {drawerTab === 'defense'    && <PlayerStats    espnData={espnData} cat="defensive" game={game} />}
+        {drawerTab === 'kicking'    && <KickingStats   espnData={espnData} game={game} />}
+        {drawerTab === 'returns'    && <ReturnStats    espnData={espnData} game={game} />}
       </div>
     </div>
   )
+}
+
+function calcFpts(vals, cat, mode='ppr') {
+  const v = (k) => parseFloat(vals[k] || 0)
+  if (cat === 'passing')   return (v('YDS')/25) + (v('TD')*6) - (v('INT')*2)
+  if (cat === 'rushing')   return (v('YDS')/10) + (v('TD')*6)
+  if (cat === 'receiving') {
+    const base = (v('YDS')/10) + (v('TD')*6)
+    return mode === 'ppr' ? base + v('REC') : base
+  }
+  return 0
 }
 
 function ScoringPlays({ espnData }) {
@@ -1100,29 +1116,32 @@ function ScoringPlays({ espnData }) {
 function TeamStats({ espnData, game: g }) {
   const teams = espnData?.boxscore?.teams || []
   if (!teams.length) return <div className="no-data">Team stats not available</div>
-
+  const norm = (a) => a?.replace('LAR','LA').replace('WSH','WAS').replace('JAX','JAC') || ''
   const getStats = (tm) => {
-    const teamData = teams.find(t => t.team?.abbreviation === tm ||
-      t.team?.abbreviation?.replace('LAR','LA').replace('WSH','WAS').replace('JAX','JAC') === tm)
+    const td = teams.find(t => norm(t.team?.abbreviation) === norm(tm))
     const stats = {}
-    teamData?.statistics?.forEach(s => { stats[s.name] = s.displayValue })
+    td?.statistics?.forEach(s => { stats[s.name] = s.displayValue })
     return stats
   }
-
-  const awayStats = getStats(g.away)
-  const homeStats = getStats(g.home)
-
+  const away = getStats(g.away)
+  const home = getStats(g.home)
   const rows = [
-    ['Total Yards',       'totalYards',       true ],
-    ['Passing Yards',     'netPassingYards',   true ],
-    ['Rushing Yards',     'rushingYards',      true ],
-    ['First Downs',       'firstDowns',        true ],
-    ['Turnovers',         'turnovers',         false],
-    ['Sacks',             'sacks',             true ],
-    ['Penalty Yards',     'penaltyYards',      false],
-    ['Time of Poss.',     'possessionTime',    null ],
+    ['Total Net Yards',     'totalYards',         true ],
+    ['Net Passing Yards',   'netPassingYards',     true ],
+    ['Rushing Yards',       'rushingYards',        true ],
+    ['Yards Per Play',      'yardsPerPlay',        true ],
+    ['First Downs',         'firstDowns',          true ],
+    ['3rd Down Conv.',      'thirdDownEff',        null ],
+    ['4th Down Conv.',      'fourthDownEff',       null ],
+    ['Red Zone (TD/Att)',   'redZoneAttempts',     null ],
+    ['Turnovers',           'turnovers',           false],
+    ['Fumbles / Lost',      'fumblesLost',         null ],
+    ['Interceptions',       'interceptions',       false],
+    ['Penalties / Yards',   'totalPenaltiesYards', false],
+    ['Sacks Allowed',       'sacks',               false],
+    ['Punts / Avg',         'punts',               null ],
+    ['Time of Poss.',       'possessionTime',      null ],
   ]
-
   return (
     <div className="team-stats">
       <div className="ts-header">
@@ -1130,14 +1149,17 @@ function TeamStats({ espnData, game: g }) {
         <span className="ts-mid"></span>
         <span className="ts-team">{g.home}</span>
       </div>
-      {rows.map(([label, key, moreIsBetter]) => {
-        const av = awayStats[key] || '—'
-        const hv = homeStats[key] || '—'
+      {rows.map(([label, key, mb]) => {
+        const av = away[key] || '—'
+        const hv = home[key] || '—'
+        const an = parseFloat(av), hn = parseFloat(hv)
+        const aw = mb === true ? an > hn : mb === false ? an < hn : false
+        const hw = mb === true ? hn > an : mb === false ? hn < an : false
         return (
           <div key={key} className="ts-row">
-            <span className="ts-val">{av}</span>
+            <span className={`ts-val ${aw ? 'ts-win' : ''}`}>{av}</span>
             <span className="ts-label">{label}</span>
-            <span className="ts-val right">{hv}</span>
+            <span className={`ts-val right ${hw ? 'ts-win' : ''}`}>{hv}</span>
           </div>
         )
       })}
@@ -1145,53 +1167,274 @@ function TeamStats({ espnData, game: g }) {
   )
 }
 
-function PlayerStats({ espnData, cat }) {
-  const teams = espnData?.boxscore?.players || []
+function PlayerStats({ espnData, cat, game: g }) {
+  const teamsData = espnData?.boxscore?.players || []
+  const squadRaw  = (() => { try { return JSON.parse(localStorage.getItem('fw-squad') || '{}') } catch { return {} } })()
+  const squadPlayers = squadRaw?.players || []
 
-  const allPlayers = []
-  teams.forEach(teamData => {
-    const tm = teamData.team?.abbreviation || ''
-    const statGroup = teamData.statistics?.find(s => s.name === cat)
-    if (!statGroup) return
-    statGroup.athletes?.forEach(a => {
+  const colDefs = {
+    passing: [
+      { key:'C/ATT', label:'C/ATT', title:'Completions/Attempts' },
+      { derived:(v) => { const [c,a] = (v['C/ATT']||'').split('/').map(Number); return (c&&a) ? (c/a*100).toFixed(1)+'%' : v['PCT']||'—' }, label:'CMP%', title:'Completion %' },
+      { key:'YDS',   label:'YDS',   title:'Passing Yards' },
+      { key:'AVG',   label:'YPA',   title:'Yards Per Attempt' },
+      { key:'TD',    label:'TD',    title:'Touchdown Passes' },
+      { key:'INT',   label:'INT',   title:'Interceptions' },
+      { key:'SCK',   label:'SCK',   title:'Sacks Taken' },
+      { key:'LNG',   label:'LNG',   title:'Longest Pass' },
+      { key:'QBR',   label:'QBR',   title:'ESPN QBR' },
+      { derived:(v) => v['RTNG']||v['RTG']||'—', label:'RTG', title:'Passer Rating' },
+      { fpts:true, std:true, label:'FPTS', title:'Fantasy Pts (STD)' },
+    ],
+    rushing: [
+      { key:'CAR', label:'CAR', title:'Carries' },
+      { key:'YDS', label:'YDS', title:'Rushing Yards' },
+      { key:'AVG', label:'YPC', title:'Yards Per Carry' },
+      { key:'TD',  label:'TD',  title:'Rushing TDs' },
+      { key:'LNG', label:'LNG', title:'Long Run' },
+      { key:'20+', label:'20+', title:'Runs 20+ Yards' },
+      { key:'FUM', label:'FUM', title:'Fumbles' },
+      { fpts:true, std:true, label:'FPTS', title:'Fantasy Pts (STD)' },
+    ],
+    receiving: [
+      { key:'REC',  label:'REC',  title:'Receptions' },
+      { key:'TGT',  label:'TGT',  title:'Targets' },
+      { key:'YDS',  label:'YDS',  title:'Receiving Yards' },
+      { key:'AVG',  label:'YPR',  title:'Yards Per Reception' },
+      { key:'YAC',  label:'YAC',  title:'Yards After Catch' },
+      { key:'TD',   label:'TD',   title:'Receiving TDs' },
+      { key:'LNG',  label:'LNG',  title:'Long Reception' },
+      { key:'20+',  label:'20+',  title:'Receptions 20+ Yards' },
+      { key:'FD',   label:'FD',   title:'First Downs' },
+      { key:'FUM',  label:'FUM',  title:'Fumbles' },
+      { fpts:true, ppr:true, label:'PPR', title:'Fantasy Pts (PPR)' },
+      { fpts:true, std:true, label:'STD', title:'Fantasy Pts (STD)' },
+    ],
+    defensive: [
+      { key:'TOT',   label:'TOT',   title:'Total Tackles' },
+      { key:'SOLO',  label:'SOLO',  title:'Solo Tackles' },
+      { key:'AST',   label:'AST',   title:'Assisted Tackles' },
+      { key:'SACKS', label:'SACKS', title:'Sacks' },
+      { key:'TFL',   label:'TFL',   title:'Tackles For Loss' },
+      { key:'QH',    label:'QH',    title:'QB Hits' },
+      { key:'INT',   label:'INT',   title:'Interceptions' },
+      { key:'PD',    label:'PD',    title:'Passes Defended' },
+      { key:'FF',    label:'FF',    title:'Forced Fumbles' },
+      { key:'FR',    label:'FR',    title:'Fumble Recoveries' },
+      { key:'TD',    label:'TD',    title:'Defensive TDs' },
+    ],
+  }
+  const cols = colDefs[cat] || []
+
+  const getVal = (col, row) => {
+    if (col.derived) return col.derived(row.vals)
+    if (col.fpts) {
+      if (col.ppr) return row.fpts_ppr > 0 ? row.fpts_ppr.toFixed(1) : '—'
+      return row.fpts_std > 0 ? row.fpts_std.toFixed(1) : '—'
+    }
+    return row.vals[col.key] || '—'
+  }
+
+  const isSquad = (name) => squadPlayers.some(p => name.toLowerCase().includes(p.toLowerCase()))
+
+  const grouped = []
+  teamsData.forEach(td => {
+    const tm = td.team?.abbreviation || ''
+    const teamName = td.team?.displayName || tm
+    const sg = td.statistics?.find(s => s.name === cat)
+    if (!sg) return
+    const rows = []
+    sg.athletes?.forEach(a => {
       const vals = {}
-      statGroup.labels?.forEach((lbl, i) => { vals[lbl] = a.stats?.[i] || '0' })
-      allPlayers.push({ name: a.athlete?.displayName || '—', team: tm, ...vals })
+      sg.labels?.forEach((lbl, i) => { vals[lbl] = a.stats?.[i] || '0' })
+      if (!sg.labels?.some(lbl => parseFloat(vals[lbl]) !== 0)) return
+      rows.push({
+        name: a.athlete?.displayName || '—',
+        pos:  a.athlete?.position?.abbreviation || '',
+        team: tm,
+        vals,
+        fpts_ppr: calcFpts(vals, cat, 'ppr'),
+        fpts_std: calcFpts(vals, cat, 'std'),
+      })
     })
+    if (rows.length) grouped.push({ tm, teamName, rows })
   })
 
-  if (!allPlayers.length) return <div className="no-data">No {cat} stats available</div>
-
-  // Determine columns based on category
-  const colMap = {
-    passing:   ['C/ATT', 'YDS', 'AVG', 'TD', 'INT', 'QBR'],
-    rushing:   ['CAR',   'YDS', 'AVG', 'TD', 'LNG'],
-    receiving: ['REC',   'YDS', 'AVG', 'TD', 'LNG', 'TGT'],
-    defensive: ['TOT',   'SOLO','SACKS','TFL','PD',  'INT'],
-  }
-  const cols = colMap[cat] || Object.keys(allPlayers[0]).filter(k => k !== 'name' && k !== 'team')
+  if (!grouped.length) return <div className="no-data">No {cat} stats available</div>
 
   return (
-    <table className="player-table">
-      <thead>
-        <tr>
-          <th className="pt-name">Player</th>
-          <th className="pt-team">TM</th>
-          {cols.map(c => <th key={c}>{c}</th>)}
-        </tr>
-      </thead>
-      <tbody>
-        {allPlayers.map((p, i) => (
-          <tr key={i}>
-            <td className="pt-name">{p.name}</td>
-            <td className="pt-team">{p.team}</td>
-            {cols.map(c => <td key={c}>{p[c] || '—'}</td>)}
+    <div className="player-table-wrap">
+      {cat === 'receiving' && <div className="bs-footnote">TGT = targets · YAC = yards after catch · FD = first downs · PPR includes +1/reception</div>}
+      {cat === 'defensive' && <div className="bs-footnote">QH = QB hits · TFL = tackles for loss · PD = passes defended · FF = forced fumble · FR = fumble recovery</div>}
+      <table className="player-table">
+        <thead>
+          <tr>
+            <th className="pt-name">Player</th>
+            <th className="pt-team">TM</th>
+            {cat === 'receiving' && <th title="Position">POS</th>}
+            {cols.map((c,i) => <th key={i} title={c.title}>{c.label}</th>)}
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {grouped.map(({ tm, teamName, rows }) => (
+            <React.Fragment key={tm}>
+              <tr className="pt-team-hdr">
+                <td colSpan={cols.length + (cat === 'receiving' ? 3 : 2)}>{teamName.toUpperCase()}</td>
+              </tr>
+              {rows.map((row, i) => {
+                const inSquad = isSquad(row.name)
+                return (
+                  <tr key={i} className={inSquad ? 'squad-highlight' : ''}>
+                    <td className="pt-name">
+                      {row.name}
+                      {inSquad && <span className="squad-tag-inline">⚡</span>}
+                    </td>
+                    <td className="pt-team">{row.team}</td>
+                    {cat === 'receiving' && <td className="pt-pos">{row.pos}</td>}
+                    {cols.map((col, ci) => {
+                      const val = getVal(col, row)
+                      const cls = col.ppr ? 'fpts-ppr' : col.std ? 'fpts-std' : ''
+                      return <td key={ci} className={cls}>{val}</td>
+                    })}
+                  </tr>
+                )
+              })}
+            </React.Fragment>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
+
+function KickingStats({ espnData, game: g }) {
+  const teamsData = espnData?.boxscore?.players || []
+  const grouped = []
+  teamsData.forEach(td => {
+    const tm = td.team?.abbreviation || ''
+    const teamName = td.team?.displayName || tm
+    const rows = []
+    ;['kicking','punting'].forEach(cat => {
+      const sg = td.statistics?.find(s => s.name === cat)
+      sg?.athletes?.forEach(a => {
+        const vals = {}
+        sg.labels?.forEach((lbl, i) => { vals[lbl] = a.stats?.[i] || '—' })
+        rows.push({ name: a.athlete?.displayName || '—', tm, role: cat === 'kicking' ? 'K' : 'P', vals })
+      })
+    })
+    if (rows.length) grouped.push({ tm, teamName, rows })
+  })
+  if (!grouped.length) return <div className="no-data">No kicking stats available</div>
+  return (
+    <div className="player-table-wrap">
+      <div className="bs-footnote">MISS = missed FG distances · NET = net punt avg · IN20 = punts inside opponent 20 · TB = touchbacks</div>
+      <table className="player-table">
+        <thead>
+          <tr>
+            <th className="pt-name">Player</th><th>TM</th><th>Role</th>
+            <th title="FGs Made">FGM</th><th title="FGs Attempted">FGA</th><th title="FG%">FG%</th>
+            <th title="Longest FG">LNG</th><th title="Missed FG yards">MISS</th>
+            <th title="XP Made">XPM</th><th title="XP Att">XPA</th>
+            <th title="Kickoffs">KO</th><th title="Touchbacks">TB</th>
+            <th title="Punts">NO</th><th title="Punt Yards">YDS</th>
+            <th title="Gross Avg">AVG</th><th title="Net Avg">NET</th>
+            <th title="Longest Punt">LNG</th><th title="Inside 20">IN20</th>
+          </tr>
+        </thead>
+        <tbody>
+          {grouped.map(({ tm, teamName, rows }) => (
+            <React.Fragment key={tm}>
+              <tr className="pt-team-hdr"><td colSpan="18">{teamName.toUpperCase()}</td></tr>
+              {rows.map((r, i) => (
+                <tr key={i}>
+                  <td className="pt-name">{r.name}</td>
+                  <td className="pt-team">{r.tm}</td>
+                  <td className="pt-pos">{r.role}</td>
+                  {r.role === 'K' ? <>
+                    <td>{r.vals['FGM']||'—'}</td>
+                    <td>{r.vals['FGA']||'—'}</td>
+                    <td>{r.vals['PCT']||r.vals['FG%']||'—'}</td>
+                    <td>{r.vals['LNG']||r.vals['LONG']||'—'}</td>
+                    <td className="fpts-miss">{r.vals['MISS']||r.vals['BLK']||'—'}</td>
+                    <td>{r.vals['XPM']||'—'}</td>
+                    <td>{r.vals['XPA']||'—'}</td>
+                    <td>{r.vals['KO']||'—'}</td>
+                    <td>{r.vals['TB']||'—'}</td>
+                    <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+                  </> : <>
+                    <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+                    <td>—</td><td>—</td><td>—</td><td>—</td>
+                    <td>{r.vals['NO']||r.vals['PUNTS']||'—'}</td>
+                    <td>{r.vals['YDS']||'—'}</td>
+                    <td>{r.vals['AVG']||'—'}</td>
+                    <td>{r.vals['NET']||r.vals['NAVG']||'—'}</td>
+                    <td>{r.vals['LNG']||r.vals['LONG']||'—'}</td>
+                    <td>{r.vals['IN20']||'—'}</td>
+                  </>}
+                </tr>
+              ))}
+            </React.Fragment>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function ReturnStats({ espnData, game: g }) {
+  const teamsData = espnData?.boxscore?.players || []
+  const grouped = []
+  teamsData.forEach(td => {
+    const tm = td.team?.abbreviation || ''
+    const teamName = td.team?.displayName || tm
+    const rows = []
+    ;['kickReturns','puntReturns'].forEach(cat => {
+      const sg = td.statistics?.find(s => s.name === cat)
+      sg?.athletes?.forEach(a => {
+        const vals = {}
+        sg.labels?.forEach((lbl, i) => { vals[lbl] = a.stats?.[i] || '—' })
+        if (parseFloat(vals['NO']||vals['RET']||0) === 0) return
+        rows.push({ name: a.athlete?.displayName || '—', tm, type: cat === 'kickReturns' ? 'KR' : 'PR', vals })
+      })
+    })
+    if (rows.length) grouped.push({ tm, teamName, rows })
+  })
+  if (!grouped.length) return <div className="no-data">No return stats available</div>
+  return (
+    <div className="player-table-wrap">
+      <div className="bs-footnote">KR = kickoff return · PR = punt return · FC = fair catches</div>
+      <table className="player-table">
+        <thead>
+          <tr>
+            <th className="pt-name">Player</th><th>TM</th><th>Type</th>
+            <th>RET</th><th>YDS</th><th>AVG</th><th>LNG</th><th>TD</th><th>FC</th>
+          </tr>
+        </thead>
+        <tbody>
+          {grouped.map(({ tm, teamName, rows }) => (
+            <React.Fragment key={tm}>
+              <tr className="pt-team-hdr"><td colSpan="9">{teamName.toUpperCase()}</td></tr>
+              {rows.map((r, i) => (
+                <tr key={i}>
+                  <td className="pt-name">{r.name}</td>
+                  <td className="pt-team">{r.tm}</td>
+                  <td className="pt-pos">{r.type}</td>
+                  <td>{r.vals['NO']||r.vals['RET']||'—'}</td>
+                  <td>{r.vals['YDS']||'—'}</td>
+                  <td>{r.vals['AVG']||'—'}</td>
+                  <td>{r.vals['LNG']||r.vals['LONG']||'—'}</td>
+                  <td>{r.vals['TD']||'—'}</td>
+                  <td>{r.vals['FC']||'—'}</td>
+                </tr>
+              ))}
+            </React.Fragment>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 
 function LiveDrawer({ game: g, espnData, loading }) {
   return (
