@@ -175,8 +175,8 @@ export default function App() {
         ))}
 
         <div className="mob-drawer-footer">
-          <a href="https://nysportsdaily.com" target="_blank" rel="noopener" className="mob-drawer-promo">
-            🗽 NY Sports Daily
+          <a href="https://buymeacoffee.com/mhughes65v" target="_blank" rel="noopener" className="mob-drawer-promo">
+            ☕ Buy me a coffee
           </a>
         </div>
       </nav>
@@ -5818,19 +5818,19 @@ function Sidebar({ activeWeek, setActiveView, squad }) {
         ))}
       </div>
 
-      {/* ── NY SPORTS DAILY PROMO ── */}
+      {/* ── BUY ME A COFFEE PROMO ── */}
       <div className="sb-widget sb-widget-promo">
-        <div className="sb-promo-title">🗽 NY Sports Daily</div>
+        <div className="sb-promo-title">The Final Whistle</div>
         <div className="sb-promo-text">
-          All New York sports, all the time.
+          Independent · Ad-free · Built for NFL fans
         </div>
         <a
-          href="https://nysportsdaily.com"
+          href="https://buymeacoffee.com/mhughes65v"
           target="_blank"
           rel="noopener"
           className="sb-promo-btn"
         >
-          nysportsdaily.com →
+          ☕ Buy me a coffee
         </a>
       </div>
 
@@ -5863,10 +5863,6 @@ function Footer({ squad, favTeam }) {
           {' · '}
           <a href={`https://www.amazon.com?tag=${AMAZON_TAG}`} target="_blank" rel="noopener">
             Shop Amazon
-          </a>
-          {' · '}
-          <a href="https://nysportsdaily.com" target="_blank" rel="noopener">
-            NY Sports Daily
           </a>
         </span>
         <span className="footer-scoring">6pt TD · Standard / PPR</span>
