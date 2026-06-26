@@ -417,6 +417,10 @@ function Masthead({ lastUpdated, hasLiveGame, onRefresh, fontTheme, setFontTheme
         <a className="support-link amazon" href={AMAZON_URL} target="_blank" rel="noopener">
           shop amazon 🛒
         </a>
+        <span className="support-div">·</span>
+        <a className="support-link" href="https://instagram.com/nflboxscore" target="_blank" rel="noopener">
+          📸 @nflboxscore
+        </a>
         {lastUpdated && (
           <span className="live-badge" onClick={onRefresh} title="Click to refresh">
             {hasLiveGame && <span className="live-dot" />}
