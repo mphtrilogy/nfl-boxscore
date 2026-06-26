@@ -2091,3 +2091,284 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   outline-offset: 2px;
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TYPOGRAPHY & STATS TAB CRISP REDESIGN
+   Fixes the ASCII/amateurish look on Stats, type hierarchy throughout
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Stats tabs — complete redesign ──────────────────────────────────────── */
+.stats-tabs {
+  display: flex;
+  align-items: stretch;
+  background: var(--paper-dark);
+  border-bottom: 2px solid var(--rule-hvy);
+  padding: 0;
+  gap: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.stats-tabs::-webkit-scrollbar { display: none; }
+
+.stats-tab-group {
+  display: flex;
+  align-items: center;
+  padding: 0;
+  gap: 0;
+}
+.stats-tab-group + .stats-tab-group {
+  border-left: 1px solid var(--rule);
+}
+
+.stats-tab-label {
+  font-family: var(--font-mono);
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--muted-lt);
+  padding: 0 10px 0 12px;
+  white-space: nowrap;
+  border-right: 1px solid var(--rule);
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  background: var(--paper-mid);
+}
+
+.stats-tab {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  padding: 11px 14px;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all .15s;
+}
+.stats-tab:hover {
+  color: var(--ink);
+  background: rgba(42,31,14,.04);
+}
+.stats-tab.on {
+  color: var(--ink);
+  font-weight: 700;
+  border-bottom-color: var(--gold);
+  background: var(--paper);
+}
+
+/* Stats info bar */
+.stats-info-bar {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  color: var(--muted);
+  letter-spacing: .06em;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--paper-mid);
+}
+
+/* Stats table headers */
+.stats-th {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  padding: 8px 8px;
+  background: var(--ink);
+  color: rgba(255,255,255,.5);
+  text-align: center;
+  white-space: nowrap;
+  border-right: 1px solid rgba(255,255,255,.06);
+}
+.stats-th:last-child { border-right: none; }
+.stats-th-rank { width: 28px; padding: 8px 4px; }
+.stats-th-team { text-align: left; padding-left: 14px; min-width: 52px; }
+.stats-th-player { text-align: left; padding-left: 12px; min-width: 160px; }
+
+/* Sortable */
+.stats-th.sortable { cursor: pointer; user-select: none; }
+.stats-th.sortable:hover { color: rgba(255,255,255,.85); background: #2a1f0e; }
+.stats-th.sort-active { color: var(--gold); background: rgba(200,168,75,.15); }
+.sort-arrow { color: var(--gold); font-size: 10px; margin-left: 2px; }
+
+/* Stats table cells */
+.stats-table { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 11px; }
+.stats-row td { padding: 7px 8px; border-bottom: 1px solid rgba(42,31,14,.06); text-align: center; vertical-align: middle; color: var(--muted); }
+.stats-row:last-child td { border-bottom: none; }
+.stats-row:hover td { background: rgba(200,168,75,.05) !important; }
+.stats-top5 td { background: rgba(200,168,75,.03); }
+.stats-squad-row td { background: rgba(200,168,75,.09) !important; border-left: 3px solid var(--gold); }
+
+.stats-rank { color: var(--muted-lt); font-size: 9px; text-align: center; width: 28px; }
+.stats-team-cell { text-align: left; padding-left: 14px; white-space: nowrap; }
+.stats-abbr { font-family: var(--font-display); font-weight: 700; font-size: 13px; color: var(--ink); letter-spacing: .02em; }
+.stats-squad-dot { display: inline-block; width: 6px; height: 6px; background: var(--gold); border-radius: 50%; margin-left: 5px; vertical-align: middle; }
+.stats-val { text-align: center; color: var(--ink); font-variant-numeric: tabular-nums; }
+.stats-val-primary { font-weight: 700; font-size: 12px; color: var(--ink); }
+.stats-player-cell { text-align: left; padding-left: 12px; font-weight: 600; color: var(--ink); font-family: var(--font-body); font-size: 12px; white-space: nowrap; }
+.stats-squad-tag { color: var(--gold); margin-left: 5px; font-size: 10px; }
+.stats-team-sm { color: var(--muted); font-size: 9px; white-space: nowrap; }
+.stats-pos { color: var(--accent); font-size: 9px; font-weight: 700; letter-spacing: .06em; }
+.stats-fpts { color: #1a5c1a; font-weight: 700; }
+.stats-good { color: #1a5c1a !important; font-weight: 700; }
+.stats-bad  { color: #8b1a1a !important; }
+
+/* Stats footer note */
+.stats-footer-note {
+  font-family: var(--font-mono);
+  font-size: 7.5px;
+  letter-spacing: .08em;
+  color: var(--muted-lt);
+  padding: 10px 16px;
+  border-top: 1px solid var(--rule);
+  text-align: center;
+  background: var(--paper-dark);
+}
+
+/* ── Global type hierarchy improvements ──────────────────────────────────── */
+
+/* Section bar — more presence */
+.section-bar {
+  padding: 10px 18px;
+  letter-spacing: 0;
+}
+.section-bar h2 {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .28em;
+}
+
+/* All monospace data labels — consistent sizing */
+.play-q, .play-clock, .play-team { font-size: 10px; }
+.play-text { font-family: var(--font-body); font-size: 11px; color: var(--ink); }
+
+/* Standings — team names read better with body font */
+.std-abv { font-size: 12.5px; letter-spacing: .02em; }
+.std-nick { font-size: 8.5px; }
+
+/* Schedule game cards — team names larger */
+.sg-abv { font-size: 18px; }
+.sg-city { font-size: 8.5px; }
+.sg-scores { font-size: 21px; }
+
+/* News headlines — body font, proper weight */
+.news-headline {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--ink);
+}
+.news-source {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+/* TV Guide — cleaner */
+.tvg-teams-line {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* Injury table — player names readable */
+.injury-table td.it-name { font-size: 11px; font-weight: 600; }
+.injury-table td.it-pos  { font-size: 8.5px; font-weight: 700; }
+
+/* Draft cards — crisp hierarchy */
+.dt-player { font-size: 14px; font-weight: 700; }
+.dt-pos    { font-size: 9px;  font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.dt-pick   { font-size: 10px; }
+.dt-note   { font-size: 9px; line-height: 1.5; }
+
+/* FW Formula table — player names */
+.fw-name { font-family: var(--font-body); font-size: 12px; font-weight: 600; color: var(--ink); }
+
+/* Trends table — player names */
+.trends-table td.tt-name { font-family: var(--font-body); font-size: 12px; font-weight: 500; }
+.trends-table td.tt-pts  { font-size: 13px; font-weight: 800; }
+
+/* Squad modal — cleaner type */
+.squad-modal-title { font-size: 16px; font-weight: 700; letter-spacing: -.01em; }
+.squad-modal-sub   { font-size: 10px; letter-spacing: .04em; }
+.squad-section-title { font-size: 11px; font-weight: 700; letter-spacing: .14em; }
+
+/* History HOF */
+.hof-player-name { font-size: 15px; font-weight: 700; }
+.hof-pts-display { font-size: 22px; font-weight: 800; color: var(--gold); }
+
+/* Coming soon — better display */
+.cs-title { font-size: 24px; font-weight: 700; letter-spacing: -.02em; }
+.cs-text  { font-size: 14px; line-height: 1.7; color: var(--muted); }
+.cs-date  { font-size: 10px; letter-spacing: .1em; }
+
+/* Week selector pills */
+.ws-btn { font-size: 8.5px; padding: 4px 9px; }
+.ws-btn.on { font-weight: 700; }
+
+/* Filter pills */
+.fpill { font-size: 8.5px; padding: 4px 8px; }
+
+/* Waiver wire */
+.ww-name { font-size: 14px; }
+.ww-reason { font-size: 9.5px; line-height: 1.5; }
+
+/* Resources accordion */
+.res-cat-header { font-size: 11px; letter-spacing: .1em; }
+.res-link { font-size: 13px; }
+
+/* Playroom cards */
+.pr-fact   { font-size: 16px; line-height: 1.65; }
+.pr-prompt { font-size: 18px; line-height: 1.5; }
+
+/* ── Mobile type fixes ────────────────────────────────────────────────────── */
+@media(max-width:600px){
+  .stats-tab { font-size: 8.5px; padding: 10px 10px; letter-spacing: .06em; }
+  .stats-tab-label { font-size: 6.5px; padding: 0 7px; }
+  .stats-th { font-size: 7px; padding: 6px 5px; letter-spacing: .08em; }
+  .stats-table { font-size: 10px; }
+  .stats-player-cell { font-size: 11px; }
+  .news-headline { font-size: 13px; }
+  .sg-abv { font-size: 16px; }
+}
+
+/* ── NY Sports Daily cross-promo removal ─────────────────────────────────── */
+/* Keep the send.js footer link for email only — remove from site UI */
+.sb-widget-promo .sb-promo-title {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.sb-widget-promo .sb-promo-text {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--muted);
+  letter-spacing: .06em;
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+.sb-widget-promo .sb-promo-btn {
+  font-size: 8px;
+  letter-spacing: .1em;
+  background: var(--paper-dark);
+  color: var(--muted);
+  border: 1px solid var(--rule);
+}
+.sb-widget-promo .sb-promo-btn:hover {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+
