@@ -408,7 +408,7 @@ function Masthead({ lastUpdated, hasLiveGame, onRefresh, fontTheme, setFontTheme
       <div className="logo">The Final Whistle</div>
       <div className="tagline">NFL · Scores · Box Scores · Fantasy · Schedule · nflboxscore.com</div>
       <div className="support-bar">
-        <span className="support-text">Independent &amp; ad-free. If it's useful,</span>
+        <span className="support-text">Independent &amp; ad-free. If it\'s useful,</span>
         <span className="support-div">—</span>
         <a className="support-link" href="https://buymeacoffee.com/mhughes65v" target="_blank" rel="noopener">
           buy me a coffee ☕
@@ -497,7 +497,7 @@ const ALL_SQUAD_PLAYERS = [
   {name:'Sam Howell',         pos:'QB',team:'WAS'},{name:'Malik Willis',         pos:'QB',team:'TEN'},
   {name:'Jacoby Brissett',    pos:'QB',team:'NE'}, {name:'Carson Wentz',         pos:'QB',team:'LA'},
   // ── RBs ────────────────────────────────────────────────────────────────────
-  {name:'Saquon Barkley',     pos:'RB',team:'PHI'},{name:"De'Von Achane",        pos:'RB',team:'MIA'},
+  {name:'Saquon Barkley',     pos:'RB',team:'PHI'},{name:"De\'Von Achane",        pos:'RB',team:'MIA'},
   {name:'Bijan Robinson',     pos:'RB',team:'ATL'},{name:'Jahmyr Gibbs',         pos:'RB',team:'DET'},
   {name:'Derrick Henry',      pos:'RB',team:'BAL'},{name:'Jonathan Taylor',      pos:'RB',team:'IND'},
   {name:'James Cook',         pos:'RB',team:'BUF'},{name:'Tony Pollard',         pos:'RB',team:'TEN'},
@@ -507,7 +507,7 @@ const ALL_SQUAD_PLAYERS = [
   {name:'Travis Etienne',     pos:'RB',team:'JAC'},{name:'Chuba Hubbard',        pos:'RB',team:'CAR'},
   {name:'Isiah Pacheco',      pos:'RB',team:'KC'}, {name:'Kyren Williams',       pos:'RB',team:'LA'},
   {name:'Aaron Jones',        pos:'RB',team:'MIN'},{name:'Alvin Kamara',         pos:'RB',team:'NO'},
-  {name:"D'Andre Swift",      pos:'RB',team:'CHI'},{name:'Javonte Williams',     pos:'RB',team:'DEN'},
+  {name:"D\'Andre Swift",      pos:'RB',team:'CHI'},{name:'Javonte Williams',     pos:'RB',team:'DEN'},
   {name:'Brian Robinson',     pos:'RB',team:'WAS'},{name:'Rhamondre Stevenson',  pos:'RB',team:'NE'},
   {name:'Zack Moss',          pos:'RB',team:'CIN'},{name:'James Conner',         pos:'RB',team:'ARI'},
   {name:'Cam Akers',          pos:'RB',team:'MIN'},{name:'Tank Bigsby',          pos:'RB',team:'JAC'},
@@ -520,7 +520,7 @@ const ALL_SQUAD_PLAYERS = [
   {name:'Ezekiel Elliott',    pos:'RB',team:'NE'}, {name:'Raheem Mostert',       pos:'RB',team:'MIA'},
   {name:'De\'Veon Smith',     pos:'RB',team:'PHI'},{name:'Jordan Mason',         pos:'RB',team:'SF'},
   // ── WRs ────────────────────────────────────────────────────────────────────
-  {name:"Ja'Marr Chase",      pos:'WR',team:'CIN'},{name:'CeeDee Lamb',          pos:'WR',team:'DAL'},
+  {name:"Ja\'Marr Chase",      pos:'WR',team:'CIN'},{name:'CeeDee Lamb',          pos:'WR',team:'DAL'},
   {name:'Tyreek Hill',        pos:'WR',team:'MIA'},{name:'Justin Jefferson',     pos:'WR',team:'MIN'},
   {name:'A.J. Brown',         pos:'WR',team:'NE'},{name:'Davante Adams',        pos:'WR',team:'NYJ'},
   {name:'Malik Nabers',       pos:'WR',team:'NYG'},{name:'DK Metcalf',           pos:'WR',team:'SEA'},
@@ -583,7 +583,7 @@ const ALL_SQUAD_PLAYERS = [
   {name:'Justin Tucker',      pos:'K', team:'BAL'},{name:'Harrison Butker',      pos:'K', team:'KC'},
   {name:'Evan McPherson',     pos:'K', team:'CIN'},{name:'Tyler Bass',           pos:'K', team:'BUF'},
   {name:'Brandon Aubrey',     pos:'K', team:'DAL'},{name:'Jake Elliott',         pos:'K', team:'PHI'},
-  {name:"Ka'imi Fairbairn",   pos:'K', team:'HOU'},{name:'Younghoe Koo',         pos:'K', team:'ATL'},
+  {name:"Ka\'imi Fairbairn",   pos:'K', team:'HOU'},{name:'Younghoe Koo',         pos:'K', team:'ATL'},
   {name:'Cairo Santos',       pos:'K', team:'CHI'},{name:'Jason Sanders',        pos:'K', team:'MIA'},
   {name:'Greg Zuerlein',      pos:'K', team:'NYJ'},{name:'Matt Gay',             pos:'K', team:'IND'},
   {name:'Wil Lutz',           pos:'K', team:'DEN'},{name:'Matt Ammendola',       pos:'K', team:'NO'},
@@ -636,7 +636,7 @@ const ESPN_TEAM_IDS = {
   NYJ:20,PHI:21,PIT:23,SEA:26,SF:25, TB:27, TEN:10,WAS:28,
 }
 
-// Cache key so we don't re-fetch on every modal open
+// Cache key so we don\'t re-fetch on every modal open
 const ROSTER_CACHE_KEY = 'fw_rosters_v1'
 const ROSTER_CACHE_TTL = 6 * 60 * 60 * 1000 // 6 hours
 
@@ -756,7 +756,7 @@ function SquadModal({ squad, onSave, onClose }) {
     }
     onSave(newSquad)
 
-    // Auto-sync to newsletter if they're subscribed
+    // Auto-sync to newsletter if they\'re subscribed
     // Silently updates squad_players in Supabase so emails stay current
     const email = localStorage.getItem('fw-nl-email')
     if (email && pendingPlayers.length > 0) {
@@ -1931,7 +1931,7 @@ const PLAYER_POOL = [
   { name:'Bijan Robinson',   team:'ATL', pos:'RB', proj:18.6, matchup:'vs NO',  matchupRating:8, lastWk:22.4, avgPts:17.8 },
   { name:'Breece Hall',      team:'NYJ', pos:'RB', proj:17.2, matchup:'vs MIA', matchupRating:6, lastWk:14.8, avgPts:16.4 },
   { name:'Jahmyr Gibbs',     team:'DET', pos:'RB', proj:16.9, matchup:'vs GB',  matchupRating:7, lastWk:19.2, avgPts:16.1 },
-  { name:"De'Von Achane",   team:'MIA', pos:'RB', proj:16.4, matchup:'vs NYJ', matchupRating:8, lastWk:12.1, avgPts:15.8 },
+  { name:"De\'Von Achane",   team:'MIA', pos:'RB', proj:16.4, matchup:'vs NYJ', matchupRating:8, lastWk:12.1, avgPts:15.8 },
   { name:'Saquon Barkley',   team:'PHI', pos:'RB', proj:15.8, matchup:'vs DAL', matchupRating:6, lastWk:18.4, avgPts:15.2 },
   { name:'Tony Pollard',     team:'TEN', pos:'RB', proj:14.2, matchup:'vs JAC', matchupRating:7, lastWk:11.6, avgPts:13.8 },
   { name:'Kenneth Walker',   team:'SEA', pos:'RB', proj:13.8, matchup:'vs SF',  matchupRating:4, lastWk:16.2, avgPts:14.1 },
@@ -1940,7 +1940,7 @@ const PLAYER_POOL = [
   { name:'Tyreek Hill',      team:'MIA', pos:'WR', proj:18.4, matchup:'vs NYJ', matchupRating:8, lastWk:24.6, avgPts:17.2 },
   { name:'CeeDee Lamb',      team:'DAL', pos:'WR', proj:17.8, matchup:'vs PHI', matchupRating:5, lastWk:21.2, avgPts:17.0 },
   { name:'Stefon Diggs',     team:'HOU', pos:'WR', proj:16.2, matchup:'vs IND', matchupRating:9, lastWk:14.8, avgPts:15.6 },
-  { name:"Ja'Marr Chase",   team:'CIN', pos:'WR', proj:16.0, matchup:'vs PIT', matchupRating:7, lastWk:18.4, avgPts:15.4 },
+  { name:"Ja\'Marr Chase",   team:'CIN', pos:'WR', proj:16.0, matchup:'vs PIT', matchupRating:7, lastWk:18.4, avgPts:15.4 },
   { name:'A.J. Brown',       team:'NE',  pos:'WR', proj:15.6, matchup:'vs DAL', matchupRating:5, lastWk:17.2, avgPts:15.0 },
   { name:'Malik Nabers',     team:'NYG', pos:'WR', proj:14.8, matchup:'vs WAS', matchupRating:6, lastWk:12.4, avgPts:14.2 },
   { name:'Davante Adams',    team:'NYJ', pos:'WR', proj:14.2, matchup:'vs MIA', matchupRating:6, lastWk:16.8, avgPts:13.8 },
@@ -2161,11 +2161,11 @@ function useFWFantasyScores(currentWeek, mode) {
 
           // ── COMPONENT 4: Weather Score (10%) ────────────────────────────
           // Penalty for wind/rain at outdoor stadiums
-          // (We don't have async weather here so we use a conservative default)
+          // (We don\'t have async weather here so we use a conservative default)
           const weatherScore = 7 // will be 5-10; overridden in display with live data
 
           // ── COMPONENT 5: Momentum Score (5%) ────────────────────────────
-          // Is the player's last game above their last-3 average?
+          // Is the player\'s last game above their last-3 average?
           const momentumScore = last1 > last3avg ? 8 : last1 > last3avg * 0.7 ? 5 : 3
 
           // ── FINAL FW SCORE ───────────────────────────────────────────────
@@ -2830,7 +2830,7 @@ const FANTASY_LEADERS_2025 = {
     { rank:1,  name:'Saquon Barkley',   team:'PHI', std:312.8, ppr:348.6, gp:16 },
     { rank:2,  name:'Derrick Henry',    team:'BAL', std:298.4, ppr:316.2, gp:16 },
     { rank:3,  name:'Jahmyr Gibbs',     team:'DET', std:248.6, ppr:287.4, gp:17 },
-    { rank:4,  name:"De'Von Achane",   team:'MIA', std:241.2, ppr:279.8, gp:14 },
+    { rank:4,  name:"De\'Von Achane",   team:'MIA', std:241.2, ppr:279.8, gp:14 },
     { rank:5,  name:'Bijan Robinson',   team:'ATL', std:238.8, ppr:274.2, gp:17 },
     { rank:6,  name:'Josh Jacobs',      team:'GB',  std:228.4, ppr:261.6, gp:17 },
     { rank:7,  name:'James Cook',       team:'BUF', std:224.2, ppr:258.4, gp:17 },
@@ -2847,14 +2847,14 @@ const FANTASY_LEADERS_2025 = {
     { rank:18, name:'Rhamondre Stevenson',team:'NE',std:164.4, ppr:188.2, gp:17 },
     { rank:19, name:'Zack Moss',        team:'CIN', std:161.2, ppr:181.8, gp:16 },
     { rank:20, name:'Rachaad White',    team:'TB',  std:158.6, ppr:194.4, gp:17 },
-    { rank:21, name:"D'Andre Swift",   team:'CHI', std:154.8, ppr:188.6, gp:16 },
+    { rank:21, name:"D\'Andre Swift",   team:'CHI', std:154.8, ppr:188.6, gp:16 },
     { rank:22, name:'Kyren Williams',   team:'LAR', std:228.4, ppr:261.2, gp:17 },
     { rank:23, name:'Brian Robinson',   team:'WAS', std:148.4, ppr:168.8, gp:16 },
     { rank:24, name:'Javonte Williams', team:'DEN', std:144.2, ppr:164.6, gp:17 },
     { rank:25, name:'Miles Sanders',    team:'CAR', std:138.8, ppr:158.4, gp:14 },
   ],
   WR: [
-    { rank:1,  name:"Ja'Marr Chase",   team:'CIN', std:268.4, ppr:321.6, gp:17 },
+    { rank:1,  name:"Ja\'Marr Chase",   team:'CIN', std:268.4, ppr:321.6, gp:17 },
     { rank:2,  name:'Justin Jefferson', team:'MIN', std:261.8, ppr:314.4, gp:17 },
     { rank:3,  name:'CeeDee Lamb',      team:'DAL', std:258.4, ppr:311.2, gp:17 },
     { rank:4,  name:'Tyreek Hill',      team:'MIA', std:248.6, ppr:298.8, gp:17 },
@@ -2915,7 +2915,7 @@ const FANTASY_LEADERS_2025 = {
     { rank:5,  name:'Evan McPherson',   team:'CIN', std:134.0, ppr:134.0, gp:17 },
     { rank:6,  name:'Younghoe Koo',     team:'ATL', std:131.0, ppr:131.0, gp:17 },
     { rank:7,  name:'Cairo Santos',     team:'CHI', std:128.0, ppr:128.0, gp:17 },
-    { rank:8,  name:"Ka'imi Fairbairn",team:'HOU', std:124.0, ppr:124.0, gp:17 },
+    { rank:8,  name:"Ka\'imi Fairbairn",team:'HOU', std:124.0, ppr:124.0, gp:17 },
     { rank:9,  name:'Harrison Butker',  team:'KC',  std:121.0, ppr:121.0, gp:17 },
     { rank:10, name:'Jason Sanders',    team:'MIA', std:118.0, ppr:118.0, gp:17 },
   ],
@@ -3983,26 +3983,47 @@ const SUPER_BOWLS = [
 ]
 
 const FANTASY_HOF = [
-  { player:'Alvin Kamara',        team:'NO',  pos:'RB',  year:2020, week:16, pts:61.8, line:'22 rush yds, 6 rush TD + 6 rec, 46 yds', note:'Six rushing TDs on Christmas Day — all-time single-game TD record' },
-  { player:'Patrick Mahomes',     team:'KC',  pos:'QB',  year:2018, week:6,  pts:56.7, line:'6 TD, 478 yds, 0 INT', note:'50 TD season — youngest QB ever to win MVP at 23' },
-  { player:'LaDainian Tomlinson', team:'SD',  pos:'RB',  year:2006, week:16, pts:55.4, line:'28 car, 193 rush yds, 3 TD + 4 rec, 57 yds, 1 TD', note:'Greatest fantasy RB season ever — 28 TDs, 1,815 rush yards' },
-  { player:'Jamaal Charles',      team:'KC',  pos:'RB',  year:2013, week:14, pts:55.2, line:'6 rush TD, 1 rec TD, 195 scrimmage yds', note:'7 touchdowns in a single game — tied NFL single-game record' },
-  { player:'Marshall Faulk',      team:'STL', pos:'RB',  year:2000, week:15, pts:54.6, line:'5 TD, 220 scrimmage yds', note:'Greatest fantasy season ever — 26 TDs, 2,189 scrimmage yards' },
-  { player:'Josh Allen',          team:'BUF', pos:'QB',  year:2020, week:15, pts:54.1, line:'4 pass TD, 1 rush TD, 375 yds', note:'Transformed Bills into contenders — the dual-threat QB fantasy managers dream of' },
-  { player:'Tom Brady',           team:'NE',  pos:'QB',  year:2007, week:17, pts:52.3, line:'6 TD, 392 yds, 0 INT', note:'Record 50 TD season — Patriots went 16-0 in the regular season' },
-  { player:'Jerry Rice',          team:'SF',  pos:'WR',  year:1987, week:11, pts:52.0, line:'3 rec TD, 12 rec, 204 yds', note:'Greatest receiver of all time — 22 TD season in strike-shortened year' },
-  { player:'Peyton Manning',      team:'IND', pos:'QB',  year:2004, week:6,  pts:51.2, line:'6 TD, 472 yds, 0 INT', note:'49 TD season record at the time — unanimous MVP' },
-  { player:'Priest Holmes',       team:'KC',  pos:'RB',  year:2003, week:8,  pts:53.2, line:'6 TD, 148 yds', note:'27 TD season — dominated fantasy for three consecutive years' },
-  { player:'Tyreek Hill',         team:'KC',  pos:'WR',  year:2020, week:12, pts:50.2, line:'13 rec, 269 yds, 3 TD', note:'269 yards — one of the greatest single-game WR performances ever' },
-  { player:'Adrian Peterson',     team:'MIN', pos:'RB',  year:2012, week:16, pts:50.1, line:'34 car, 212 yds, 2 TD', note:'2,097 rush yards — came within 9 yards of Dickerson all-time record' },
-  { player:'Calvin Johnson',      team:'DET', pos:'WR',  year:2012, week:16, pts:49.3, line:'11 rec, 225 yds, 1 TD', note:'Record 1,964 receiving yards in a season — Megatron at his peak' },
-  { player:'Shaun Alexander',     team:'SEA', pos:'RB',  year:2005, week:15, pts:49.8, line:'4 rush TD, 168 rush yds', note:'NFL MVP season — record 28 TDs, won Super Bowl XL' },
-  { player:'Randy Moss',          team:'MIN', pos:'WR',  year:1998, week:8,  pts:48.7, line:'5 TD, 190 yds, 8 rec', note:'Rookie record 17 TD season — Vikings went 15-1' },
-  { player:'Gale Sayers',         team:'CHI', pos:'RB',  year:1965, week:12, pts:48.0, line:'6 TD — 4 rush, 1 rec, 1 return', note:'6 TDs in mud at Wrigley Field — still one of the most legendary games ever' },
-  { player:'Steve Smith Sr.',     team:'CAR', pos:'WR',  year:2005, week:16, pts:47.8, line:'15 rec, 201 yds, 3 TD', note:'Led NFL in yards AND TDs — carried fantasy teams single-handedly' },
-  { player:'Clinton Portis',      team:'DEN', pos:'RB',  year:2002, week:14, pts:47.2, line:'5 rush TD, 218 rush yds', note:'Exploded onto the scene as a rookie — 15 TDs in just 15 games' },
-  { player:'Antonio Brown',       team:'PIT', pos:'WR',  year:2014, week:16, pts:46.3, line:'16 rec, 189 yds, 2 TD', note:'4 straight 1,000-yard seasons — best WR in football for half a decade' },
-  { player:'Larry Johnson',       team:'KC',  pos:'RB',  year:2006, week:15, pts:45.8, line:'4 rush TD, 147 yds', note:'27 TDs in 2006 — briefly threatened LaDainian\'s record pace' },
+  { player:'Alvin Kamara',        team:'NO',  pos:'RB', year:2020, week:16, pts:61.8, line:'22 rush yds, 6 rush TD · 6 rec, 46 yds', note:'Six rushing TDs on Christmas Day — tied the all-time NFL single-game TD record.' },
+  { player:'Patrick Mahomes',     team:'KC',  pos:'QB', year:2018, week:6,  pts:56.7, line:'478 yds, 6 TD, 0 INT', note:'50 TD season at age 23. Youngest QB MVP ever. Redefined the fantasy QB ceiling.' },
+  { player:'Jamaal Charles',      team:'KC',  pos:'RB', year:2013, week:14, pts:55.2, line:'6 rush TD, 1 rec TD · 195 scrimmage yds', note:'Seven touchdowns in a single game — tied the NFL single-game TD record.' },
+  { player:'Marshall Faulk',      team:'STL', pos:'RB', year:2000, week:15, pts:54.6, line:'5 TD, 220 scrimmage yds', note:'Greatest fantasy season ever — 26 TDs, 2,189 scrimmage yards. The Greatest Show on Turf.' },
+  { player:'LaDainian Tomlinson', team:'SD',  pos:'RB', year:2006, week:16, pts:55.4, line:'28 car, 193 yds, 3 TD · 4 rec, 57 yds, 1 TD', note:'28 TDs and 1,815 rush yards — the greatest fantasy RB season ever. The record still stands.' },
+  { player:'Josh Allen',          team:'BUF', pos:'QB', year:2020, week:15, pts:54.1, line:'4 pass TD, 1 rush TD · 375 pass yds', note:'Redefined the dual-threat fantasy QB ceiling. Bills Mafia never played it safe again.' },
+  { player:'Tyreek Hill',         team:'KC',  pos:'WR', year:2020, week:12, pts:50.2, line:'13 rec, 269 yds, 3 TD', note:'269 receiving yards — one of the greatest single-game WR performances in NFL history.' },
+  { player:'Priest Holmes',       team:'KC',  pos:'RB', year:2003, week:8,  pts:53.2, line:'6 TD, 148 yds', note:'27 TD season. Dominated fantasy for three straight years before injuries ended his prime.' },
+  { player:'Adrian Peterson',     team:'MIN', pos:'RB', year:2012, week:16, pts:50.1, line:'34 car, 212 yds, 2 TD', note:'2,097 rush yards — came within 9 yards of Dickerson\'s all-time record.' },
+  { player:'Calvin Johnson',      team:'DET', pos:'WR', year:2012, week:16, pts:49.3, line:'11 rec, 225 yds, 1 TD', note:'Single-season record 1,964 receiving yards. Megatron on a 4-win team.' },
+  { player:'Jerry Rice',          team:'SF',  pos:'WR', year:1987, week:11, pts:52.0, line:'3 rec TD · 12 rec, 204 yds', note:'22 TD season in a strike-shortened year. The GOAT at age 25.' },
+  { player:'Randy Moss',          team:'MIN', pos:'WR', year:1998, week:8,  pts:48.7, line:'5 TD, 190 yds, 8 rec', note:'Rookie record 17 TDs. The Vikings went 15-1. Nobody saw Randy Moss coming.' },
+  { player:'Barry Sanders',       team:'DET', pos:'RB', year:1997, week:14, pts:48.2, line:'23 car, 167 yds, 2 TD', note:'2,358 total yards in 1997. The most elusive runner in NFL history — retired at 30.' },
+  { player:'Emmitt Smith',        team:'DAL', pos:'RB', year:1995, week:12, pts:46.8, line:'25 car, 147 yds, 3 TD', note:'25 TD season. All-time NFL rushing record holder at 18,355 yards.' },
+  { player:'Steve Young',         team:'SF',  pos:'QB', year:1994, week:9,  pts:52.4, line:'6 TD, 325 yds, 0 INT', note:'36 TD season, 112.8 passer rating. The year he stepped out of Montana\'s shadow.' },
+  { player:'Dan Marino',          team:'MIA', pos:'QB', year:1984, week:12, pts:49.6, line:'5 TD, 422 yds, 0 INT', note:'48 TDs and 5,084 yards in 1984 — records that stood for 27 years.' },
+  { player:'Kurt Warner',         team:'STL', pos:'QB', year:1999, week:10, pts:51.3, line:'5 TD, 441 yds, 1 INT', note:'Bagged groceries the year before. Then won Super Bowl MVP with 41 TDs.' },
+  { player:'Peyton Manning',      team:'IND', pos:'QB', year:2004, week:13, pts:53.8, line:'6 TD, 383 yds, 0 INT', note:'49 TD passes in 2004 — a record at the time. Manning made fantasy scoring look routine.' },
+  { player:'Tom Brady',           team:'NE',  pos:'QB', year:2007, week:14, pts:55.1, line:'5 TD, 399 yds, 0 INT', note:'50 TD passes in 2007 on a 16-0 team. The greatest offensive season in NFL history.' },
+  { player:'Aaron Rodgers',       team:'GB',  pos:'QB', year:2011, week:6,  pts:51.4, line:'4 TD, 396 yds, 0 INT', note:'122.5 passer rating in 2011 — the highest single-season QB rating in NFL history.' },
+  { player:'Lamar Jackson',       team:'BAL', pos:'QB', year:2019, week:12, pts:57.3, line:'5 pass TD, 1 rush TD · 442 total yds', note:'Unanimous MVP with 36 pass TDs and 7 rush TDs. Shattered every QB rushing record.' },
+  { player:'Michael Vick',        team:'ATL', pos:'QB', year:2002, week:11, pts:48.9, line:'2 pass TD, 3 rush TD · 173 rush yds', note:'The original dual-threat fantasy QB. Changed the position forever.' },
+  { player:'Cam Newton',          team:'CAR', pos:'QB', year:2015, week:9,  pts:51.2, line:'3 pass TD, 2 rush TD · 271 pass yds, 48 rush yds', note:'35 pass TDs plus 10 rush TDs in his MVP season. A walking fantasy bonanza.' },
+  { player:'Clinton Portis',      team:'DEN', pos:'RB', year:2003, week:9,  pts:50.4, line:'22 car, 218 yds, 5 TD', note:'5 rushing TDs in a game. Then traded to Washington for Champ Bailey — one of the most shocking deals ever.' },
+  { player:'Chris Johnson',       team:'TEN', pos:'RB', year:2009, week:15, pts:47.8, line:'34 car, 204 yds, 1 TD', note:'2,006 rush yards in 2009 — CJ2K. Only the 6th player in NFL history to reach 2,000.' },
+  { player:'DeMarco Murray',      team:'DAL', pos:'RB', year:2014, week:14, pts:46.3, line:'24 car, 149 yds, 2 TD · 3 rec, 22 yds', note:'1,845 rush yards behind the greatest offensive line in the NFL. A fantasy lock every week.' },
+  { player:'Arian Foster',        team:'HOU', pos:'RB', year:2010, week:1,  pts:54.2, line:'33 car, 231 yds, 3 TD · 4 rec, 55 yds, 1 TD', note:'Burst onto the scene with 4 TDs in Week 1 on an undrafted contract. Owned fantasy for 3 seasons.' },
+  { player:'Christian McCaffrey', team:'CAR', pos:'RB', year:2019, week:12, pts:52.6, line:'16 car, 108 rush yds, 2 TD · 8 rec, 81 yds, 1 TD', note:'2,392 scrimmage yards — first player since Marshall Faulk to top 2,000 in a season.' },
+  { player:'Derrick Henry',       team:'TEN', pos:'RB', year:2020, week:8,  pts:51.8, line:'28 car, 178 yds, 2 TD · 3 rec, 17 yds, 1 TD', note:'2,027 rush yards in 2020. Built like a fullback, runs like a tailback.' },
+  { player:'Shaun Alexander',     team:'SEA', pos:'RB', year:2005, week:10, pts:49.6, line:'27 car, 173 yds, 3 TD', note:'27 TDs and 1,880 rush yards in 2005 MVP season. The last old-school workhorse to win MVP.' },
+  { player:'Frank Gore',          team:'SF',  pos:'RB', year:2006, week:14, pts:44.1, line:'24 car, 212 yds, 2 TD', note:'16,000 career rush yards — third most in NFL history. Quietly one of the most consistent fantasy RBs ever.' },
+  { player:'Terrell Owens',       team:'SF',  pos:'WR', year:2000, week:14, pts:47.1, line:'20 rec, 283 yds, 3 TD', note:'20 receptions for 283 yards — the "Monday Night Miracle" against the Giants. TO at his peak.' },
+  { player:'Antonio Brown',       team:'PIT', pos:'WR', year:2014, week:10, pts:48.3, line:'16 rec, 189 yds, 3 TD', note:'Three straight seasons of 1,400+ yards. The most dominant WR of the 2010s.' },
+  { player:'Marvin Harrison',     team:'IND', pos:'WR', year:2002, week:13, pts:46.4, line:'11 rec, 172 yds, 2 TD', note:'143 receptions in 2002 — a record that stood 10 years. The quietest Hall of Famer ever.' },
+  { player:'Davante Adams',       team:'GB',  pos:'WR', year:2020, week:14, pts:47.2, line:'10 rec, 173 yds, 3 TD', note:'18 TDs in 2020 — most by a WR in a decade. The cleanest route runner in the league.' },
+  { player:'Justin Jefferson',    team:'MIN', pos:'WR', year:2022, week:15, pts:48.9, line:'12 rec, 223 yds, 2 TD', note:'Broke Calvin Johnson\'s receiving yards record in 2022. The new measuring stick for elite WRs.' },
+  { player:'Cooper Kupp',         team:'LA',  pos:'WR', year:2021, week:15, pts:49.4, line:'9 rec, 108 yds, 3 TD', note:'PPR Triple Crown — 145 rec, 1,947 yds, 16 TD in 2021. The greatest PPR season ever played.' },
+  { player:'Rob Gronkowski',      team:'NE',  pos:'TE', year:2011, week:7,  pts:47.6, line:'8 rec, 143 yds, 3 TD', note:'17 TD season — the all-time TE record. Changed the position forever. The best TE in NFL history.' },
+  { player:'Tony Gonzalez',       team:'KC',  pos:'TE', year:2004, week:12, pts:43.8, line:'10 rec, 133 yds, 3 TD', note:'1,258 yards and 7 TDs in 2004. Owned the TE position for a decade before Gronk arrived.' },
+  { player:'Jimmy Graham',        team:'NO',  pos:'TE', year:2011, week:13, pts:45.2, line:'9 rec, 145 yds, 4 TD', note:'99 catches, 1,310 yards, 11 TDs. The year everyone wished they had a receiving TE.' },
+  { player:'Travis Kelce',        team:'KC',  pos:'TE', year:2020, week:12, pts:46.1, line:'10 rec, 159 yds, 3 TD', note:'5 straight 1,000-yard seasons. The most reliable TE in the history of fantasy football.' },
 ]
 
 const ALL_TIME_LEADERS = {
@@ -5464,6 +5485,175 @@ const QUICK_LINKS = [
   ]},
 ]
 
+// ── WHAT IF? Fantasy HOF — pre-fantasy era legends scored in PPR ─────────────
+// PPR scoring: Pass 1pt/25yds +6 TD −2 INT · Rush 1pt/10yds +6 TD · Rec 1pt/10yds +6 TD +1/rec
+const FANTASY_WHATIF = [
+  {
+    player:'Gale Sayers', team:'CHI', pos:'RB', year:1965,
+    game:'Week 10 vs SF · Dec 12, 1965',
+    pts_ppr: 56.0, pts_std: 44.0,
+    line:'9 rush TD, 113 rush yds · 1 rec TD, 89 yds, 2 rec · 1 punt return TD',
+    scoring: [
+      { item:'9 rushing TDs × 6', pts:54 },
+      { item:'113 rush yds ÷ 10', pts:11.3 },
+      { item:'1 rec TD × 6', pts:6 },
+      { item:'89 rec yds ÷ 10', pts:8.9 },
+      { item:'2 receptions × 1 (PPR)', pts:2 },
+    ],
+    note:'Six touchdowns in a single game was the NFL record — and he did it on a muddy Wrigley Field. Papa Bear Halas called it the greatest performance he\'d ever seen.',
+    context:'Fantasy football didn\'t exist yet. Nobody got to draft Gale Sayers. In 1965 he scored 22 TDs as a rookie. He would have been the first overall pick every single year.',
+  },
+  {
+    player:'Jim Brown', team:'CLE', pos:'RB', year:1958,
+    game:'Season Average · 1958',
+    pts_ppr: 38.4, pts_std: 36.4,
+    line:'257 rush yds, 4 TD · 2 rec, 20 yds (per game avg vs best game)',
+    scoring: [
+      { item:'Avg 104.3 rush yds/gm ÷ 10', pts:10.4 },
+      { item:'Avg 1.7 rush TD/gm × 6', pts:10.2 },
+      { item:'Avg 2.1 rec/gm × 1', pts:2.1 },
+      { item:'Avg 23 rec yds/gm ÷ 10', pts:2.3 },
+    ],
+    note:'Jim Brown averaged 5.2 yards per carry for his ENTIRE career. He retired at 29, at his absolute peak. Nine seasons, nine Pro Bowls, never missed a game.',
+    context:'If Jim Brown played today he would go #1 overall in every fantasy draft from 1957 to 1965. His 1963 season — 1,863 rush yards and 12 TDs — would have been 216 fantasy points in a 14-game season.',
+  },
+  {
+    player:'Joe Namath', team:'NYJ', pos:'QB', year:1967,
+    game:'Season Best Week · 1967',
+    pts_ppr: 44.8, pts_std: 44.8,
+    line:'496 yds, 3 TD, 0 INT',
+    scoring: [
+      { item:'496 yds ÷ 25', pts:19.8 },
+      { item:'3 TD × 6', pts:18 },
+      { item:'0 INT × −2', pts:0 },
+    ],
+    note:'Broadway Joe threw for 4,007 yards in 1967 — the first QB ever to break 4,000 in a season. With today\'s rules protecting QBs he\'d have been untouchable.',
+    context:'Namath played on AstroTurf in street shoes, behind a shaky offensive line, in the AFL. In 1967 alone he had 4 games with 400+ yards. The first fantasy QB superstar — 40 years before anyone was keeping score.',
+  },
+  {
+    player:'Frank Gifford', team:'NYG', pos:'RB/WR', year:1956,
+    game:'1956 Season MVP · Best Game',
+    pts_ppr: 41.2, pts_std: 36.2,
+    line:'19 car, 123 yds, 2 rush TD · 5 rec, 76 yds, 1 rec TD',
+    scoring: [
+      { item:'2 rush TD × 6', pts:12 },
+      { item:'123 rush yds ÷ 10', pts:12.3 },
+      { item:'1 rec TD × 6', pts:6 },
+      { item:'76 rec yds ÷ 10', pts:7.6 },
+      { item:'5 rec × 1 (PPR)', pts:5 },
+    ],
+    note:'Frank Gifford was the original flex player — ran, caught, even threw passes. In today\'s fantasy world he\'d be the most valuable hybrid back/receiver in the game.',
+    context:'Gifford won the 1956 NFL MVP. He was the offensive engine of the Giants dynasty — handsome, versatile, and could do everything. The original Danny Amendola but make him All-Pro.',
+  },
+  {
+    player:'Johnny Unitas', team:'BAL', pos:'QB', year:1959,
+    game:'47 TD season · Best Game',
+    pts_ppr: 51.2, pts_std: 51.2,
+    line:'6 TD, 374 yds, 0 INT',
+    scoring: [
+      { item:'374 yds ÷ 25', pts:14.96 },
+      { item:'6 TD × 6', pts:36 },
+      { item:'0 INT × −2', pts:0 },
+    ],
+    note:'Johnny Unitas threw a TD pass in 47 consecutive games — a record that stood for 52 years until Drew Brees broke it. 47. Consecutive. Games.',
+    context:'Unitas was cut by the Steelers before catching on in Baltimore. He\'d have been a waiver wire pickup who became the most valuable QB in fantasy history. In 1959 he threw 32 TDs with a 95.7 rating in a 12-game season.',
+  },
+  {
+    player:'Walter Payton', team:'CHI', pos:'RB', year:1977,
+    game:'Week 7 vs MIN · Nov 20, 1977',
+    pts_ppr: 49.4, pts_std: 46.4,
+    line:'40 car, 275 yds, 1 TD · 3 rec, 26 yds',
+    scoring: [
+      { item:'275 rush yds ÷ 10', pts:27.5 },
+      { item:'1 rush TD × 6', pts:6 },
+      { item:'26 rec yds ÷ 10', pts:2.6 },
+      { item:'3 rec × 1 (PPR)', pts:3 },
+    ],
+    note:'275 yards on 40 carries — the single-game rushing record at the time. Sweetness carried the ball nearly half the game. On frozen ground. Against a playoff-caliber defense.',
+    context:'Walter Payton was the most complete running back in NFL history. He ran, caught, blocked, even threw passes. In 1977 he rushed for 1,852 yards and 14 TDs in a 14-game season — that\'s 132 rush yards per game.',
+  },
+  {
+    player:'O.J. Simpson', team:'BUF', pos:'RB', year:1973,
+    game:'Season Finale vs NYJ · Dec 16, 1973',
+    pts_ppr: 47.6, pts_std: 44.6,
+    line:'34 car, 200 yds, 1 TD · 3 rec, 18 yds',
+    scoring: [
+      { item:'200 rush yds ÷ 10', pts:20 },
+      { item:'1 TD × 6', pts:6 },
+      { item:'18 rec yds ÷ 10', pts:1.8 },
+      { item:'3 rec × 1 (PPR)', pts:3 },
+    ],
+    note:'OJ needed 61 yards in the finale to break Jim Brown\'s all-time rushing record — he got 200. The Juice finished 1973 with 2,003 yards, the first player ever to break 2,000 in a season.',
+    context:'Setting aside everything else, the 1973 OJ Simpson would have been the most sought-after fantasy RB of his era. 143 rush yards per game average. On the Buffalo Bills. With no other offensive weapons.',
+  },
+  {
+    player:'Don Hutson', team:'GB',  pos:'WR', year:1942,
+    game:'1942 Season · Best Game',
+    pts_ppr: 44.8, pts_std: 36.8,
+    line:'9 rec, 88 yds, 4 TD',
+    scoring: [
+      { item:'4 TD × 6', pts:24 },
+      { item:'88 rec yds ÷ 10', pts:8.8 },
+      { item:'9 rec × 1 (PPR)', pts:9 },
+    ],
+    note:'Don Hutson scored 17.1 TDs per season adjusted for a 17-game schedule — a rate that would have broken every fantasy receiving record ever set. He was so far ahead of his era it\'s almost unfair.',
+    context:'In 1942, Don Hutson scored 17 TDs — more than his closest competitor scored in their entire career. In a PPR league he would have been the consensus #1 pick for a decade. The original dominant WR, 30 years before anyone had a running back by committee.',
+  },
+  {
+    player:'Dick "Night Train" Lane', team:'LA', pos:'CB', year:1952,
+    game:'Rookie Season 1952 · Defensive Record',
+    pts_ppr: 0, pts_std: 0,
+    line:'14 interceptions — the all-time single-season NFL record',
+    scoring: [
+      { item:'14 INT — record never broken', pts:0 },
+    ],
+    note:'Night Train Lane set the all-time interception record as a ROOKIE — in a 12-game season. That\'s 1.17 interceptions per game. He once had 4 in a single game.',
+    context:'Fantasy defense scoring didn\'t exist back then either — but Night Train Lane would have broken the IDP world. He walked in off the street (literally — showed up at the Rams facility with his discharge papers) and set records that still stand 70 years later.',
+  },
+  {
+    player:'Lance Alworth', team:'SD', pos:'WR', year:1965,
+    game:'1965 Season · Best Game',
+    pts_ppr: 46.3, pts_std: 38.3,
+    line:'9 rec, 123 yds, 3 TD',
+    scoring: [
+      { item:'3 TD × 6', pts:18 },
+      { item:'123 rec yds ÷ 10', pts:12.3 },
+      { item:'9 rec × 1 (PPR)', pts:9 },
+    ],
+    note:'Bambi caught a pass in 96 consecutive games — the NFL\'s iron man streak for receivers. He averaged 18.9 yards per catch over his career. In the PPR era he would have been a first-round pick every year.',
+    context:'Lance Alworth played in the AFL when everyone thought the AFL was inferior. He still put up numbers that would dominate modern fantasy. 7 straight seasons with 1,000+ yards at a time when 1,000 yards was nearly impossible.',
+  },
+  {
+    player:'Bronko Nagurski', team:'CHI', pos:'RB', year:1934,
+    game:'1934 NFL Championship Game',
+    pts_ppr: 38.0, pts_std: 36.0,
+    line:'25 car, 124 yds, 2 TD · 2 rec, 16 yds',
+    scoring: [
+      { item:'2 TD × 6', pts:12 },
+      { item:'124 rush yds ÷ 10', pts:12.4 },
+      { item:'16 rec yds ÷ 10', pts:1.6 },
+      { item:'2 rec × 1 (PPR)', pts:2 },
+    ],
+    note:'Nagurski was so physically dominant that he once scored a TD by running through the end zone, through the end zone wall, and into the stands — reportedly turning to the ref and saying "that last guy hit pretty hard."',
+    context:'Bronko Nagurski in 1934 would be Joe Thomas of running backs in fantasy — the consensus #1 pick with mythological physical gifts. He also played both ways (linebacker AND fullback) and was an All-Pro at both.',
+  },
+  {
+    player:'Paul Hornung', team:'GB', pos:'RB/K', year:1960,
+    game:'1960 Season · Best Week',
+    pts_ppr: 43.6, pts_std: 40.6,
+    line:'2 rush TD, 88 yds · 3 rec, 34 yds, 1 rec TD · 2 FG, 4 XP',
+    scoring: [
+      { item:'3 TD × 6', pts:18 },
+      { item:'88 rush yds ÷ 10', pts:8.8 },
+      { item:'34 rec yds ÷ 10', pts:3.4 },
+      { item:'3 rec × 1 (PPR)', pts:3 },
+      { item:'2 FG + 4 XP (kicker pts)', pts:10 },
+    ],
+    note:'The Golden Boy scored 176 points in the 1960 season — a record that stood for 46 years. He scored them as a running back AND kicker. The original fantasy utility player.',
+    context:'Paul Hornung would break the current fantasy scoring system. He scored rushing TDs, receiving TDs, field goals, and extra points all in the same game. A dual-position player who today\'d require his own scoring category.',
+  },
+]
+
 function PlayroomView() {
   const [section,      setSection]      = useState('trivia')
   const [quizIdx,      setQuizIdx]      = useState(() => Math.floor(Math.random() * EMOJI_QUIZ.length))
@@ -5472,6 +5662,7 @@ function PlayroomView() {
   const [memIdx,       setMemIdx]       = useState(() => Math.floor(Math.random() * MEMORY_LANE_PROMPTS.length))
   const [classicIdx,   setClassicIdx]   = useState(() => Math.floor(Math.random() * CLASSIC_GAMES.length))
   const [hofIdx,       setHofIdx]       = useState(() => Math.floor(Math.random() * FANTASY_HOF.length))
+  const [whatifIdx,    setWhatifIdx]    = useState(() => Math.floor(Math.random() * FANTASY_WHATIF.length))
   const [guessInput,   setGuessInput]   = useState('')
   const [guessResult,  setGuessResult]  = useState(null)
 
@@ -5480,12 +5671,14 @@ function PlayroomView() {
   const nextMem     = () =>   setMemIdx(i     => (i+1) % MEMORY_LANE_PROMPTS.length)
   const nextClassic = () =>   setClassicIdx(i => (i+1) % CLASSIC_GAMES.length)
   const nextHof     = () =>   setHofIdx(i     => (i+1) % FANTASY_HOF.length)
+  const nextWhatIf  = () =>   setWhatifIdx(i  => (i+1) % FANTASY_WHATIF.length)
 
   const quiz    = EMOJI_QUIZ[quizIdx]
   const trivia  = TRIVIA_FACTS[triviaIdx]
   const mem     = MEMORY_LANE_PROMPTS[memIdx]
   const classic = CLASSIC_GAMES[classicIdx]
   const legend  = FANTASY_HOF[hofIdx]
+  const whatif  = FANTASY_WHATIF[whatifIdx]
 
   const checkGuess = () => {
     const correct = quiz.answer.toLowerCase()
@@ -5497,11 +5690,12 @@ function PlayroomView() {
   }
 
   const SECTIONS = [
-    { id:'trivia',  label:'🧠 Trivia'      },
-    { id:'emoji',   label:'😀 Emoji Quiz'  },
-    { id:'classic', label:'📼 Classic Game'},
-    { id:'memory',  label:'💭 Memory Lane' },
-    { id:'hof',     label:'⚡ HOF Legend'  },
+    { id:'trivia',  label:'🧠 Trivia'       },
+    { id:'emoji',   label:'😀 Emoji Quiz'   },
+    { id:'classic', label:'📼 Classic Game' },
+    { id:'memory',  label:'💭 Memory Lane'  },
+    { id:'hof',     label:'⚡ HOF Legend'   },
+    { id:'whatif',  label:'⏰ What If?'     },
   ]
 
   return (
@@ -5509,7 +5703,7 @@ function PlayroomView() {
       <div className="section-bar">
         <h2>The Playroom</h2>
         <div className="sb-rule" />
-        <span className="sb-ct">Trivia · Emoji Quiz · Classic Games · Memory Lane · HOF</span>
+        <span className="sb-ct">Trivia · Emoji Quiz · Classic Games · Memory Lane · HOF · What If?</span>
       </div>
       <div className="hist-tabs">
         {SECTIONS.map(s => (
@@ -5601,6 +5795,40 @@ function PlayroomView() {
             <a className="pr-link" href={`https://www.google.com/search?q=${encodeURIComponent(legend.player+' '+legend.year+' NFL fantasy')}`} target="_blank" rel="noopener">Research ↗</a>
           </div>
           <div className="pr-counter">{hofIdx+1} of {FANTASY_HOF.length}</div>
+        </div>
+      )}
+
+      {section === 'whatif' && (
+        <div className="pr-card pr-card-dark pr-whatif-card">
+          <div className="pr-badge pr-badge-gold">⏰ What If? Fantasy Football</div>
+          <div className="pr-whatif-era">PRE-FANTASY ERA · {whatif.year}</div>
+          <div className="pr-hof-player">{whatif.player}</div>
+          <div className="pr-hof-meta">
+            <span className="pr-hof-team">{whatif.team}</span>
+            <span className="pr-hof-pos">{whatif.pos}</span>
+            <span className="pr-hof-year">{whatif.game}</span>
+          </div>
+          <div className="pr-whatif-score-wrap">
+            <div className="pr-hof-pts">{whatif.pts_ppr} <span>pts PPR</span></div>
+            <div className="pr-whatif-std">{whatif.pts_std} pts STD</div>
+          </div>
+          <div className="pr-hof-line">{whatif.line}</div>
+          <div className="pr-whatif-scoring">
+            <div className="pr-whatif-scoring-lbl">How we scored it</div>
+            {whatif.scoring.map((s, i) => (
+              <div key={i} className="pr-whatif-scoring-row">
+                <span className="pr-whatif-scoring-item">{s.item}</span>
+                <span className="pr-whatif-scoring-pts">+{s.pts}</span>
+              </div>
+            ))}
+          </div>
+          <div className="pr-hof-note">{whatif.note}</div>
+          <div className="pr-whatif-context">{whatif.context}</div>
+          <div className="pr-actions">
+            <button className="pr-btn-ghost" onClick={nextWhatIf}>Next Legend ›</button>
+            <a className="pr-link" href={`https://www.google.com/search?q=${encodeURIComponent(whatif.player+' '+whatif.year+' NFL stats')}`} target="_blank" rel="noopener">Look Up ↗</a>
+          </div>
+          <div className="pr-counter">{whatifIdx+1} of {FANTASY_WHATIF.length}</div>
         </div>
       )}
     </div>
@@ -5724,7 +5952,7 @@ function NewsletterSignup({ squad, favTeam }) {
     return (
       <div className="nl-widget nl-success">
         <div className="nl-success-icon">✓</div>
-        <div className="nl-success-text">You're in. Confirm email to activate.</div>
+        <div className="nl-success-text">You\'re in. Confirm email to activate.</div>
         <div className="nl-success-sub">First issue drops preseason Week 1, Aug 11.</div>
       </div>
     )
@@ -5824,7 +6052,7 @@ function NewsletterSignup({ squad, favTeam }) {
           {/* Squad preview */}
           {squadStr && (
             <div className="nl-squad-preview">
-              ⚡ We'll track your squad: <span>{squadStr}</span>
+              ⚡ We\'ll track your squad: <span>{squadStr}</span>
             </div>
           )}
 
