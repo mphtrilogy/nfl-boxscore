@@ -109,7 +109,7 @@ const FANTASY_HOF = [
     note:'27 TD season — dominated fantasy football for three straight years before injuries derailed him.' },
   { player:'Adrian Peterson',     team:'MIN', pos:'RB', year:2012, week:16, pts:50.1,
     line:'34 car, 212 yds, 2 TD',
-    note:'2,097 rush yards — came within 9 yards of Eric Dickerson's all-time single-season record.' },
+    note:'2,097 rush yards — came within 9 yards of Eric Dickerson\'s all-time single-season record.' },
   { player:'Calvin Johnson',      team:'DET', pos:'WR', year:2012, week:16, pts:49.3,
     line:'11 rec, 225 yds, 1 TD',
     note:'Single-season record 1,964 receiving yards. Megatron at his absolute peak, on a team that won 4 games.' },
@@ -128,7 +128,7 @@ const FANTASY_HOF = [
     note:'25 TD season — part of a dynasty. All-time NFL rushing record holder at 18,355 yards.' },
   { player:'Steve Young',         team:'SF',  pos:'QB', year:1994, week:9,  pts:52.4,
     line:'6 TD, 325 yds, 0 INT',
-    note:'36 TD season, 112.8 passer rating. The year he finally stepped out of Montana's shadow.' },
+    note:'36 TD season, 112.8 passer rating. The year he finally stepped out of Montana\'s shadow.' },
   { player:'Dan Marino',          team:'MIA', pos:'QB', year:1984, week:12, pts:49.6,
     line:'5 TD, 422 yds, 0 INT',
     note:'48 TD passes and 5,084 yards in 1984 — records that stood for 27 years. The greatest arm of his era.' },
@@ -137,7 +137,7 @@ const FANTASY_HOF = [
     note:'Bagged groceries the year before. Then threw for 4,353 yards and 41 TDs and won the Super Bowl MVP.' },
   { player:'Peyton Manning',      team:'IND', pos:'QB', year:2004, week:13, pts:53.8,
     line:'6 TD, 383 yds, 0 INT',
-    note:'49 TD passes in 2004 — a record that stood until Brady broke it. Fantasy QBs didn't get this good until Mahomes.' },
+    note:'49 TD passes in 2004 — a record that stood until Brady broke it. Fantasy QBs didn\'t get this good until Mahomes.' },
   { player:'Tom Brady',           team:'NE',  pos:'QB', year:2007, week:14, pts:55.1,
     line:'5 TD, 399 yds, 0 INT',
     note:'50 TD passes in 2007 — a record at the time. The Patriots went 16-0. The greatest offensive season in NFL history.' },
@@ -195,7 +195,7 @@ const FANTASY_HOF = [
     note:'18 TD season — the most by a WR in a decade. The cleanest route runner in the league.' },
   { player:'Justin Jefferson',    team:'MIN', pos:'WR', year:2022, week:15, pts:48.9,
     line:'12 rec, 223 yds, 2 TD',
-    note:'Broke Calvin Johnson's receiving yards record in 2022. The new measuring stick for elite WRs.' },
+    note:'Broke Calvin Johnson\'s receiving yards record in 2022. The new measuring stick for elite WRs.' },
   { player:'Cooper Kupp',         team:'LA',  pos:'WR', year:2021, week:15, pts:49.4,
     line:'9 rec, 108 yds, 3 TD',
     note:'Triple Crown season — most receptions (145), most yards (1,947), most TDs (16). The greatest PPR season ever.' },
@@ -223,7 +223,7 @@ async function espnFetch(path) {
 // Determine week context per send type
 // Monday  → recapWeek = last completed week (all Sunday games)
 // Tuesday → recapWeek = current week (for MNF which just finished)
-// Thu/Fri → currentWeek = this week's games
+// Thu/Fri → currentWeek = this week\'s games
 async function getWeekContext(sendType) {
   const sb   = await espnFetch('/scoreboard')
   const week = sb?.week?.number || 1
@@ -239,7 +239,7 @@ async function getWeekContext(sendType) {
   return { currentWeek: week, recapWeek: null }
 }
 
-// Season type helper — mirrors the app's espnSeasonType()
+// Season type helper — mirrors the app\'s espnSeasonType()
 // ESPN: seasontype=1 (preseason Aug 7–Sep 8), seasontype=2 (regular Sep 9+)
 function getSeasonType() {
   const now            = new Date()
@@ -601,7 +601,7 @@ body{margin:0;padding:0;background:#f0ebe0;font-family:Georgia,serif}
 `
 
 // ── Scoring mode helper ───────────────────────────────────────────────────────
-// Always use this to get a player's fantasy points — never access .fpts directly
+// Always use this to get a player\'s fantasy points — never access .fpts directly
 // in render functions. mode = 'ppr' | 'std'
 function fp(player, mode) {
   return mode === 'std' ? (player.fpts_std ?? player.fpts) : (player.fpts_ppr ?? player.fpts)
@@ -885,7 +885,7 @@ function renderWaiverSection(parsedGames, nextWeek, squad, mode = 'ppr') {
   return `
 <span class="sec-label">📋 Waiver Wire Targets — Week ${nextWeek}</span>
 ${rows}
-<div class="callout">Claims close Wednesday in most leagues. Lead with your top priority — don't split waiver position across multiple speculative adds.</div>
+<div class="callout">Claims close Wednesday in most leagues. Lead with your top priority — don\'t split waiver position across multiple speculative adds.</div>
 <div class="cta-wrap">
   <a class="cta" href="${SITE_URL}">Full Waiver Analysis &rarr;</a>
 </div>`
@@ -1007,7 +1007,7 @@ async function fetchTeamNews(favTeam) {
     }
   } catch { /* silent — fall through to Google News */ }
 
-  // Source 2: Google News RSS via the app's /api/gnews proxy
+  // Source 2: Google News RSS via the app\'s /api/gnews proxy
   // Builds same query as buildNewsUrl() in the app
   try {
     if (articles.length < 4 && info) {
@@ -1070,7 +1070,7 @@ const FANTASY_WHATIF = [
     player:'Gale Sayers', team:'CHI', pos:'RB', year:1965,
     game:'Week 10 vs SF · Dec 12, 1965', pts_ppr:56.0, pts_std:44.0,
     line:'9 rush TD, 113 rush yds · 1 rec TD, 89 yds, 2 rec · 1 punt return TD',
-    note:'Six touchdowns in a single game — Papa Bear Halas called it the greatest performance he'd ever seen. On a muddy Wrigley Field.',
+    note:'Six touchdowns in a single game — Papa Bear Halas called it the greatest performance he\'d ever seen. On a muddy Wrigley Field.',
     whatif:true,
   },
   {
@@ -1091,7 +1091,7 @@ const FANTASY_WHATIF = [
     player:'Frank Gifford', team:'NYG', pos:'RB/WR', year:1956,
     game:'1956 NFL MVP Season · Best Game', pts_ppr:41.2, pts_std:36.2,
     line:'19 car, 123 yds, 2 rush TD · 5 rec, 76 yds, 1 rec TD',
-    note:'The original flex player — ran, caught, even threw passes. In today's PPR world he'd be the most valuable hybrid back in the game.',
+    note:'The original flex player — ran, caught, even threw passes. In today\'s PPR world he\'d be the most valuable hybrid back in the game.',
     whatif:true,
   },
   {
@@ -1450,7 +1450,7 @@ export default async function handler(req) {
 
     // 3. Identify which games to deep-fetch (completed since last night)
     const targetEvents  = getTargetEvents(
-      sendType === 'tuesday' ? recapEvents :  // MNF = current week's final game
+      sendType === 'tuesday' ? recapEvents :  // MNF = current week\'s final game
       sendType === 'friday'  ? currentEvents : // TNF = current week Thursday game
       recapEvents,
       sendType
