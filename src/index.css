@@ -2854,3 +2854,79 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 /* Team stats win highlight */
 .ts-win { color: var(--green) !important; font-weight: 700 !important; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   WHAT IF? Fantasy HOF card
+   ═══════════════════════════════════════════════════════════════════════════ */
+.pr-whatif-card { border-color: rgba(200,168,75,.5); }
+
+.pr-whatif-era {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: rgba(200,168,75,.6);
+  margin-bottom: 10px;
+}
+
+.pr-whatif-score-wrap { margin: 12px 0 6px; }
+.pr-whatif-std {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: rgba(255,255,255,.4);
+  letter-spacing: .06em;
+  margin-top: 3px;
+}
+
+/* Scoring breakdown */
+.pr-whatif-scoring {
+  background: rgba(0,0,0,.25);
+  border: 1px solid rgba(200,168,75,.15);
+  border-radius: 3px;
+  padding: 10px 14px;
+  margin: 14px 0;
+}
+.pr-whatif-scoring-lbl {
+  font-family: var(--font-mono);
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: rgba(200,168,75,.5);
+  margin-bottom: 8px;
+}
+.pr-whatif-scoring-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(255,255,255,.04);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+}
+.pr-whatif-scoring-row:last-child { border-bottom: none; }
+.pr-whatif-scoring-item { color: rgba(255,255,255,.65); flex: 1; }
+.pr-whatif-scoring-pts {
+  color: var(--gold);
+  font-weight: 700;
+  min-width: 36px;
+  text-align: right;
+}
+
+/* Context note */
+.pr-whatif-context {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: rgba(255,255,255,.4);
+  letter-spacing: .04em;
+  line-height: 1.6;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,.08);
+}
+
+@media(max-width:600px){
+  .pr-whatif-scoring { padding: 8px 10px; }
+  .pr-whatif-scoring-row { font-size: 8.5px; }
+}
