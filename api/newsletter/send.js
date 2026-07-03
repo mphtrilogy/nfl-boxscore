@@ -82,42 +82,132 @@ const STADIUM_COORDS = {
 
 // ── Fantasy HOF data (rotating tidbit for Thu/Fri) ───────────────────────────
 const FANTASY_HOF = [
-  { player:'Alvin Kamara',        pos:'RB', team:'NO',  year:2020, week:16, pts:61.8,
+  // ── All-time single game explosion performances ──
+  { player:'Alvin Kamara',        team:'NO',  pos:'RB', year:2020, week:16, pts:61.8,
     line:'22 rush yds, 6 rush TD · 6 rec, 46 yds',
-    note:'Six rushing TDs on Christmas Day — all-time single-game TD record.' },
-  { player:'Patrick Mahomes',     pos:'QB', team:'KC',  year:2018, week:6,  pts:56.7,
-    line:'6 TD, 478 yds, 0 INT',
-    note:'50 TD season. Youngest QB ever to win MVP at 23.' },
-  { player:'LaDainian Tomlinson', pos:'RB', team:'SD',  year:2006, week:16, pts:55.4,
-    line:'28 car, 193 yds, 3 TD · 4 rec, 57 yds, 1 TD',
-    note:'Greatest fantasy RB season ever — 28 TDs, 1,815 rush yards.' },
-  { player:'Marshall Faulk',      pos:'RB', team:'STL', year:2000, week:15, pts:54.6,
+    note:'Six rushing TDs on Christmas Day — tied the all-time NFL single-game TD record. The greatest fantasy game ever played.' },
+  { player:'Patrick Mahomes',     team:'KC',  pos:'QB', year:2018, week:6,  pts:56.7,
+    line:'478 yds, 6 TD, 0 INT',
+    note:'Part of a historic 50-TD season at age 23. Youngest QB MVP ever. Redefined what a fantasy QB could be.' },
+  { player:'Jamaal Charles',      team:'KC',  pos:'RB', year:2013, week:14, pts:55.2,
+    line:'6 rush TD, 1 rec TD · 195 scrimmage yds',
+    note:'Seven touchdowns in a single game — tied the NFL single-game TD record. The most electric fantasy performance of the 2010s.' },
+  { player:'Marshall Faulk',      team:'STL', pos:'RB', year:2000, week:15, pts:54.6,
     line:'5 TD, 220 scrimmage yds',
-    note:'26 TDs, 2,189 scrimmage yards. The greatest fantasy season ever played.' },
-  { player:'Jamaal Charles',      pos:'RB', team:'KC',  year:2013, week:14, pts:55.2,
-    line:'6 rush TD, 1 rec TD, 195 scrimmage yds',
-    note:'7 touchdowns in a single game — tied the NFL single-game record.' },
-  { player:'Tyreek Hill',         pos:'WR', team:'KC',  year:2020, week:12, pts:50.2,
+    note:'Greatest fantasy season ever — 26 TDs, 2,189 scrimmage yards. The Greatest Show on Turf at its peak.' },
+  { player:'LaDainian Tomlinson', team:'SD',  pos:'RB', year:2006, week:16, pts:55.4,
+    line:'28 car, 193 yds, 3 TD · 4 rec, 57 yds, 1 TD',
+    note:'The greatest fantasy RB season ever — 28 TDs, 1,815 rush yards. The record still stands.' },
+  { player:'Josh Allen',          team:'BUF', pos:'QB', year:2020, week:15, pts:54.1,
+    line:'4 pass TD, 1 rush TD · 375 pass yds',
+    note:'Redefined what a dual-threat fantasy QB could deliver. The ceiling no one had seen before.' },
+  { player:'Tyreek Hill',         team:'KC',  pos:'WR', year:2020, week:12, pts:50.2,
     line:'13 rec, 269 yds, 3 TD',
     note:'269 receiving yards — one of the greatest single-game WR performances in NFL history.' },
-  { player:'Adrian Peterson',     pos:'RB', team:'MIN', year:2012, week:16, pts:50.1,
-    line:'34 car, 212 yds, 2 TD',
-    note:'2,097 rush yards — came within 9 yards of Dickerson\'s all-time record.' },
-  { player:'Josh Allen',          pos:'QB', team:'BUF', year:2020, week:15, pts:54.1,
-    line:'4 pass TD, 1 rush TD, 375 yds',
-    note:'Redefined what a fantasy QB could be. Dual-threat ceiling no one had seen.' },
-  { player:'Calvin Johnson',      pos:'WR', team:'DET', year:2012, week:16, pts:49.3,
-    line:'11 rec, 225 yds, 1 TD',
-    note:'Record 1,964 receiving yards in a season. Megatron at his absolute peak.' },
-  { player:'Jerry Rice',          pos:'WR', team:'SF',  year:1987, week:11, pts:52.0,
-    line:'3 rec TD, 12 rec, 204 yds',
-    note:'22 TD season in a strike-shortened year. The greatest receiver of all time.' },
-  { player:'Randy Moss',          pos:'WR', team:'MIN', year:1998, week:8,  pts:48.7,
-    line:'5 TD, 190 yds, 8 rec',
-    note:'Rookie record 17 TD season. Vikings went 15-1. Nobody saw it coming.' },
-  { player:'Priest Holmes',       pos:'RB', team:'KC',  year:2003, week:8,  pts:53.2,
+  { player:'Priest Holmes',       team:'KC',  pos:'RB', year:2003, week:8,  pts:53.2,
     line:'6 TD, 148 yds',
-    note:'27 TD season — dominated fantasy for three straight years.' },
+    note:'27 TD season — dominated fantasy football for three straight years before injuries derailed him.' },
+  { player:'Adrian Peterson',     team:'MIN', pos:'RB', year:2012, week:16, pts:50.1,
+    line:'34 car, 212 yds, 2 TD',
+    note:'2,097 rush yards — came within 9 yards of Eric Dickerson's all-time single-season record.' },
+  { player:'Calvin Johnson',      team:'DET', pos:'WR', year:2012, week:16, pts:49.3,
+    line:'11 rec, 225 yds, 1 TD',
+    note:'Single-season record 1,964 receiving yards. Megatron at his absolute peak, on a team that won 4 games.' },
+  { player:'Jerry Rice',          team:'SF',  pos:'WR', year:1987, week:11, pts:52.0,
+    line:'3 rec TD · 12 rec, 204 yds',
+    note:'22 TD season in a strike-shortened year. The greatest receiver of all time at age 25.' },
+  { player:'Randy Moss',          team:'MIN', pos:'WR', year:1998, week:8,  pts:48.7,
+    line:'5 TD, 190 yds, 8 rec',
+    note:'Rookie record 17 TD season. The Vikings went 15-1 and nobody saw Randy coming.' },
+  // ── Season-long dominance ──
+  { player:'Barry Sanders',       team:'DET', pos:'RB', year:1997, week:14, pts:48.2,
+    line:'23 car, 167 yds, 2 TD',
+    note:'2,358 total yards in 1997. The most elusive runner in NFL history — retired at 30 with 15,269 career rush yards.' },
+  { player:'Emmitt Smith',        team:'DAL', pos:'RB', year:1995, week:12, pts:46.8,
+    line:'25 car, 147 yds, 3 TD',
+    note:'25 TD season — part of a dynasty. All-time NFL rushing record holder at 18,355 yards.' },
+  { player:'Steve Young',         team:'SF',  pos:'QB', year:1994, week:9,  pts:52.4,
+    line:'6 TD, 325 yds, 0 INT',
+    note:'36 TD season, 112.8 passer rating. The year he finally stepped out of Montana's shadow.' },
+  { player:'Dan Marino',          team:'MIA', pos:'QB', year:1984, week:12, pts:49.6,
+    line:'5 TD, 422 yds, 0 INT',
+    note:'48 TD passes and 5,084 yards in 1984 — records that stood for 27 years. The greatest arm of his era.' },
+  { player:'Kurt Warner',         team:'STL', pos:'QB', year:1999, week:10, pts:51.3,
+    line:'5 TD, 441 yds, 1 INT',
+    note:'Bagged groceries the year before. Then threw for 4,353 yards and 41 TDs and won the Super Bowl MVP.' },
+  { player:'Peyton Manning',      team:'IND', pos:'QB', year:2004, week:13, pts:53.8,
+    line:'6 TD, 383 yds, 0 INT',
+    note:'49 TD passes in 2004 — a record that stood until Brady broke it. Fantasy QBs didn't get this good until Mahomes.' },
+  { player:'Tom Brady',           team:'NE',  pos:'QB', year:2007, week:14, pts:55.1,
+    line:'5 TD, 399 yds, 0 INT',
+    note:'50 TD passes in 2007 — a record at the time. The Patriots went 16-0. The greatest offensive season in NFL history.' },
+  { player:'Aaron Rodgers',       team:'GB',  pos:'QB', year:2011, week:6,  pts:51.4,
+    line:'4 TD, 396 yds, 0 INT',
+    note:'45 TDs, 6 INTs, 122.5 passer rating in 2011. The highest single-season QB rating in NFL history.' },
+  // ── Unforgettable single weeks ──
+  { player:'Shaun Alexander',     team:'SEA', pos:'RB', year:2005, week:10, pts:49.6,
+    line:'27 car, 173 yds, 3 TD',
+    note:'27 TDs and 1,880 rush yards in 2005. The last old-school workhorse RB to win MVP.' },
+  { player:'Clinton Portis',      team:'DEN', pos:'RB', year:2003, week:9,  pts:50.4,
+    line:'22 car, 218 yds, 5 TD',
+    note:'5 rushing TDs in a game. Traded to Washington after the season for Champ Bailey — one of the most shocking deals ever.' },
+  { player:'Chris Johnson',       team:'TEN', pos:'RB', year:2009, week:15, pts:47.8,
+    line:'34 car, 204 yds, 1 TD',
+    note:'2,006 rush yards in 2009 — only the 6th player in NFL history to reach 2,000 in a season.' },
+  { player:'DeMarco Murray',      team:'DAL', pos:'RB', year:2014, week:14, pts:46.3,
+    line:'24 car, 149 yds, 2 TD + 3 rec, 22 yds',
+    note:'1,845 rush yards on the greatest offensive line in the NFL. Every week felt like a lock.' },
+  { player:'Arian Foster',        team:'HOU', pos:'RB', year:2010, week:1,  pts:54.2,
+    line:'33 car, 231 yds, 3 TD · 4 rec, 55 yds, 1 TD',
+    note:'Burst onto the scene with 4 TDs in Week 1 on an undrafted contract. Owned fantasy football for 3 seasons.' },
+  { player:'Terrell Owens',       team:'SF',  pos:'WR', year:2000, week:14, pts:47.1,
+    line:'20 rec, 283 yds, 3 TD',
+    note:'20 receptions for 283 yards in a single game — the famous "Monday Night Miracle" against the Giants.' },
+  { player:'Antonio Brown',       team:'PIT', pos:'WR', year:2014, week:10, pts:48.3,
+    line:'16 rec, 189 yds, 3 TD',
+    note:'The most dominant WR of his era. Three straight seasons of 1,400+ yards during his Pittsburgh prime.' },
+  { player:'Marvin Harrison',     team:'IND', pos:'WR', year:2002, week:13, pts:46.4,
+    line:'11 rec, 172 yds, 2 TD',
+    note:'143 receptions in 2002 — a record that stood for 10 years. The quietest Hall of Famer ever.' },
+  { player:'Rob Gronkowski',      team:'NE',  pos:'TE', year:2011, week:7,  pts:47.6,
+    line:'8 rec, 143 yds, 3 TD',
+    note:'17 TD season in 2011 — the all-time TE record. Changed the position forever. The best TE in NFL history.' },
+  { player:'Tony Gonzalez',       team:'KC',  pos:'TE', year:2004, week:12, pts:43.8,
+    line:'10 rec, 133 yds, 3 TD',
+    note:'1,258 yards and 7 TDs in 2004. The greatest TE of his era — owned the position for a decade before Gronk arrived.' },
+  { player:'Jimmy Graham',        team:'NO',  pos:'TE', year:2011, week:13, pts:45.2,
+    line:'9 rec, 145 yds, 4 TD',
+    note:'The year Jimmy Graham made every team wish they had a receiving TE. 99 catches, 1,310 yards, 11 TDs.' },
+  { player:'Travis Kelce',        team:'KC',  pos:'TE', year:2020, week:12, pts:46.1,
+    line:'10 rec, 159 yds, 3 TD',
+    note:'5 straight 1,000-yard seasons and counting. The most reliable TE in fantasy history.' },
+  { player:'Michael Vick',        team:'ATL', pos:'QB', year:2002, week:11, pts:48.9,
+    line:'2 pass TD, 3 rush TD · 173 rush yds',
+    note:'The original dual-threat fantasy QB. Nobody had seen a QB run like this. Changed the position forever.' },
+  { player:'Cam Newton',          team:'CAR', pos:'QB', year:2015, week:9,  pts:51.2,
+    line:'3 pass TD, 2 rush TD · 271 pass yds, 48 rush yds',
+    note:'35 TD passes plus 10 rushing TDs in 2015 MVP season. Every week was a fantasy bonanza.' },
+  { player:'Lamar Jackson',       team:'BAL', pos:'QB', year:2019, week:12, pts:57.3,
+    line:'5 pass TD, 1 rush TD · 442 total yds',
+    note:'Unanimous MVP with 36 pass TDs and 7 rush TDs. Shattered every QB rushing record ever set.' },
+  { player:'Davante Adams',       team:'GB',  pos:'WR', year:2020, week:14, pts:47.2,
+    line:'10 rec, 173 yds, 3 TD',
+    note:'18 TD season — the most by a WR in a decade. The cleanest route runner in the league.' },
+  { player:'Justin Jefferson',    team:'MIN', pos:'WR', year:2022, week:15, pts:48.9,
+    line:'12 rec, 223 yds, 2 TD',
+    note:'Broke Calvin Johnson's receiving yards record in 2022. The new measuring stick for elite WRs.' },
+  { player:'Cooper Kupp',         team:'LA',  pos:'WR', year:2021, week:15, pts:49.4,
+    line:'9 rec, 108 yds, 3 TD',
+    note:'Triple Crown season — most receptions (145), most yards (1,947), most TDs (16). The greatest PPR season ever.' },
+  { player:'Christian McCaffrey', team:'CAR', pos:'RB', year:2019, week:12, pts:52.6,
+    line:'16 car, 108 rush yds, 2 rush TD · 8 rec, 81 yds, 1 TD',
+    note:'2,392 scrimmage yards in 2019 — the first player since Marshall Faulk to top 2,000 in a season.' },
+  { player:'Derrick Henry',       team:'TEN', pos:'RB', year:2020, week:8,  pts:51.8,
+    line:'28 car, 178 yds, 2 TD · 3 rec, 17 yds, 1 TD',
+    note:'2,027 rush yards in 2020 — the 5th player ever to top 2,000. Built like a fullback, runs like a tailback.' },
+  { player:'Frank Gore',          team:'SF',  pos:'RB', year:2006, week:14, pts:44.1,
+    line:'24 car, 212 yds, 2 TD',
+    note:'16,000 career rush yards — the third most in NFL history. Quietly one of the most consistent fantasy RBs of any era.' },
 ]
 
 // ── ESPN API helpers ──────────────────────────────────────────────────────────
@@ -972,11 +1062,128 @@ function renderTeamNewsSection(articles, favTeam) {
 </div>`
 }
 
-// HOF TIDBIT — rotating by week number so it changes each week
-function renderHOFTidbit(weekNum) {
-  const idx  = (weekNum - 1) % FANTASY_HOF.length
-  const legend = FANTASY_HOF[idx]
+// HOF TIDBIT — varies by week AND day so Thu/Fri sends show different legends
 
+// ── What If? Fantasy HOF — pre-fantasy era legends ───────────────────────────
+const FANTASY_WHATIF = [
+  {
+    player:'Gale Sayers', team:'CHI', pos:'RB', year:1965,
+    game:'Week 10 vs SF · Dec 12, 1965', pts_ppr:56.0, pts_std:44.0,
+    line:'9 rush TD, 113 rush yds · 1 rec TD, 89 yds, 2 rec · 1 punt return TD',
+    note:'Six touchdowns in a single game — Papa Bear Halas called it the greatest performance he'd ever seen. On a muddy Wrigley Field.',
+    whatif:true,
+  },
+  {
+    player:'Jim Brown', team:'CLE', pos:'RB', year:1963,
+    game:'Season Average · 1963', pts_ppr:38.4, pts_std:36.4,
+    line:'1,863 rush yds, 12 TD in 14 games — 133 rush yds/game',
+    note:'5.2 yards per carry for his entire career. Retired at 29 at his absolute peak. Nine seasons, nine Pro Bowls, never missed a game.',
+    whatif:true,
+  },
+  {
+    player:'Joe Namath', team:'NYJ', pos:'QB', year:1967,
+    game:'Best Week · 1967', pts_ppr:44.8, pts_std:44.8,
+    line:'496 yds, 3 TD, 0 INT',
+    note:'First QB ever to throw for 4,000 yards in a season. In 1967 alone he had 4 games with 400+ yards — 40 years before anyone was keeping score.',
+    whatif:true,
+  },
+  {
+    player:'Frank Gifford', team:'NYG', pos:'RB/WR', year:1956,
+    game:'1956 NFL MVP Season · Best Game', pts_ppr:41.2, pts_std:36.2,
+    line:'19 car, 123 yds, 2 rush TD · 5 rec, 76 yds, 1 rec TD',
+    note:'The original flex player — ran, caught, even threw passes. In today's PPR world he'd be the most valuable hybrid back in the game.',
+    whatif:true,
+  },
+  {
+    player:'Johnny Unitas', team:'BAL', pos:'QB', year:1959,
+    game:'Consecutive TD streak · Best Week', pts_ppr:51.2, pts_std:51.2,
+    line:'6 TD, 374 yds, 0 INT',
+    note:'TD pass in 47 consecutive games — a record that stood 52 years. Cut by the Steelers before becoming the greatest QB of his era.',
+    whatif:true,
+  },
+  {
+    player:'Walter Payton', team:'CHI', pos:'RB', year:1977,
+    game:'Week 7 vs MIN · Nov 20, 1977', pts_ppr:49.4, pts_std:46.4,
+    line:'40 car, 275 yds, 1 TD · 3 rec, 26 yds',
+    note:'275 yards on 40 carries — the single-game rushing record at the time. On frozen ground. Against a playoff defense. Sweetness at his peak.',
+    whatif:true,
+  },
+  {
+    player:'O.J. Simpson', team:'BUF', pos:'RB', year:1973,
+    game:'Season Finale vs NYJ · Dec 16, 1973', pts_ppr:47.6, pts_std:44.6,
+    line:'34 car, 200 yds, 1 TD · 3 rec, 18 yds',
+    note:'First player ever to break 2,000 rush yards in a season. Did it entirely on his own, on the Bills, with no supporting weapons.',
+    whatif:true,
+  },
+  {
+    player:'Don Hutson', team:'GB', pos:'WR', year:1942,
+    game:'1942 Season · Best Game', pts_ppr:44.8, pts_std:36.8,
+    line:'9 rec, 88 yds, 4 TD',
+    note:'Scored 17 TDs in 1942 — more than his closest competitor scored in their entire career. The original dominant WR, 30 years before PPR existed.',
+    whatif:true,
+  },
+  {
+    player:'Lance Alworth', team:'SD', pos:'WR', year:1965,
+    game:'1965 Season · Best Game', pts_ppr:46.3, pts_std:38.3,
+    line:'9 rec, 123 yds, 3 TD',
+    note:'Caught a pass in 96 consecutive games. Seven straight 1,000-yard seasons when 1,000 yards was nearly impossible. Bambi would have been a first-rounder every year.',
+    whatif:true,
+  },
+  {
+    player:'Bronko Nagurski', team:'CHI', pos:'RB', year:1934,
+    game:'1934 NFL Championship Game', pts_ppr:38.0, pts_std:36.0,
+    line:'25 car, 124 yds, 2 TD · 2 rec, 16 yds',
+    note:'Once scored a TD by running through the end zone wall into the stands — reportedly told the ref "that last guy hit pretty hard." The original physical specimen.',
+    whatif:true,
+  },
+  {
+    player:'Paul Hornung', team:'GB', pos:'RB/K', year:1960,
+    game:'1960 Season · 176 pts scored', pts_ppr:43.6, pts_std:40.6,
+    line:'2 rush TD, 88 yds · 3 rec, 34 yds, 1 rec TD · 2 FG, 4 XP',
+    note:'176 points in the 1960 season — a record that stood 46 years. Scored as a RB AND kicker. The original dual-position fantasy nightmare.',
+    whatif:true,
+  },
+  {
+    player:'Dick "Night Train" Lane', team:'LA', pos:'CB', year:1952,
+    game:'Rookie Season 1952', pts_ppr:0, pts_std:0,
+    line:'14 interceptions — the all-time single-season NFL record',
+    note:'Set the all-time INT record as a ROOKIE in a 12-game season. Walked in off the street with his Army discharge papers. The record still stands 70+ years later.',
+    whatif:true,
+  },
+]
+
+// Merged pool: modern HOF + What If legends, tagged for rendering
+const ALL_HOF = [
+  ...FANTASY_HOF.map(l => ({ ...l, whatif:false })),
+  ...FANTASY_WHATIF,
+]
+
+function renderHOFTidbit(weekNum, sendType) {
+  const dayOffset = { thursday:0, friday:7, monday:14, tuesday:21 }[sendType] || 0
+  const idx    = (weekNum - 1 + dayOffset) % ALL_HOF.length
+  const legend = ALL_HOF[idx]
+
+  if (legend.whatif) {
+    // What If? card — pre-fantasy era legend
+    return `
+<span class="sec-label">⏰ What If? Fantasy Football — Pre-Fantasy Era Legend</span>
+<div class="hof">
+  <div class="hof-label" style="color:rgba(200,168,75,.6);font-size:9px;letter-spacing:.18em">PRE-FANTASY ERA · ${legend.year}</div>
+  <div class="hof-player">${legend.player}</div>
+  <div class="hof-meta">${legend.pos} &nbsp;&middot;&nbsp; ${legend.team} &nbsp;&middot;&nbsp; ${legend.game}</div>
+  <div style="margin-top:10px">
+    <span class="hof-pts">${legend.pts_ppr}</span>
+    <div class="hof-pts-lbl">pts PPR &nbsp;/&nbsp; ${legend.pts_std} STD &nbsp;&middot;&nbsp; <em>estimated if played today</em></div>
+  </div>
+  <div class="hof-line">${legend.line}</div>
+  <div class="hof-note">${legend.note}</div>
+  <div style="margin-top:8px;font-family:'IBM Plex Mono',monospace;font-size:8px;color:rgba(200,168,75,.4);letter-spacing:.08em">
+    What would this performance have scored in a modern PPR league?
+  </div>
+</div>`
+  }
+
+  // Standard modern HOF card
   return `
 <span class="sec-label">⚡ Fantasy Hall of Fame — This Week in History</span>
 <div class="hof">
@@ -1114,7 +1321,7 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
   <a class="cta" href="${SITE_URL}">FW Formula Scores &rarr;</a>
 </div>`
 
-    html += renderHOFTidbit(currentWeek)
+    html += renderHOFTidbit(currentWeek, sendType)
     html += teamNewsHTML
   }
 
@@ -1173,7 +1380,7 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
   <a class="cta" href="${SITE_URL}">FW Formula Scores &rarr;</a>
 </div>`
 
-    html += renderHOFTidbit(currentWeek)
+    html += renderHOFTidbit(currentWeek, sendType)
     html += teamNewsHTML
   }
 
