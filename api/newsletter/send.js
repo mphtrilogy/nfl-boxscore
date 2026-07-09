@@ -1160,7 +1160,13 @@ const ALL_HOF = [
 
 function renderHOFTidbit(weekNum, sendType) {
   const dayOffset = { thursday:0, friday:7, monday:14, tuesday:21 }[sendType] || 0
-  const idx    = (weekNum - 1 + dayOffset) % ALL_HOF.length
+  // During off-season (week 1 stuck), use day-of-year for variety
+  // Once season starts week numbers increment naturally
+  const now = new Date()
+  const start = new Date(now.getFullYear(), 0, 0)
+  const dayOfYear = Math.floor((now - start) / (1000 * 60 * 60 * 24))
+  const rotator = weekNum > 1 ? (weekNum - 1) * 7 : dayOfYear
+  const idx = (rotator + dayOffset) % ALL_HOF.length
   const legend = ALL_HOF[idx]
 
   if (legend.whatif) {
