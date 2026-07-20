@@ -3,26 +3,26 @@
 // Season opens Wed Sept 9 (SEA vs NE)
 // Each team plays 17 games with 1 bye week
 
-export const WEEK_META = [
-  { week:1,  label:'Week 1',  dates:'Sep 9–15, 2026'    },
-  { week:2,  label:'Week 2',  dates:'Sep 17–22, 2026'   },
-  { week:3,  label:'Week 3',  dates:'Sep 24–29, 2026'   },
-  { week:4,  label:'Week 4',  dates:'Oct 1–6, 2026'     },
-  { week:5,  label:'Week 5',  dates:'Oct 8–13, 2026'    },
-  { week:6,  label:'Week 6',  dates:'Oct 15–20, 2026'   },
-  { week:7,  label:'Week 7',  dates:'Oct 22–27, 2026'   },
-  { week:8,  label:'Week 8',  dates:'Oct 29–Nov 3, 2026' },
-  { week:9,  label:'Week 9',  dates:'Nov 5–10, 2026'    },
-  { week:10, label:'Week 10', dates:'Nov 12–17, 2026'   },
-  { week:11, label:'Week 11', dates:'Nov 19–24, 2026'   },
-  { week:12, label:'Week 12', dates:'Nov 25–Dec 1, 2026' },
-  { week:13, label:'Week 13', dates:'Dec 3–8, 2026'     },
-  { week:14, label:'Week 14', dates:'Dec 10–15, 2026'   },
-  { week:15, label:'Week 15', dates:'Dec 17–22, 2026'   },
-  { week:16, label:'Week 16', dates:'Dec 24–28, 2026'   },
-  { week:17, label:'Week 17', dates:'Jan 1–5, 2027'     },
-  { week:18, label:'Week 18', dates:'Jan 10–11, 2027'   },
-]
+export const WEEK_META = {
+  1:  { week:1,  label:'Week 1',  dates:'Sep 9–15, 2026'    },
+  2:  { week:2,  label:'Week 2',  dates:'Sep 17–22, 2026'   },
+  3:  { week:3,  label:'Week 3',  dates:'Sep 24–29, 2026'   },
+  4:  { week:4,  label:'Week 4',  dates:'Oct 1–6, 2026'     },
+  5:  { week:5,  label:'Week 5',  dates:'Oct 8–13, 2026'    },
+  6:  { week:6,  label:'Week 6',  dates:'Oct 15–20, 2026'   },
+  7:  { week:7,  label:'Week 7',  dates:'Oct 22–27, 2026'   },
+  8:  { week:8,  label:'Week 8',  dates:'Oct 29–Nov 3, 2026' },
+  9:  { week:9,  label:'Week 9',  dates:'Nov 5–10, 2026'    },
+  10: { week:10, label:'Week 10', dates:'Nov 12–17, 2026'   },
+  11: { week:11, label:'Week 11', dates:'Nov 19–24, 2026'   },
+  12: { week:12, label:'Week 12', dates:'Nov 25–Dec 1, 2026' },
+  13: { week:13, label:'Week 13', dates:'Dec 3–8, 2026'     },
+  14: { week:14, label:'Week 14', dates:'Dec 10–15, 2026'   },
+  15: { week:15, label:'Week 15', dates:'Dec 17–22, 2026'   },
+  16: { week:16, label:'Week 16', dates:'Dec 24–28, 2026'   },
+  17: { week:17, label:'Week 17', dates:'Jan 1–5, 2027'     },
+  18: { week:18, label:'Week 18', dates:'Jan 10–11, 2027'   },
+}
 
 export const SCHEDULE_2026 = [
 
