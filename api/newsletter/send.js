@@ -1132,6 +1132,8 @@ ${rows}
   <a class="cta" href="https://www.nfl.com/injuries/">Full NFL Injury Report &rarr;</a>
 </div>`
 }
+
+async function fetchTeamNews(favTeam) {
   if (!favTeam || favTeam === 'All') return []
 
   const info     = TEAM_INFO[favTeam]
@@ -1263,6 +1265,8 @@ function renderLeagueNewsSection(articles) {
   </a>
 </div>`
 }
+
+function renderTeamNewsSection(articles, favTeam) {
   if (!articles?.length || !favTeam || favTeam === 'All') return ''
   const info = TEAM_INFO[favTeam]
   const label = info ? `${info.city} ${info.nick}` : favTeam
