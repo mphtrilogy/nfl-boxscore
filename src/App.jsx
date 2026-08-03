@@ -73,18 +73,6 @@ export default function App() {
   // Current ESPN season type based on toggle
   const currentSeasonType = seasonMode === 'pre' ? 1 : 2
 
-  // For preseason: fetch directly since useScoreboard defaults to seasontype=2
-  const [preData, setPreData] = useState(null)
-  const [preLoading, setPreLoading] = useState(false)
-  useEffect(() => {
-    if (seasonMode !== 'pre' || !seasonStarted) return
-    setPreLoading(true)
-    fetch(`/api/espn/scoreboard?week=${activeWeek}&seasontype=1&limit=20`)
-      .then(r => r.json())
-      .then(d => { setPreData(d); setPreLoading(false) })
-      .catch(() => setPreLoading(false))
-  }, [seasonMode, activeWeek, seasonStarted])
-
   // Also ask ESPN what the current week is and sync if different
   useEffect(() => {
     if (!seasonStarted) return
@@ -101,12 +89,24 @@ export default function App() {
 
   // Live ESPN scoreboard for current week — only during season
   const { data: espnData, loading: regLoading, error, lastUpdated, refresh } = useScoreboard(
-    seasonStarted && seasonMode === 'reg' ? activeWeek : null
+    seasonStarted ? activeWeek : null
   )
 
-  // Merge preseason and regular season data sources
+  // For preseason mode: fetch directly with seasontype=1
+  const [preData, setPreData]       = useState(null)
+  const [preLoading, setPreLoading] = useState(false)
+  useEffect(() => {
+    if (seasonMode !== 'pre' || !seasonStarted) return
+    setPreLoading(true)
+    fetch(`/api/espn/scoreboard?week=${activeWeek}&seasontype=1&limit=20`)
+      .then(r => r.json())
+      .then(d => { setPreData(d); setPreLoading(false) })
+      .catch(() => setPreLoading(false))
+  }, [seasonMode, activeWeek, seasonStarted])
+
+  // Active data source
   const activeEspnData = seasonMode === 'pre' ? preData : espnData
-  const loading = seasonMode === 'pre' ? preLoading : regLoading
+  const loading        = seasonMode === 'pre' ? preLoading : regLoading
 
   // Parse ESPN games — empty before season
   const liveGames = seasonStarted
@@ -114,14 +114,17 @@ export default function App() {
     : []
 
   // Merge live scores into schedule — only during season
-  const mergedGames = SCHEDULE_2026.filter(g => g.week === activeWeek).map(g => {
-    if (!seasonStarted) return { ...g, status: 'upcoming', homeScore: null, awayScore: null }
-    const live = liveGames.find(lg =>
-      lg.home === g.home && lg.away === g.away
-    )
-    if (live) return { ...g, ...live }
-    return g
-  })
+  // In preseason, games come directly from ESPN (not in SCHEDULE_2026)
+  const mergedGames = seasonMode === 'pre'
+    ? liveGames  // preseason: use ESPN games directly
+    : SCHEDULE_2026.filter(g => g.week === activeWeek).map(g => {
+        if (!seasonStarted) return { ...g, status: 'upcoming', homeScore: null, awayScore: null }
+        const live = liveGames.find(lg =>
+          lg.home === g.home && lg.away === g.away
+        )
+        if (live) return { ...g, ...live }
+        return g
+      })
 
   // Detect if any game is live (for auto-refresh indicator)
   const hasLiveGame = seasonStarted && liveGames.some(g => g.status === 'live')
