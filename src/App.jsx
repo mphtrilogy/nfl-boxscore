@@ -73,6 +73,18 @@ export default function App() {
   // Current ESPN season type based on toggle
   const currentSeasonType = seasonMode === 'pre' ? 1 : 2
 
+  // For preseason: fetch directly since useScoreboard defaults to seasontype=2
+  const [preData, setPreData] = useState(null)
+  const [preLoading, setPreLoading] = useState(false)
+  useEffect(() => {
+    if (seasonMode !== 'pre' || !seasonStarted) return
+    setPreLoading(true)
+    fetch(`/api/espn/scoreboard?week=${activeWeek}&seasontype=1&limit=20`)
+      .then(r => r.json())
+      .then(d => { setPreData(d); setPreLoading(false) })
+      .catch(() => setPreLoading(false))
+  }, [seasonMode, activeWeek, seasonStarted])
+
   // Also ask ESPN what the current week is and sync if different
   useEffect(() => {
     if (!seasonStarted) return
@@ -88,14 +100,17 @@ export default function App() {
   }, [seasonMode])
 
   // Live ESPN scoreboard for current week — only during season
-  const { data: espnData, loading, error, lastUpdated, refresh } = useScoreboard(
-    seasonStarted ? activeWeek : null,
-    currentSeasonType
+  const { data: espnData, loading: regLoading, error, lastUpdated, refresh } = useScoreboard(
+    seasonStarted && seasonMode === 'reg' ? activeWeek : null
   )
+
+  // Merge preseason and regular season data sources
+  const activeEspnData = seasonMode === 'pre' ? preData : espnData
+  const loading = seasonMode === 'pre' ? preLoading : regLoading
 
   // Parse ESPN games — empty before season
   const liveGames = seasonStarted
-    ? (espnData?.events?.map(parseESPNGame).filter(Boolean) || [])
+    ? (activeEspnData?.events?.map(parseESPNGame).filter(Boolean) || [])
     : []
 
   // Merge live scores into schedule — only during season
