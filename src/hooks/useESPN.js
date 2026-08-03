@@ -5,7 +5,7 @@ const ESPN_BASE = '/api/espn'
 const ESPN_ABBR_MAP = { 'LAR': 'LA', 'WSH': 'WAS', 'JAX': 'JAC' }
 function normalizeAbbr(abbr) { return ESPN_ABBR_MAP[abbr] || abbr }
 
-export function useScoreboard(week = null) {
+export function useScoreboard(week = null, seasontype = 2) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -14,7 +14,7 @@ export function useScoreboard(week = null) {
   const fetch_scores = useCallback(async () => {
     try {
       setLoading(true)
-      const params = week ? `?week=${week}&seasontype=2` : ''
+      const params = week ? `?week=${week}&seasontype=${seasontype}&limit=20` : ''
       const res = await fetch(`${ESPN_BASE}/scoreboard${params}`)
       if (!res.ok) throw new Error(`ESPN API ${res.status}`)
       const json = await res.json()
@@ -26,7 +26,7 @@ export function useScoreboard(week = null) {
     } finally {
       setLoading(false)
     }
-  }, [week])
+  }, [week, seasontype])
 
   useEffect(() => {
     fetch_scores()
@@ -37,7 +37,7 @@ export function useScoreboard(week = null) {
   return { data, loading, error, lastUpdated, refresh: fetch_scores }
 }
 
-export function useTeamSchedule(teamAbbr) {
+export function useTeamSchedule(teamAbbr, seasontype = 2) {
   const [games, setGames] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -46,16 +46,16 @@ export function useTeamSchedule(teamAbbr) {
     if (!teamAbbr || teamAbbr === 'All') { setGames([]); return }
     setLoading(true)
     setError(null)
-    fetch(`${ESPN_BASE}/teams/${teamAbbr.toLowerCase()}/schedule?season=2026&seasontype=2`)
+    fetch(`${ESPN_BASE}/teams/${teamAbbr.toLowerCase()}/schedule?season=2026&seasontype=${seasontype}`)
       .then(r => { if (!r.ok) throw new Error(`ESPN ${r.status}`); return r.json() })
       .then(data => { setGames(parseTeamSchedule(data, teamAbbr)); setLoading(false) })
       .catch(e => { setError(e.message); setLoading(false) })
-  }, [teamAbbr])
+  }, [teamAbbr, seasontype])
 
   return { games, loading, error }
 }
 
-export function useWeekSchedule(week) {
+export function useWeekSchedule(week, seasontype = 2) {
   const [games, setGames] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -63,11 +63,11 @@ export function useWeekSchedule(week) {
   useEffect(() => {
     if (!week) return
     setLoading(true)
-    fetch(`${ESPN_BASE}/scoreboard?week=${week}&seasontype=2&limit=20`)
+    fetch(`${ESPN_BASE}/scoreboard?week=${week}&seasontype=${seasontype}&limit=20`)
       .then(r => r.json())
       .then(data => { setGames((data.events || []).map(parseESPNGame).filter(Boolean)); setLoading(false) })
       .catch(e => { setError(e.message); setLoading(false) })
-  }, [week])
+  }, [week, seasontype])
 
   return { games, loading, error }
 }
