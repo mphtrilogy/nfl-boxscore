@@ -2930,3 +2930,35 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .pr-whatif-scoring { padding: 8px 10px; }
   .pr-whatif-scoring-row { font-size: 8.5px; }
 }
+
+/* ── Season toggle (Preseason / Regular Season) ──────────────────────────── */
+.ws-season-toggle {
+  display: flex;
+  gap: 0;
+  margin-bottom: 8px;
+  border: 1px solid var(--rule-hvy);
+  border-radius: var(--r);
+  overflow: hidden;
+  width: fit-content;
+}
+.ws-season-btn {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  padding: 7px 14px;
+  background: var(--paper-mid);
+  color: var(--muted);
+  border: none;
+  cursor: pointer;
+  transition: all .15s;
+}
+.ws-season-btn + .ws-season-btn {
+  border-left: 1px solid var(--rule-hvy);
+}
+.ws-season-btn:hover { background: var(--paper-dk); color: var(--ink); }
+.ws-season-btn.on {
+  background: var(--ink);
+  color: var(--gold);
+}
