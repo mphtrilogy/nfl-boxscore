@@ -1106,28 +1106,32 @@ function renderInjurySection(injuries, favTeam) {
     const colors = {
       'IR':       'background:#1a1209;color:rgba(245,240,232,.6)',
       'Out':      'background:#8b1a1a;color:#fff',
-      'Doubtful': 'background:rgba(200,168,75,.2);color:#9a7a2e;border:1px solid rgba(200,168,75,.4)',
+      'Doubtful': 'background:rgba(139,90,30,.25);color:#7a4a0e;border:1px solid rgba(139,90,30,.4)',
     }
-    return `<span style="display:inline-block;font-family:monospace;font-size:6.5px;font-weight:700;letter-spacing:.1em;padding:1px 6px;border-radius:2px;margin-right:6px;${colors[s] || ''}">${s.toUpperCase()}</span>`
+    return `<span style="display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:6.5px;font-weight:700;letter-spacing:.1em;padding:2px 7px;border-radius:2px;margin-right:7px;vertical-align:middle;${colors[s] || ''}">${s.toUpperCase()}</span>`
   }
 
   const rows = injuries.map(inj => {
     const isFav = inj.team === favTeam
-    const hl    = isFav ? 'background:rgba(200,168,75,.04);border-left:2px solid rgba(200,168,75,.3);' : ''
+    const hl    = isFav ? 'background:rgba(200,168,75,.05);border-left:3px solid rgba(200,168,75,.5);' : 'border-left:3px solid transparent;'
     return `
-<div style="display:table;width:100%;padding:6px 18px;border-bottom:1px solid rgba(42,31,14,.08);box-sizing:border-box;${hl}">
-  <span style="display:table-cell;vertical-align:middle">
-    ${badge(inj.status)}
-    <span style="font-family:Georgia,serif;font-size:12px;font-weight:600;color:#1a1209">${inj.name}</span>
-    <span style="font-family:monospace;font-size:8.5px;color:#9e9080;margin-left:5px">${inj.pos} · ${inj.team}</span>
-  </span>
-  <span style="display:table-cell;text-align:right;vertical-align:middle;font-family:monospace;font-size:8px;color:#9e9080;max-width:140px">${inj.detail ? inj.detail.substring(0,50) : ''}</span>
-</div>`
+<tr>
+  <td style="padding:8px 16px;border-bottom:1px solid rgba(42,31,14,.08);${hl}">
+    <div style="margin-bottom:3px">
+      ${badge(inj.status)}
+      <span style="font-family:Georgia,serif;font-size:13px;font-weight:700;color:#1a1209">${inj.name}</span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:8.5px;color:#9e9080;margin-left:6px">${inj.pos} · ${inj.team}</span>
+    </div>
+    ${inj.detail ? `<div style="font-family:'IBM Plex Mono',monospace;font-size:8.5px;color:#6b5f4e;line-height:1.5;padding-left:2px">${inj.detail}</div>` : ''}
+  </td>
+</tr>`
   }).join('')
 
   return `
 <span class="sec-label">🏥 Injury Report — Notable Outs &amp; Doubtful</span>
-${rows}
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse">
+  ${rows}
+</table>
 <div class="cta-wrap">
   <a class="cta" href="https://www.nfl.com/injuries/">Full NFL Injury Report &rarr;</a>
 </div>`
@@ -1515,9 +1519,9 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
       others.forEach(g => { html += renderCondensedGame(g) })
     }
 
-    html += injuryHTML
     html += teamNewsHTML
     html += leagueNewsHTML
+    html += injuryHTML
     html += renderWaiverSection(parsedGames, currentWeek, squad, mode)
   }
 
@@ -1537,9 +1541,9 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
     }
 
     html += renderSquadSummary(parsedGames, squad, mode)
-    html += injuryHTML
     html += teamNewsHTML
     html += leagueNewsHTML
+    html += injuryHTML
     html += renderWaiverSection(parsedGames, currentWeek, squad, mode)
   }
 
@@ -1581,9 +1585,9 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
 </div>`
 
     html += renderHOFTidbit(currentWeek, sendType)
-    html += injuryHTML
     html += teamNewsHTML
     html += leagueNewsHTML
+    html += injuryHTML
   }
 
   // ── FRIDAY: TNF recap + fav team preview + odds + weather + injuries ───────
@@ -1676,11 +1680,7 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
     // 4. Weather section — all outdoor games
     html += await renderWeatherSection(upcoming)
 
-    // 5. Injury report
-    const injuries    = await fetchInjuries(favTeam)
-    html += renderInjurySection(injuries, favTeam)
-
-    // 6. Start/Sit
+    // 5. Start/Sit
     html += `
 <span class="sec-label">⚖️ Start / Sit — Week ${currentWeek}</span>
 <div class="callout">Lineups lock Sunday morning. The FW Formula scores every rostered player 0–10 using recent trend, matchup difficulty, usage data, and weather — auto-updated every page load.</div>
@@ -1691,6 +1691,10 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
     html += renderHOFTidbit(currentWeek, sendType)
     html += teamNewsHTML
     html += leagueNewsHTML
+
+    // 6. Injury report — bottom of email
+    const injuries    = await fetchInjuries(favTeam)
+    html += renderInjurySection(injuries, favTeam)
   }
 
   html += foot(email)
