@@ -1015,39 +1015,71 @@ function PreseasonView({ squad }) {
           const homeWin  = isFinal && g.homeScore > g.awayScore
           const awayWin  = isFinal && g.awayScore > g.homeScore
           const box      = boxData[g.id]
-          const loading  = boxLoad[g.id]
+          const boxLoading = boxLoad[g.id]
+          const periods  = box ? (box.header?.competitions?.[0]?.competitors || []) : []
+          const awayPeriods = periods.find(c => c.homeAway === 'away')?.linescores || []
+          const homePeriods = periods.find(c => c.homeAway === 'home')?.linescores || []
+          const qLabels  = awayPeriods.map((_, i) => i < 4 ? `Q${i+1}` : 'OT')
 
           return (
-            <div key={g.id} className="game-card">
+            <div key={g.id} className="game-card featured">
               <div className="card-head">
-                {g.note && <div className="game-note">{g.note}</div>}
-                <div className="matchup">
-                  <div className={`team-row ${awayWin ? 'winner' : isFinal ? 'loser' : ''}`}>
-                    <span className="team-abv">{g.away}</span>
-                    <span className="team-score">{g.awayScore ?? '–'}</span>
+                {g.note && <div className="card-note">{g.note}</div>}
+
+                {/* Linescore table */}
+                {(isFinal || isLive) && qLabels.length > 0 ? (
+                  <table className="ls-table">
+                    <thead>
+                      <tr>
+                        <th className="lt-team"></th>
+                        {qLabels.map((q,i) => <th key={i}>{q}</th>)}
+                        <th className="lt-total">T</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className={awayWin ? 'lwin' : ''}>
+                        <td className="lt-team">{g.away}</td>
+                        {awayPeriods.map((p,i) => <td key={i}>{p.value ?? 0}</td>)}
+                        <td className="lt-total">{g.awayScore}</td>
+                      </tr>
+                      <tr className={homeWin ? 'lwin' : ''}>
+                        <td className="lt-team">{g.home}</td>
+                        {homePeriods.map((p,i) => <td key={i}>{p.value ?? 0}</td>)}
+                        <td className="lt-total">{g.homeScore}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="matchup">
+                    <div className={`team-row ${awayWin ? 'winner' : isFinal ? 'loser' : ''}`}>
+                      <span className="team-abv">{g.away}</span>
+                      <span className="team-score">{g.awayScore ?? '–'}</span>
+                    </div>
+                    <div className={`team-row ${homeWin ? 'winner' : isFinal ? 'loser' : ''}`}>
+                      <span className="team-abv">{g.home}</span>
+                      <span className="team-score">{g.homeScore ?? '–'}</span>
+                    </div>
                   </div>
-                  <div className={`team-row ${homeWin ? 'winner' : isFinal ? 'loser' : ''}`}>
-                    <span className="team-abv">{g.home}</span>
-                    <span className="team-score">{g.homeScore ?? '–'}</span>
-                  </div>
-                </div>
-                <div className="game-meta">
-                  <span className={`game-status ${isLive ? 'live' : ''}`}>
+                )}
+
+                <div className="card-status-row">
+                  <span className={`card-status ${isFinal ? 'final' : isLive ? 'live' : ''}`}>
                     {isLive ? `🔴 ${g.statusDetail}` : isFinal ? 'FINAL' : `${g.day} · ${g.time}`}
                   </span>
-                  {g.network && <span className="game-network">{g.network}</span>}
+                  {g.network && <span className="card-network">{g.network}</span>}
                 </div>
+
                 {(isFinal || isLive) && (
                   <button className="card-toggle-hint" onClick={() => toggleGame(g.id)}>
-                    {isOpen ? '▲ Hide Box Score' : '▼ Box Score'}
+                    {isOpen ? '▲ Hide Box Score' : '▼ Full Box Score'}
                   </button>
                 )}
               </div>
 
               {isOpen && (
-                <div className="box-drawer">
-                  {loading && <div className="drawer-loading">Loading box score…</div>}
-                  {!loading && box && (
+                <div className="drawer">
+                  {boxLoading && <div className="drawer-loading">Loading box score…</div>}
+                  {!boxLoading && box && (
                     <BoxScoreDrawer espnData={box} loading={false} game={{ home: g.home, away: g.away }} />
                   )}
                 </div>
