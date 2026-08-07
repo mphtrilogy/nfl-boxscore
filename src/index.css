@@ -2963,79 +2963,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   color: var(--gold);
 }
 
-/* ── Preseason card fixes ─────────────────────────────────────────────────── */
-/* Fix FINALNBC running together */
-.game-status { margin-right: 6px; }
-.game-network { 
-  margin-left: 6px;
-  padding: 1px 6px;
-  background: var(--ink);
-  color: var(--paper);
-  font-family: var(--font-mono);
-  font-size: 8px;
-  font-weight: 700;
-  letter-spacing: .08em;
-  border-radius: 2px;
-}
-.game-meta {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding: 4px 0;
-  font-family: var(--font-mono);
-  font-size: 9px;
-  color: var(--muted);
-}
 
-/* Fix box score table overflow in preseason cards */
-.game-card .box-drawer { 
-  overflow-x: auto; 
-  -webkit-overflow-scrolling: touch;
-}
-.game-card .player-table-wrap { 
-  overflow-x: auto;
-  max-width: 100%;
-}
-.game-card .player-table {
-  min-width: unset;
-  font-size: 10px;
-}
-.game-card .player-table th,
-.game-card .player-table td {
-  padding: 4px 6px;
-  font-size: 9.5px;
-}
-.game-card .pt-name {
-  min-width: 100px;
-  max-width: 140px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* ── Preseason box score — scoring plays contrast fix ─────────────────────── */
-.game-card .scoring-plays { background: var(--night); }
-.game-card .play-row { 
-  background: var(--night) !important;
-  border-bottom: 1px solid rgba(255,255,255,.07) !important;
-}
-.game-card .play-row:nth-child(even) { background: rgba(0,0,0,.18) !important; }
-.game-card .play-text { color: #F0E8D8 !important; }
-.game-card .play-score { color: #fff !important; font-weight: 700 !important; }
-.game-card .play-q { color: rgba(200,168,75,.8) !important; font-weight: 700 !important; }
-.game-card .play-team { color: var(--gold) !important; font-weight: 700 !important; }
-.game-card .play-clock { color: rgba(255,255,255,.45) !important; }
-
-/* Team stats inside game card */
-.game-card .team-stats { background: var(--paper); }
-.game-card .ts-val { color: var(--ink) !important; }
-.game-card .ts-label { color: var(--muted) !important; }
-
-/* Drawer tabs inside game card */
-.game-card .drawer-tabs { background: var(--paper-dk); }
-.game-card .dtab { color: var(--muted); }
-.game-card .dtab.on { color: var(--ink); border-bottom-color: var(--gold); }
 
 /* ── PRESEASON scoring plays — force dark background ─────────────────────── */
 .game-card .scoring-plays,
@@ -3057,3 +2985,65 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .game-card .play-clock{ color: rgba(255,255,255,.4) !important; }
 .game-card .play-team { color: #C8A84B !important; font-weight: 700 !important; }
 .game-card .play-score{ color: #ffffff !important; font-weight: 800 !important; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PRESEASON VIEW — game cards use ink background, need light text throughout
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Card base */
+.games-grid .game-card {
+  background: var(--ink);
+  color: var(--paper);
+  border: 1px solid rgba(200,168,75,.15);
+}
+.games-grid .game-card:hover { background: #110d06; }
+.games-grid .team-abv  { color: var(--paper); font-size: 18px; font-weight: 700; }
+.games-grid .team-score { color: var(--paper); font-size: 22px; font-weight: 800; }
+.games-grid .team-row.winner .team-abv,
+.games-grid .team-row.winner .team-score { color: var(--gold); }
+.games-grid .team-row.loser .team-abv,
+.games-grid .team-row.loser .team-score { color: rgba(245,240,232,.35); }
+.games-grid .game-status { color: rgba(245,240,232,.5); }
+.games-grid .game-network { color: var(--gold); }
+.games-grid .game-note { color: var(--gold); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 6px; }
+.games-grid .card-toggle-hint { color: rgba(245,240,232,.35); background: none; border: none; cursor: pointer; font-size: 10px; margin-top: 8px; }
+
+/* Drawer inside dark card */
+.games-grid .box-drawer { background: #0d0900; border-top: 1px solid rgba(245,240,232,.08); overflow-x: auto; }
+.games-grid .drawer-tabs { background: rgba(0,0,0,.3); border-bottom: 1px solid rgba(245,240,232,.1); }
+.games-grid .dtab { color: rgba(245,240,232,.4); border-bottom-color: transparent; }
+.games-grid .dtab:hover { color: var(--paper); }
+.games-grid .dtab.on { color: var(--paper); border-bottom-color: var(--gold); }
+
+/* Scoring plays */
+.games-grid .scoring-plays { background: #0d0900; padding: 0; }
+.games-grid .play-row {
+  background: #0d0900;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+}
+.games-grid .play-row:nth-child(even) { background: rgba(255,255,255,.03); }
+.games-grid .play-q     { color: var(--gold); }
+.games-grid .play-clock { color: rgba(245,240,232,.35); }
+.games-grid .play-team  { color: var(--gold); }
+.games-grid .play-text  { color: rgba(245,240,232,.85); }
+.games-grid .play-score { color: #fff; font-weight: 800; }
+
+/* Team stats */
+.games-grid .team-stats { background: #0d0900; }
+.games-grid .ts-team    { color: var(--paper) !important; }
+.games-grid .ts-val     { color: var(--paper); }
+.games-grid .ts-label   { color: rgba(245,240,232,.35); }
+.games-grid .ts-row     { border-bottom: 1px solid rgba(255,255,255,.05); }
+
+/* Player tables */
+.games-grid .player-table { background: #0d0900; }
+.games-grid .player-table th { color: rgba(245,240,232,.4); border-bottom-color: rgba(255,255,255,.08); }
+.games-grid .player-table td { color: rgba(245,240,232,.7); border-bottom-color: rgba(255,255,255,.04); }
+.games-grid .player-table td.pt-name { color: var(--paper); }
+.games-grid .player-table td.pt-team { color: rgba(245,240,232,.35); }
+.games-grid .player-table tr:hover td { background: rgba(255,255,255,.03); }
+.games-grid .fpts-col { color: var(--gold) !important; }
+.games-grid .squad-row td { background: rgba(200,168,75,.08) !important; }
+
+/* No data message */
+.games-grid .no-data { color: rgba(245,240,232,.3); padding: 20px; text-align: center; font-size: 11px; }
