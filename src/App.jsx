@@ -126,6 +126,7 @@ export default function App() {
         <div className="mob-drawer-section-label">MAIN</div>
         {[
           { view:'Scores',    icon:'🏈', label:'Scores'    },
+          { view:'Preseason', icon:'🏟️', label:'Preseason' },
           { view:'Schedule',  icon:'📅', label:'Schedule'  },
           { view:'Standings', icon:'🏆', label:'Standings' },
           { view:'TV Guide',  icon:'📺', label:'TV Guide'  },
