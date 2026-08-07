@@ -29,7 +29,7 @@ function getAutoWeek() {
 }
 
 // ── TOP-LEVEL NAV VIEWS ───────────────────────────────────────────────────────
-const VIEWS = ['Scores', 'Schedule', 'Standings', 'TV Guide', 'News', 'Injuries', 'Stats', 'Leaders', 'Fantasy', 'Draft', 'History', 'Playroom', 'Resources']
+const VIEWS = ['Scores', 'Preseason', 'Schedule', 'Standings', 'TV Guide', 'News', 'Injuries', 'Stats', 'Leaders', 'Fantasy', 'Draft', 'History', 'Playroom', 'Resources']
 
 export default function App() {
   const [activeView,    setActiveView]    = useState('Scores')
@@ -218,6 +218,7 @@ export default function App() {
             squad={squad}
           />
         )}
+        {activeView === 'Preseason' && <PreseasonView squad={squad} />}
         {activeView === 'Schedule'  && (
           <ScheduleView
             teamFilter={teamFilter}
@@ -909,6 +910,176 @@ function SquadModal({ squad, onSave, onClose }) {
 }
 
 // ── SCORES VIEW ───────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// ── PRESEASON VIEW — self-contained, no shared hooks ──────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+function PreseasonView({ squad }) {
+  const [week,     setWeek]     = useState(1)
+  const [games,    setGames]    = useState([])
+  const [loading,  setLoading]  = useState(false)
+  const [openId,   setOpenId]   = useState(null)
+  const [boxData,  setBoxData]  = useState({})
+  const [boxLoad,  setBoxLoad]  = useState({})
+
+  const WEEKS = [1, 2, 3, 4]
+  const WEEK_DATES = {
+    1: 'Hall of Fame + Aug 7–11, 2026',
+    2: 'Aug 13–15, 2026',
+    3: 'Aug 20–23, 2026',
+    4: 'Aug 27–29, 2026',
+  }
+
+  useEffect(() => {
+    setLoading(true)
+    setGames([])
+    setOpenId(null)
+    fetch(`/api/espn/scoreboard?week=${week}&seasontype=1&limit=20`)
+      .then(r => r.json())
+      .then(data => {
+        const parsed = (data.events || []).map(ev => {
+          const comp = ev.competitions?.[0]
+          const home = comp?.competitors?.find(c => c.homeAway === 'home')
+          const away = comp?.competitors?.find(c => c.homeAway === 'away')
+          if (!home || !away) return null
+          const status = ev.status?.type?.state
+          const isFinal = status === 'post'
+          const isLive  = status === 'in'
+          const d = new Date(ev.date)
+          return {
+            id:        ev.id,
+            home:      home.team?.abbreviation || '',
+            away:      away.team?.abbreviation || '',
+            homeName:  home.team?.displayName || '',
+            awayName:  away.team?.displayName || '',
+            homeScore: isFinal || isLive ? parseInt(home.score) || 0 : null,
+            awayScore: isFinal || isLive ? parseInt(away.score) || 0 : null,
+            status:    isFinal ? 'final' : isLive ? 'live' : 'upcoming',
+            statusDetail: ev.status?.type?.detail || '',
+            time:      d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' }),
+            day:       d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }),
+            network:   comp?.broadcasts?.[0]?.names?.[0] || '',
+            note:      comp?.notes?.[0]?.headline || '',
+          }
+        }).filter(Boolean)
+        setGames(parsed)
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
+  }, [week])
+
+  const toggleGame = (id) => {
+    if (openId === id) { setOpenId(null); return }
+    setOpenId(id)
+    if (boxData[id]) return
+    setBoxLoad(b => ({ ...b, [id]: true }))
+    fetch(`/api/espn/summary?event=${id}`)
+      .then(r => r.json())
+      .then(d => {
+        setBoxData(b => ({ ...b, [id]: d }))
+        setBoxLoad(b => ({ ...b, [id]: false }))
+      })
+      .catch(() => setBoxLoad(b => ({ ...b, [id]: false })))
+  }
+
+  const squadPlayers = (() => {
+    try { return JSON.parse(localStorage.getItem('fw-squad') || '{}')?.players || [] }
+    catch { return [] }
+  })()
+
+  return (
+    <div>
+      <div className="section-bar">
+        <h2>2026 NFL Preseason</h2>
+        <div className="sb-rule" />
+        <span className="sb-ct">Real box scores · Hall of Fame + Weeks 1–4</span>
+      </div>
+
+      {/* Week selector */}
+      <div className="week-selector">
+        <div className="week-label-row">
+          <span className="ws-label">Week</span>
+          <div className="ws-pills">
+            {WEEKS.map(w => (
+              <button key={w} className={`ws-btn ${week === w ? 'on' : ''}`}
+                onClick={() => setWeek(w)}>PS{w}</button>
+            ))}
+          </div>
+        </div>
+        <div className="week-meta-bar">
+          <span className="wm-label">Preseason Week {week}</span>
+          <span className="wm-dates">{WEEK_DATES[week]}</span>
+        </div>
+      </div>
+
+      {/* Games */}
+      {loading && (
+        <div className="leaders-coming-soon">
+          <div className="cs-icon">🏈</div>
+          <div className="cs-title">Loading preseason scores…</div>
+        </div>
+      )}
+
+      {!loading && games.length === 0 && (
+        <div className="leaders-coming-soon">
+          <div className="cs-icon">📅</div>
+          <div className="cs-title">No games yet for Preseason Week {week}</div>
+          <div className="cs-text">Check back once the games are scheduled.</div>
+        </div>
+      )}
+
+      <div className="games-grid">
+        {games.map(g => {
+          const isOpen   = openId === g.id
+          const isFinal  = g.status === 'final'
+          const isLive   = g.status === 'live'
+          const homeWin  = isFinal && g.homeScore > g.awayScore
+          const awayWin  = isFinal && g.awayScore > g.homeScore
+          const box      = boxData[g.id]
+          const loading  = boxLoad[g.id]
+
+          return (
+            <div key={g.id} className="game-card">
+              <div className="card-head">
+                {g.note && <div className="game-note">{g.note}</div>}
+                <div className="matchup">
+                  <div className={`team-row ${awayWin ? 'winner' : isFinal ? 'loser' : ''}`}>
+                    <span className="team-abv">{g.away}</span>
+                    <span className="team-score">{g.awayScore ?? '–'}</span>
+                  </div>
+                  <div className={`team-row ${homeWin ? 'winner' : isFinal ? 'loser' : ''}`}>
+                    <span className="team-abv">{g.home}</span>
+                    <span className="team-score">{g.homeScore ?? '–'}</span>
+                  </div>
+                </div>
+                <div className="game-meta">
+                  <span className={`game-status ${isLive ? 'live' : ''}`}>
+                    {isLive ? `🔴 ${g.statusDetail}` : isFinal ? 'FINAL' : `${g.day} · ${g.time}`}
+                  </span>
+                  {g.network && <span className="game-network">{g.network}</span>}
+                </div>
+                {(isFinal || isLive) && (
+                  <button className="card-toggle-hint" onClick={() => toggleGame(g.id)}>
+                    {isOpen ? '▲ Hide Box Score' : '▼ Box Score'}
+                  </button>
+                )}
+              </div>
+
+              {isOpen && (
+                <div className="box-drawer">
+                  {loading && <div className="drawer-loading">Loading box score…</div>}
+                  {!loading && box && (
+                    <BoxScoreDrawer espnData={box} loading={false} game={{ home: g.home, away: g.away }} />
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function ScoresView({ week, games, loading, error, openCardId, setOpenCardId, activeWeek, setActiveWeek, squad }) {
   // Sort squad games to top if squad is on
   const displayGames = (squad?.on && squad?.teams?.length)
