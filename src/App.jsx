@@ -73,10 +73,9 @@ export default function App() {
   // Current ESPN season type based on toggle (1=preseason, 2=regular)
   const currentSeasonType = seasonMode === 'pre' ? 1 : 2
 
-  // useScoreboard now accepts seasontype as second param (updated useESPN.js)
+  // useScoreboard — regular season hook (preseason has its own fetch in PreseasonView)
   const { data: espnData, loading, error, lastUpdated, refresh } = useScoreboard(
-    seasonStarted ? activeWeek : null,
-    currentSeasonType
+    seasonStarted && isRegularSeason() ? activeWeek : null
   )
 
   // Sync to ESPN current week when season mode changes
