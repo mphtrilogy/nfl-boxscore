@@ -3036,3 +3036,24 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .game-card .drawer-tabs { background: var(--paper-dk); }
 .game-card .dtab { color: var(--muted); }
 .game-card .dtab.on { color: var(--ink); border-bottom-color: var(--gold); }
+
+/* ── PRESEASON scoring plays — force dark background ─────────────────────── */
+.game-card .scoring-plays,
+.game-card .scoring-plays .play-row,
+.game-card .scoring-plays .play-row:nth-child(odd),
+.game-card .scoring-plays .play-row:nth-child(even) {
+  background: #16110A !important;
+}
+.game-card .scoring-plays .play-row:nth-child(even) {
+  background: rgba(0,0,0,.2) !important;
+}
+.game-card .play-text {
+  color: #F0E8D8 !important;
+  font-family: var(--font-body) !important;
+  font-size: 11px !important;
+  line-height: 1.5 !important;
+}
+.game-card .play-q    { color: #C8A84B !important; font-weight: 700 !important; }
+.game-card .play-clock{ color: rgba(255,255,255,.4) !important; }
+.game-card .play-team { color: #C8A84B !important; font-weight: 700 !important; }
+.game-card .play-score{ color: #ffffff !important; font-weight: 800 !important; }
