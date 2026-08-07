@@ -2962,3 +2962,77 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   background: var(--ink);
   color: var(--gold);
 }
+
+/* ── Preseason card fixes ─────────────────────────────────────────────────── */
+/* Fix FINALNBC running together */
+.game-status { margin-right: 6px; }
+.game-network { 
+  margin-left: 6px;
+  padding: 1px 6px;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  border-radius: 2px;
+}
+.game-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 0;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--muted);
+}
+
+/* Fix box score table overflow in preseason cards */
+.game-card .box-drawer { 
+  overflow-x: auto; 
+  -webkit-overflow-scrolling: touch;
+}
+.game-card .player-table-wrap { 
+  overflow-x: auto;
+  max-width: 100%;
+}
+.game-card .player-table {
+  min-width: unset;
+  font-size: 10px;
+}
+.game-card .player-table th,
+.game-card .player-table td {
+  padding: 4px 6px;
+  font-size: 9.5px;
+}
+.game-card .pt-name {
+  min-width: 100px;
+  max-width: 140px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Preseason box score — scoring plays contrast fix ─────────────────────── */
+.game-card .scoring-plays { background: var(--night); }
+.game-card .play-row { 
+  background: var(--night) !important;
+  border-bottom: 1px solid rgba(255,255,255,.07) !important;
+}
+.game-card .play-row:nth-child(even) { background: rgba(0,0,0,.18) !important; }
+.game-card .play-text { color: #F0E8D8 !important; }
+.game-card .play-score { color: #fff !important; font-weight: 700 !important; }
+.game-card .play-q { color: rgba(200,168,75,.8) !important; font-weight: 700 !important; }
+.game-card .play-team { color: var(--gold) !important; font-weight: 700 !important; }
+.game-card .play-clock { color: rgba(255,255,255,.45) !important; }
+
+/* Team stats inside game card */
+.game-card .team-stats { background: var(--paper); }
+.game-card .ts-val { color: var(--ink) !important; }
+.game-card .ts-label { color: var(--muted) !important; }
+
+/* Drawer tabs inside game card */
+.game-card .drawer-tabs { background: var(--paper-dk); }
+.game-card .dtab { color: var(--muted); }
+.game-card .dtab.on { color: var(--ink); border-bottom-color: var(--gold); }
