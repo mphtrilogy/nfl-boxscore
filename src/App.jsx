@@ -34,7 +34,6 @@ const VIEWS = ['Scores', 'Preseason', 'Schedule', 'Standings', 'TV Guide', 'News
 export default function App() {
   const [activeView,    setActiveView]    = useState('Scores')
   const [activeWeek,    setActiveWeek]    = useState(getAutoWeek)
-  const [seasonMode,    setSeasonMode]    = useState(() => isPreseason() ? 'pre' : 'reg')
   const [drawerOpen,    setDrawerOpen]    = useState(false)
   const [openCardId,    setOpenCardId]    = useState(null)
   const [teamFilter,    setTeamFilter]    = useState('All')
@@ -71,11 +70,11 @@ export default function App() {
   const seasonStarted = isGameSeason()
 
   // Current ESPN season type based on toggle (1=preseason, 2=regular)
-  const currentSeasonType = seasonMode === 'pre' ? 1 : 2
+  const currentSeasonType = espnSeasonType()
 
   // useScoreboard — regular season hook (preseason has its own fetch in PreseasonView)
   const { data: espnData, loading, error, lastUpdated, refresh } = useScoreboard(
-    seasonStarted && isRegularSeason() ? activeWeek : null
+    seasonStarted ? activeWeek : null
   )
 
   // Sync to ESPN current week when season mode changes
@@ -88,7 +87,7 @@ export default function App() {
         if (w && w >= 1 && w <= 18) setActiveWeek(w)
       })
       .catch(() => {})
-  }, [seasonMode])
+  }, [])
 
 
   // Parse ESPN games — empty before season
@@ -98,9 +97,7 @@ export default function App() {
 
   // Merge live scores into schedule — only during season
   // In preseason, games come directly from ESPN (not in SCHEDULE_2026)
-  const mergedGames = seasonMode === 'pre'
-    ? liveGames  // preseason: use ESPN games directly
-    : SCHEDULE_2026.filter(g => g.week === activeWeek).map(g => {
+  const mergedGames = SCHEDULE_2026.filter(g => g.week === activeWeek).map(g => {
         if (!seasonStarted) return { ...g, status: 'upcoming', homeScore: null, awayScore: null }
         const live = liveGames.find(lg =>
           lg.home === g.home && lg.away === g.away
@@ -461,29 +458,13 @@ const PRESEASON_META  = {
   4: { label:'Preseason Week 4', dates:'Aug 28–Sep 1, 2026' },
 }
 
-function WeekSelector({ active, onChange, seasonMode, onSeasonMode }) {
-  const showPreseason = isPreseason() || isRegularSeason() // show toggle once preseason starts
-  const weeks = seasonMode === 'pre' ? PRESEASON_WEEKS : ALL_WEEKS
-  const meta  = seasonMode === 'pre' ? PRESEASON_META  : WEEK_META
-
+function WeekSelector({ active, onChange }) {
   return (
     <div className="week-selector">
-      {showPreseason && (
-        <div className="ws-season-toggle">
-          <button
-            className={`ws-season-btn ${seasonMode === 'pre' ? 'on' : ''}`}
-            onClick={() => { onSeasonMode('pre'); onChange(1) }}
-          >Preseason</button>
-          <button
-            className={`ws-season-btn ${seasonMode === 'reg' ? 'on' : ''}`}
-            onClick={() => { onSeasonMode('reg'); onChange(isRegularSeason() ? getAutoWeek() : 1) }}
-          >Regular Season</button>
-        </div>
-      )}
       <div className="week-label-row">
         <span className="ws-label">Week</span>
         <div className="ws-pills">
-          {weeks.map(w => (
+          {ALL_WEEKS.map(w => (
             <button
               key={w}
               className={`ws-btn ${active === w ? 'on' : ''}`}
@@ -492,11 +473,11 @@ function WeekSelector({ active, onChange, seasonMode, onSeasonMode }) {
           ))}
         </div>
       </div>
-      {meta[active] && (
+      {WEEK_META[active] && (
         <div className="week-meta-bar">
-          <span className="wm-label">{meta[active].label}</span>
-          <span className="wm-dates">{meta[active].dates}</span>
-          {meta[active].note && <span className="wm-note">{meta[active].note}</span>}
+          <span className="wm-label">{WEEK_META[active].label}</span>
+          <span className="wm-dates">{WEEK_META[active].dates}</span>
+          {WEEK_META[active].note && <span className="wm-note">{WEEK_META[active].note}</span>}
         </div>
       )}
     </div>
@@ -1091,7 +1072,7 @@ function ScoresView({ week, games, loading, error, openCardId, setOpenCardId, ac
 
   return (
     <div>
-      <WeekSelector active={activeWeek} onChange={setActiveWeek} seasonMode={seasonMode} onSeasonMode={setSeasonMode} />
+      <WeekSelector active={activeWeek} onChange={setActiveWeek} />
       <div className="section-bar">
         <h2>Week {week} Scores</h2>
         <div className="sb-rule" />
