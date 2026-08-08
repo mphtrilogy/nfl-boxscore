@@ -2497,26 +2497,34 @@ function FWFormulaView({ currentWeek, mode }) {
     </div>
   )
 
-  // Preseason: show formula info but note data is limited
-  if (isPreseason()) return (
-    <div className="leaders-coming-soon">
-      <div className="cs-icon">⚡</div>
-      <div className="cs-title">FW Formula — Building Data</div>
-      <div className="cs-text">
-        Preseason box scores are flowing in but the formula needs regular season data to be meaningful.
-        Preseason snaps don't reflect real usage — starters play one quarter, backups play the rest.
-      </div>
-      <div style={{margin:'16px auto',maxWidth:500,textAlign:'left',padding:'0 20px'}}>
-        <div className="fl-offseason-banner" style={{borderRadius:4}}>
-          🗓️ FW Formula goes live <strong>Week 3</strong> of the regular season — by then we have<br/>
-          two weeks of real snap counts, target shares, and defensive rankings to work with.<br/><br/>
-          🧮 Formula: Trend (35%) + Matchup (30%) + Usage (20%) + Weather (10%) + Momentum (5%)<br/>
-          📡 Dome advantage built in · 300+ yard bonuses · PPR and STD modes
-        </div>
-      </div>
-      <div className="cs-date">Regular season Sep 9 · Full FW scores live by Week 3</div>
-    </div>
-  )
+  // Determine data maturity level for banner messaging
+  const dataLevel = !isGameSeason()   ? 'offseason'
+    : isPreseason()                    ? 'preseason'
+    : currentWeek === 1                ? 'week1'
+    : currentWeek === 2                ? 'week2'
+    : currentWeek >= 3                 ? 'full'
+    : 'full'
+
+  const BANNERS = {
+    preseason: {
+      icon: '🏕️',
+      color: '#6b5f4e',
+      text: `Preseason data — starters play ~1 quarter. Great for spotting backup battles and depth chart risers. Formula gets real Week 1 of the regular season (Sep 9).`,
+    },
+    week1: {
+      icon: '📡',
+      color: '#8b6914',
+      text: `Week 1 data only — trend and momentum scores are based on a single game. Formula gets sharper every week. Check back after Week 2 for better accuracy.`,
+    },
+    week2: {
+      icon: '📈',
+      color: '#4a7c4a',
+      text: `Two weeks of data — formula is warming up. Trend and matchup scores are meaningful. Full strength at Week 3.`,
+    },
+    full: null, // no banner needed
+  }
+
+  const banner = BANNERS[dataLevel]
 
   return (
     <div>
@@ -2538,6 +2546,14 @@ function FWFormulaView({ currentWeek, mode }) {
           </div>
         )}
       </div>
+
+      {/* Data maturity banner */}
+      {banner && (
+        <div className="fw-data-banner" style={{borderLeftColor: banner.color}}>
+          <span className="fw-data-banner-icon">{banner.icon}</span>
+          <span className="fw-data-banner-text">{banner.text}</span>
+        </div>
+      )}
 
       {/* Position filter */}
       <div className="fw-pos-bar">
