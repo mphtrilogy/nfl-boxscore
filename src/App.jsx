@@ -6089,12 +6089,13 @@ function PlayroomView() {
 // Wire-service player dispatch card. Wikipedia + Google News. No API key.
 // ═══════════════════════════════════════════════════════════════════════════
 function ScoutView({ initialPlayer = '' }) {
-  const [query,    setQuery]    = useState(initialPlayer)
-  const [input,    setInput]    = useState(initialPlayer)
+  const [query,    setQuery]    = useState('')
+  const [input,    setInput]    = useState('')
   const [wiki,     setWiki]     = useState(null)
   const [news,     setNews]     = useState([])
   const [loading,  setLoading]  = useState(false)
   const [error,    setError]    = useState('')
+  const [searched, setSearched] = useState('')
 
   // Quick-search suggestions — notable current NFL players
   const QUICK = [
@@ -6105,7 +6106,7 @@ function ScoutView({ initialPlayer = '' }) {
   ]
 
   const search = async (name) => {
-    const q = (name || query).trim()
+    const q = (name || input).trim()
     if (!q) return
     setQuery(q); setInput(q); setLoading(true); setError(''); setWiki(null); setNews([])
 
@@ -6149,7 +6150,12 @@ function ScoutView({ initialPlayer = '' }) {
     setLoading(false)
   }
 
-  useEffect(() => { if (initialPlayer) search(initialPlayer) }, [initialPlayer])
+  useEffect(() => {
+    if (initialPlayer && initialPlayer !== searched) {
+      setSearched(initialPlayer)
+      search(initialPlayer)
+    }
+  }, [initialPlayer])
 
   const handleKey = e => { if (e.key === 'Enter') search() }
 
