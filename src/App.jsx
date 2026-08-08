@@ -29,11 +29,12 @@ function getAutoWeek() {
 }
 
 // ── TOP-LEVEL NAV VIEWS ───────────────────────────────────────────────────────
-const VIEWS = ['Scores', 'Preseason', 'Schedule', 'Standings', 'TV Guide', 'News', 'Injuries', 'Stats', 'Leaders', 'Fantasy', 'Draft', 'History', 'Playroom', 'Resources']
+const VIEWS = ['Scores', 'Preseason', 'Schedule', 'Standings', 'TV Guide', 'News', 'Injuries', 'Stats', 'Leaders', 'Fantasy', 'Draft', 'History', 'Playroom', 'Scout', 'Resources']
 
 export default function App() {
   const [activeView,    setActiveView]    = useState('Scores')
   const [activeWeek,    setActiveWeek]    = useState(getAutoWeek)
+  const [scoutPlayer,   setScoutPlayer]   = useState('')
   const [drawerOpen,    setDrawerOpen]    = useState(false)
   const [openCardId,    setOpenCardId]    = useState(null)
   const [teamFilter,    setTeamFilter]    = useState('All')
@@ -162,9 +163,10 @@ export default function App() {
 
         <div className="mob-drawer-section-label">EXPLORE</div>
         {[
-          { view:'History',   icon:'📼', label:'History'     },
-          { view:'Playroom',  icon:'🎮', label:'Playroom'    },
-          { view:'Resources', icon:'🔗', label:'Resources'   },
+          { view:'History',   icon:'📼', label:'History'          },
+          { view:'Playroom',  icon:'🎮', label:'Playroom'         },
+          { view:'Scout',     icon:'🔍', label:'Scouting Report'  },
+          { view:'Resources', icon:'🔗', label:'Resources'        },
         ].map(({ view, icon, label }) => (
           <button
             key={view}
@@ -250,6 +252,7 @@ export default function App() {
         {activeView === 'History'   && <HistoryView />}
         {activeView === 'Stats'     && <StatsView squad={squad} />}
         {activeView === 'Playroom'  && <PlayroomView />}
+        {activeView === 'Scout'     && <ScoutView initialPlayer={scoutPlayer} />}
         {activeView === 'Resources' && <ResourcesView />}
         </main>
         <Sidebar activeWeek={activeWeek} setActiveView={setActiveView} squad={squad} />
@@ -1261,29 +1264,27 @@ function Linescore({ game: g }) {
 }
 
 // ── BOX SCORE DRAWER ──────────────────────────────────────────────────────────
-// ── PLAYER LINK — name + hover tooltip with ESPN + PFR links ──────────────
-function PlayerLink({ name, espnId }) {
+// ── PLAYER LINK — name + hover tooltip with Scout, ESPN + PFR links ─────────
+function PlayerLink({ name, espnId, onScout }) {
   if (!name || name === '—') return <span>{name}</span>
 
-  // Build ESPN URL — use ID if available, otherwise search
   const espnSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
   const espnUrl  = espnId
     ? `https://www.espn.com/nfl/player/_/id/${espnId}/${espnSlug}`
     : `https://www.espn.com/nfl/players/results?query=${encodeURIComponent(name)}`
-
-  // PFR search URL
   const pfrUrl = `https://www.pro-football-reference.com/search/search.fcgi?hint=${encodeURIComponent(name)}&search=${encodeURIComponent(name)}`
 
   return (
     <span className="player-link-wrap">
-      <a
-        href={espnUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="player-link"
-        title={`${name} — ESPN`}
-      >{name}</a>
+      <span className="player-link" onClick={() => onScout?.(name)} title={`Scout ${name}`}>
+        {name}
+      </span>
       <span className="player-link-refs">
+        {onScout && (
+          <button className="player-ref-btn player-ref-scout" onClick={() => onScout(name)}>
+            🔍 Scout
+          </button>
+        )}
         <a href={espnUrl} target="_blank" rel="noopener noreferrer" className="player-ref-btn">ESPN</a>
         <a href={pfrUrl}  target="_blank" rel="noopener noreferrer" className="player-ref-btn">PFR</a>
       </span>
@@ -6082,6 +6083,185 @@ function PlayroomView() {
 // ═══════════════════════════════════════════════════════════════════════════════
 // ── RESOURCES VIEW ────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ── SCOUT VIEW — The Scouting Report ──────────────────────────────────────
+// Wire-service player dispatch card. Wikipedia + Google News. No API key.
+// ═══════════════════════════════════════════════════════════════════════════
+function ScoutView({ initialPlayer = '' }) {
+  const [query,    setQuery]    = useState(initialPlayer)
+  const [input,    setInput]    = useState(initialPlayer)
+  const [wiki,     setWiki]     = useState(null)
+  const [news,     setNews]     = useState([])
+  const [loading,  setLoading]  = useState(false)
+  const [error,    setError]    = useState('')
+
+  // Quick-search suggestions — notable current NFL players
+  const QUICK = [
+    'Patrick Mahomes','Josh Allen','Lamar Jackson','Joe Burrow','Jalen Hurts',
+    'CJ Stroud','Brock Purdy','Dak Prescott','Justin Jefferson','Davante Adams',
+    'Tyreek Hill','Stefon Diggs','Travis Kelce','Sam LaPorta','Amon-Ra St. Brown',
+    'Derrick Henry','Christian McCaffrey','Saquon Barkley','De\'Von Achane','Breece Hall',
+  ]
+
+  const search = async (name) => {
+    const q = (name || query).trim()
+    if (!q) return
+    setQuery(q); setInput(q); setLoading(true); setError(''); setWiki(null); setNews([])
+
+    // Wikipedia REST API — no key needed
+    try {
+      const wikiQ   = encodeURIComponent(q + ' NFL')
+      const searchR = await fetch(`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${wikiQ}&format=json&origin=*&srlimit=1`)
+      const searchD = await searchR.json()
+      const pageTitle = searchD?.query?.search?.[0]?.title
+
+      if (pageTitle) {
+        const summaryR = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(pageTitle)}`)
+        const summaryD = await summaryR.json()
+        setWiki({
+          title:     summaryD.title || q,
+          extract:   summaryD.extract || '',
+          thumbnail: summaryD.thumbnail?.source || null,
+          url:       summaryD.content_urls?.desktop?.page || `https://en.wikipedia.org/wiki/${encodeURIComponent(pageTitle)}`,
+          description: summaryD.description || '',
+        })
+      }
+    } catch { /* silent */ }
+
+    // Google News via gnews proxy
+    try {
+      const newsR = await fetch(`/api/gnews?q=${encodeURIComponent(q + ' NFL')}`)
+      const xml   = await newsR.text()
+      const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0, 5)
+      const parsed = items.map(m => {
+        const item    = m[1]
+        const title   = (item.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/) || item.match(/<title>(.*?)<\/title>/))?.[1]?.trim() || ''
+        const link    = item.match(/<link>(.*?)<\/link>/)?.[1]?.trim() || ''
+        const source  = item.match(/<source[^>]*>(.*?)<\/source>/)?.[1]?.trim() || 'Google News'
+        const pubDate = item.match(/<pubDate>(.*?)<\/pubDate>/)?.[1]?.trim() || ''
+        const pub     = pubDate ? new Date(pubDate).toLocaleDateString('en-US', { month:'short', day:'numeric' }) : ''
+        return { title, link, source, pub }
+      }).filter(a => a.title && a.link)
+      setNews(parsed)
+    } catch { /* silent */ }
+
+    setLoading(false)
+  }
+
+  useEffect(() => { if (initialPlayer) search(initialPlayer) }, [initialPlayer])
+
+  const handleKey = e => { if (e.key === 'Enter') search() }
+
+  return (
+    <div>
+      <div className="section-bar">
+        <h2>🔍 The Scouting Report</h2>
+        <div className="sb-rule" />
+        <span className="sb-ct">Player intel · Wikipedia · Latest news · No fluff</span>
+      </div>
+
+      {/* Search bar */}
+      <div className="scout-search-wrap">
+        <div className="scout-search-row">
+          <input
+            className="scout-input"
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={handleKey}
+            placeholder="Search any NFL player…"
+            autoComplete="off"
+          />
+          <button className="scout-btn" onClick={() => search()}>Scout →</button>
+        </div>
+        <div className="scout-quick">
+          {QUICK.map(name => (
+            <button key={name} className="scout-quick-btn" onClick={() => search(name)}>{name}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Loading */}
+      {loading && (
+        <div className="leaders-coming-soon">
+          <div className="cs-icon">🔍</div>
+          <div className="cs-title">Pulling intel on {query}…</div>
+        </div>
+      )}
+
+      {/* Results */}
+      {!loading && wiki && (
+        <div className="scout-card">
+          {/* Dispatch header */}
+          <div className="scout-dispatch-header">
+            <div className="scout-dispatch-label">PLAYER DISPATCH · THE FINAL WHISTLE SCOUTING BUREAU</div>
+            <div className="scout-dispatch-date">{new Date().toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' }).toUpperCase()}</div>
+          </div>
+
+          {/* Player card */}
+          <div className="scout-player-wrap">
+            {wiki.thumbnail && (
+              <div className="scout-photo-wrap">
+                <img src={wiki.thumbnail} alt={wiki.title} className="scout-photo" />
+              </div>
+            )}
+            <div className="scout-player-info">
+              <div className="scout-player-name">{wiki.title}</div>
+              {wiki.description && <div className="scout-player-desc">{wiki.description}</div>}
+              <div className="scout-bio">{wiki.extract?.slice(0, 500)}{wiki.extract?.length > 500 ? '…' : ''}</div>
+              <div className="scout-links">
+                <a href={wiki.url} target="_blank" rel="noopener noreferrer" className="scout-ref-btn">📖 Wikipedia</a>
+                <a href={`https://www.espn.com/nfl/players/results?query=${encodeURIComponent(wiki.title)}`} target="_blank" rel="noopener noreferrer" className="scout-ref-btn">📊 ESPN Stats</a>
+                <a href={`https://www.pro-football-reference.com/search/search.fcgi?search=${encodeURIComponent(wiki.title)}`} target="_blank" rel="noopener noreferrer" className="scout-ref-btn">📈 PFR</a>
+              </div>
+            </div>
+          </div>
+
+          {/* News feed */}
+          {news.length > 0 && (
+            <div className="scout-news">
+              <div className="scout-news-label">📰 LATEST INTEL</div>
+              {news.map((item, i) => (
+                <div key={i} className="scout-news-item">
+                  <div className="scout-news-num">{String(i+1).padStart(2,'0')}</div>
+                  <div className="scout-news-body">
+                    <a href={item.link} target="_blank" rel="noopener noreferrer" className="scout-news-title">{item.title}</a>
+                    <div className="scout-news-meta">{item.source}{item.pub ? ` · ${item.pub}` : ''}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {news.length === 0 && !loading && (
+            <div className="scout-news">
+              <div className="scout-news-label">📰 LATEST INTEL</div>
+              <div className="scout-no-news">No recent news found for {wiki.title}.</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* No result */}
+      {!loading && !wiki && query && (
+        <div className="leaders-coming-soon">
+          <div className="cs-icon">🤷</div>
+          <div className="cs-title">No results for "{query}"</div>
+          <div className="cs-text">Try their full name — first and last.</div>
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!loading && !wiki && !query && (
+        <div className="leaders-coming-soon">
+          <div className="cs-icon">🔍</div>
+          <div className="cs-title">The Scouting Report</div>
+          <div className="cs-text">Search any NFL player above, or click a name in any box score to pull their file instantly.</div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 function ResourcesView() {
   const [openCat, setOpenCat] = useState(null)
