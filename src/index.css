@@ -3047,3 +3047,62 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 /* No data message */
 .games-grid .no-data { color: rgba(245,240,232,.3); padding: 20px; text-align: center; font-size: 11px; }
+
+/* ── Player links in box score tables ────────────────────────────────────── */
+.player-link-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.player-link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: rgba(200,168,75,.4);
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+  transition: color .12s, text-decoration-color .12s;
+}
+.player-link:hover {
+  color: var(--gold);
+  text-decoration-color: var(--gold);
+}
+.player-link-refs {
+  display: inline-flex;
+  gap: 3px;
+  opacity: 0;
+  transition: opacity .15s;
+}
+.player-link-wrap:hover .player-link-refs { opacity: 1; }
+
+.player-ref-btn {
+  font-family: var(--font-mono);
+  font-size: 6.5px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  padding: 1px 5px;
+  border-radius: 2px;
+  background: rgba(42,31,14,.1);
+  color: var(--muted);
+  text-decoration: none;
+  border: 1px solid rgba(42,31,14,.15);
+  transition: background .1s, color .1s;
+  white-space: nowrap;
+}
+.player-ref-btn:hover {
+  background: var(--gold);
+  color: var(--ink);
+  border-color: var(--gold);
+}
+
+/* Dark card version (preseason) */
+.games-grid .player-link { text-decoration-color: rgba(200,168,75,.3); }
+.games-grid .player-link:hover { color: var(--gold); }
+.games-grid .player-ref-btn {
+  background: rgba(255,255,255,.06);
+  color: rgba(245,240,232,.4);
+  border-color: rgba(255,255,255,.1);
+}
+.games-grid .player-ref-btn:hover {
+  background: var(--gold);
+  color: var(--ink);
+}
