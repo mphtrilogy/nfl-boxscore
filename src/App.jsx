@@ -1261,6 +1261,36 @@ function Linescore({ game: g }) {
 }
 
 // ── BOX SCORE DRAWER ──────────────────────────────────────────────────────────
+// ── PLAYER LINK — name + hover tooltip with ESPN + PFR links ──────────────
+function PlayerLink({ name, espnId }) {
+  if (!name || name === '—') return <span>{name}</span>
+
+  // Build ESPN URL — use ID if available, otherwise search
+  const espnSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+  const espnUrl  = espnId
+    ? `https://www.espn.com/nfl/player/_/id/${espnId}/${espnSlug}`
+    : `https://www.espn.com/nfl/players/results?query=${encodeURIComponent(name)}`
+
+  // PFR search URL
+  const pfrUrl = `https://www.pro-football-reference.com/search/search.fcgi?hint=${encodeURIComponent(name)}&search=${encodeURIComponent(name)}`
+
+  return (
+    <span className="player-link-wrap">
+      <a
+        href={espnUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="player-link"
+        title={`${name} — ESPN`}
+      >{name}</a>
+      <span className="player-link-refs">
+        <a href={espnUrl} target="_blank" rel="noopener noreferrer" className="player-ref-btn">ESPN</a>
+        <a href={pfrUrl}  target="_blank" rel="noopener noreferrer" className="player-ref-btn">PFR</a>
+      </span>
+    </span>
+  )
+}
+
 function BoxScoreDrawer({ espnData, loading, game }) {
   const [drawerTab, setDrawerTab] = useState('scoring')
   if (loading) return <div className="drawer-loading">Loading box score…</div>
@@ -1462,12 +1492,13 @@ function PlayerStats({ espnData, cat, game: g }) {
       sg.labels?.forEach((lbl, i) => { vals[lbl] = a.stats?.[i] || '0' })
       if (!sg.labels?.some(lbl => parseFloat(vals[lbl]) !== 0)) return
       rows.push({
-        name: a.athlete?.displayName || '—',
-        pos:  a.athlete?.position?.abbreviation || '',
-        team: tm,
+        name:      a.athlete?.displayName || '—',
+        espnId:    a.athlete?.id || null,
+        pos:       a.athlete?.position?.abbreviation || '',
+        team:      tm,
         vals,
-        fpts_ppr: calcFpts(vals, cat, 'ppr'),
-        fpts_std: calcFpts(vals, cat, 'std'),
+        fpts_ppr:  calcFpts(vals, cat, 'ppr'),
+        fpts_std:  calcFpts(vals, cat, 'std'),
       })
     })
     if (rows.length) grouped.push({ tm, teamName, rows })
@@ -1499,7 +1530,7 @@ function PlayerStats({ espnData, cat, game: g }) {
                 return (
                   <tr key={i} className={inSquad ? 'squad-highlight' : ''}>
                     <td className="pt-name">
-                      {row.name}
+                      <PlayerLink name={row.name} espnId={row.espnId} />
                       {inSquad && <span className="squad-tag-inline">⚡</span>}
                     </td>
                     <td className="pt-team">{row.team}</td>
@@ -1532,7 +1563,7 @@ function KickingStats({ espnData, game: g }) {
       sg?.athletes?.forEach(a => {
         const vals = {}
         sg.labels?.forEach((lbl, i) => { vals[lbl] = a.stats?.[i] || '—' })
-        rows.push({ name: a.athlete?.displayName || '—', tm, role: cat === 'kicking' ? 'K' : 'P', vals })
+        rows.push({ name: a.athlete?.displayName || '—', espnId: a.athlete?.id || null, tm, role: cat === 'kicking' ? 'K' : 'P', vals })
       })
     })
     if (rows.length) grouped.push({ tm, teamName, rows })
@@ -1560,7 +1591,7 @@ function KickingStats({ espnData, game: g }) {
               <tr className="pt-team-hdr"><td colSpan="18">{teamName.toUpperCase()}</td></tr>
               {rows.map((r, i) => (
                 <tr key={i}>
-                  <td className="pt-name">{r.name}</td>
+                  <td className="pt-name"><PlayerLink name={r.name} espnId={r.espnId} /></td>
                   <td className="pt-team">{r.tm}</td>
                   <td className="pt-pos">{r.role}</td>
                   {r.role === 'K' ? <>
@@ -1607,7 +1638,7 @@ function ReturnStats({ espnData, game: g }) {
         const vals = {}
         sg.labels?.forEach((lbl, i) => { vals[lbl] = a.stats?.[i] || '—' })
         if (parseFloat(vals['NO']||vals['RET']||0) === 0) return
-        rows.push({ name: a.athlete?.displayName || '—', tm, type: cat === 'kickReturns' ? 'KR' : 'PR', vals })
+        rows.push({ name: a.athlete?.displayName || '—', espnId: a.athlete?.id || null, tm, type: cat === 'kickReturns' ? 'KR' : 'PR', vals })
       })
     })
     if (rows.length) grouped.push({ tm, teamName, rows })
@@ -1629,7 +1660,7 @@ function ReturnStats({ espnData, game: g }) {
               <tr className="pt-team-hdr"><td colSpan="9">{teamName.toUpperCase()}</td></tr>
               {rows.map((r, i) => (
                 <tr key={i}>
-                  <td className="pt-name">{r.name}</td>
+                  <td className="pt-name"><PlayerLink name={r.name} espnId={r.espnId} /></td>
                   <td className="pt-team">{r.tm}</td>
                   <td className="pt-pos">{r.type}</td>
                   <td>{r.vals['NO']||r.vals['RET']||'—'}</td>
