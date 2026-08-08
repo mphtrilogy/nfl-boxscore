@@ -3344,3 +3344,25 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .scout-photo { width: 80px; height: 80px; }
   .scout-dispatch-header { flex-direction: column; }
 }
+
+/* ── FW Formula data maturity banner ────────────────────────────────────── */
+.fw-data-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 18px 14px;
+  padding: 10px 14px;
+  background: var(--paper-mid);
+  border-left: 3px solid var(--gold);
+  border-radius: 0 var(--r) var(--r) 0;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.fw-data-banner-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.fw-data-banner-text { flex: 1; }
