@@ -2405,9 +2405,12 @@ function useFWFantasyScores(currentWeek, mode) {
           const usageScore = Math.min(10, usagePerGame * 0.5)
 
           // ── COMPONENT 4: Weather Score (10%) ────────────────────────────
-          // Penalty for wind/rain at outdoor stadiums
-          // (We don\'t have async weather here so we use a conservative default)
-          const weatherScore = 7 // will be 5-10; overridden in display with live data
+          // Dome teams get 10, outdoor teams default 7 (will update with live weather)
+          const DOME_TEAMS = new Set(['ARI','ATL','DAL','DET','GB','HOU','IND','LA','LAC','MIN','NO','LV','NYG','NYJ'])
+          const gameLocation = nextOpp[p.team] // home team = opp means player travels; home = p.team means home game
+          const isHome = !nextOpp[p.team] || Object.keys(nextOpp).find(k => nextOpp[k] === p.team) === p.team
+          const hostTeam = isHome ? p.team : (opp || p.team)
+          const weatherScore = DOME_TEAMS.has(hostTeam) ? 10 : 7
 
           // ── COMPONENT 5: Momentum Score (5%) ────────────────────────────
           // Is the player\'s last game above their last-3 average?
@@ -2477,7 +2480,7 @@ function FWFormulaView({ currentWeek, mode }) {
   if (!seasonStarted) return (
     <div className="leaders-coming-soon">
       <div className="cs-icon">⚡</div>
-      <div className="cs-title">FW Formula — Live Aug 7</div>
+      <div className="cs-title">FW Formula — Live Sep 9</div>
       <div className="cs-text">
         The Final Whistle Fantasy Score pulls live from ESPN box scores,
         defensive matchup data, and weather to rank every player automatically.
@@ -2486,11 +2489,32 @@ function FWFormulaView({ currentWeek, mode }) {
       <div style={{margin:'16px auto',maxWidth:500,textAlign:'left',padding:'0 20px'}}>
         <div className="fl-offseason-banner" style={{borderRadius:4}}>
           🧮 Formula: Trend (35%) + Matchup (30%) + Usage (20%) + Weather (10%) + Momentum (5%)<br/>
-          📡 Data: ESPN box scores · Defensive rankings · Open-Meteo weather · Live weekly<br/>
+          📡 Data: ESPN box scores · Defensive rankings · Dome vs outdoor · Live weekly<br/>
           🔄 Updates: Every time you load the page — zero manual work
         </div>
       </div>
-      <div className="cs-date">Preseason opens Aug 7 · Regular season Sep 9</div>
+      <div className="cs-date">Regular season Sep 9 · FW Formula activates Week 3 (enough data)</div>
+    </div>
+  )
+
+  // Preseason: show formula info but note data is limited
+  if (isPreseason()) return (
+    <div className="leaders-coming-soon">
+      <div className="cs-icon">⚡</div>
+      <div className="cs-title">FW Formula — Building Data</div>
+      <div className="cs-text">
+        Preseason box scores are flowing in but the formula needs regular season data to be meaningful.
+        Preseason snaps don't reflect real usage — starters play one quarter, backups play the rest.
+      </div>
+      <div style={{margin:'16px auto',maxWidth:500,textAlign:'left',padding:'0 20px'}}>
+        <div className="fl-offseason-banner" style={{borderRadius:4}}>
+          🗓️ FW Formula goes live <strong>Week 3</strong> of the regular season — by then we have<br/>
+          two weeks of real snap counts, target shares, and defensive rankings to work with.<br/><br/>
+          🧮 Formula: Trend (35%) + Matchup (30%) + Usage (20%) + Weather (10%) + Momentum (5%)<br/>
+          📡 Dome advantage built in · 300+ yard bonuses · PPR and STD modes
+        </div>
+      </div>
+      <div className="cs-date">Regular season Sep 9 · Full FW scores live by Week 3</div>
     </div>
   )
 
@@ -3388,18 +3412,28 @@ function calcFantasyPts(stats, mode, pos) {
   let pts = 0
 
   if (pos === 'K') {
-    // Kicker scoring: 3pt FG <40, 4pt 40-49, 5pt 50+, 1pt XP
-    pts += (parseInt(stats['FG'] || stats['FGM'] || 0)) * 3
-    pts += (parseInt(stats['XP'] || stats['XPM'] || 0)) * 1
+    // Proper kicker scoring by distance
+    const fgm   = parseInt(stats['FGM'] || stats['FG'] || 0)
+    const fga   = parseInt(stats['FGA'] || 0)
+    const xpm   = parseInt(stats['XPM'] || stats['XP'] || 0)
+    const lng   = parseInt(stats['LNG'] || 0)
+    // Distance-based FG scoring: 3pts <40, 4pts 40-49, 5pts 50+
+    // We only have total FGM and LNG, so approximate:
+    // If longest is 50+, give 5pts for that one, 3 for rest
+    // If longest is 40-49, give 4pts for that one, 3 for rest
+    if (fgm > 0) {
+      const bonus = lng >= 50 ? 2 : lng >= 40 ? 1 : 0
+      pts += (fgm * 3) + bonus
+    }
+    pts += xpm * 1
     return Math.round(pts * 10) / 10
   }
 
   if (pos === 'DEF') {
-    // DEF/ST scoring
-    const sacks    = parseFloat(stats['SACKS'] || stats['TOT'] || 0)
-    const ints     = parseFloat(stats['INT'] || 0)
-    const fum      = parseFloat(stats['FR']  || 0)
-    const td       = parseFloat(stats['TD']  || 0)
+    const sacks = parseFloat(stats['SACKS'] || 0)
+    const ints  = parseFloat(stats['INT']   || 0)
+    const fum   = parseFloat(stats['FR']    || 0)
+    const td    = parseFloat(stats['TD']    || 0)
     pts += sacks * 1
     pts += ints  * 2
     pts += fum   * 2
@@ -3407,32 +3441,43 @@ function calcFantasyPts(stats, mode, pos) {
     return Math.round(pts * 10) / 10
   }
 
-  // Skill positions
-  const passYds = parseFloat(stats['YDS'] || 0)
-  const passTDs = parseFloat(stats['TD']  || 0)
-  const ints    = parseFloat(stats['INT'] || 0)
-  const rushYds = parseFloat(stats['YDS'] || 0)
-  const rushTDs = parseFloat(stats['TD']  || 0)
-  const recYds  = parseFloat(stats['YDS'] || 0)
-  const recTDs  = parseFloat(stats['TD']  || 0)
-  const recs    = parseFloat(stats['REC'] || 0)
-
-  // Passing
-  if (stats['C/ATT'] || stats['QBR']) {
+  // Skill positions — use pos to avoid stat bleeding between categories
+  if (pos === 'QB') {
+    const passYds = parseFloat(stats['YDS'] || 0)
+    const passTDs = parseFloat(stats['TD']  || 0)
+    const ints    = parseFloat(stats['INT'] || 0)
+    const rushYds = parseFloat(stats['RYDS'] || 0) // QB rushing yards (separate key)
+    const rushTDs = parseFloat(stats['RTD']  || 0)
     pts += passYds / 25
     pts += passTDs * 6
     pts -= ints    * 2
-  }
-  // Rushing
-  if (stats['CAR']) {
     pts += rushYds / 10
     pts += rushTDs * 6
-  }
-  // Receiving
-  if (stats['REC'] || stats['TGT']) {
+    // Bonus: 300+ passing yard game
+    if (passYds >= 300) pts += 3
+  } else if (pos === 'RB') {
+    const rushYds = parseFloat(stats['YDS'] || 0)
+    const rushTDs = parseFloat(stats['TD']  || 0)
+    const recYds  = parseFloat(stats['RYDS'] || 0)
+    const recTDs  = parseFloat(stats['RTD']  || 0)
+    const recs    = parseFloat(stats['REC']  || 0)
+    pts += rushYds / 10
+    pts += rushTDs * 6
+    pts += recYds  / 10
+    pts += recTDs  * 6
+    if (mode === 'ppr') pts += recs
+    // Bonus: 100+ rush yard game
+    if (rushYds >= 100) pts += 3
+  } else {
+    // WR, TE
+    const recYds = parseFloat(stats['YDS'] || 0)
+    const recTDs = parseFloat(stats['TD']  || 0)
+    const recs   = parseFloat(stats['REC'] || 0)
     pts += recYds / 10
     pts += recTDs * 6
     if (mode === 'ppr') pts += recs
+    // Bonus: 100+ receiving yard game
+    if (recYds >= 100) pts += 3
   }
 
   return Math.round(pts * 10) / 10
