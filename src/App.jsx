@@ -2718,7 +2718,9 @@ function FWFormulaView({ currentWeek, mode }) {
               : 'FW scores populate after Week 1 games are played.'
             }
           </div>
-          {debug && <div style={{fontFamily:'monospace',fontSize:'10px',color:'#888',marginTop:'8px',padding:'8px',background:'#f5f0e8',borderRadius:'4px'}}>{debug}</div>}
+          <div style={{fontFamily:'monospace',fontSize:'10px',color:'#888',marginTop:'8px',padding:'8px',background:'#f5f0e8',borderRadius:'4px'}}>
+            {debug || 'waiting...'} | view.players={players.length} | filtered={filtered.length}
+          </div>
         </div>
       )}
     </div>
