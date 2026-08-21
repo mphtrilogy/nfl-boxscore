@@ -2245,266 +2245,199 @@ const MATCHUP_RATINGS = {
 // These update automatically as the season progresses via useLiveDefenseRankings()
 const DEF_BASELINE = { QB:22, RB:24, WR:28, TE:12, K:8 }
 
-function useLiveDefenseRankings(currentWeek) {
-  const [rankings, setRankings] = useState({})
-  const seasonStarted = currentWeek > 1 || isGameSeason()
+// ── FW FORMULA ENGINE — clean rewrite ─────────────────────────────────────────
+// Fetches ESPN box scores directly from browser (server-side gets 403)
+// Correctly maps athlete positions from ESPN data
+// Merges rushing + receiving stats for same player
 
-  useEffect(() => {
-    if (!seasonStarted) return
-    // Fetch last 3 weeks of box scores and compute pts allowed per team per position
-    const weeksToFetch = []
-    const start = Math.max(1, currentWeek - 2)
-    for (let w = start; w <= currentWeek; w++) weeksToFetch.push(w)
+const ESPN_NFL = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl'
 
-    Promise.all(
-      weeksToFetch.map(w =>
-        fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${w}&seasontype=${espnSeasonType()}&limit=20`)
-          .then(r => r.json()).catch(() => null)
-      )
-    ).then(scoreboards => {
-      const gameIds = []
-      scoreboards.forEach((sb, idx) => {
-        sb?.events?.forEach(ev => gameIds.push(ev.id))
-      })
-      return Promise.all(
-        gameIds.slice(0,15).map(id =>
-          fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${id}`)
-            .then(r => r.json()).catch(() => null)
-        )
-      )
-    }).then(boxScores => {
-      // For each team, sum pts allowed by position
-      const defMap = {} // { TEAM: { QB:pts, RB:pts, WR:pts, TE:pts, K:pts, games:n } }
-      boxScores.forEach(bs => {
-        if (!bs?.boxscore?.players) return
-        bs.header?.competitions?.[0]?.competitors?.forEach(comp => {
-          const opp = comp.team?.abbreviation
-          if (!opp) return
-          if (!defMap[opp]) defMap[opp] = { QB:0, RB:0, WR:0, TE:0, K:0, games:0 }
-          defMap[opp].games++
-        })
-        bs.boxscore.players.forEach(teamData => {
-          // The OPPONENT allowed these points
-          const scoringTeam = teamData.team?.abbreviation
-          const comp = bs.header?.competitions?.[0]?.competitors
-          const oppTeam = comp?.find(c => c.team?.abbreviation !== scoringTeam)?.team?.abbreviation
-          if (!oppTeam) return
-          if (!defMap[oppTeam]) defMap[oppTeam] = { QB:0, RB:0, WR:0, TE:0, K:0, games:0 }
-
-          teamData.statistics?.forEach(statGroup => {
-            const pos = CAT_TO_POS[statGroup.name]
-            if (!pos || pos === 'DEF') return
-            statGroup.athletes?.forEach(a => {
-              const vals = {}
-              statGroup.labels?.forEach((l, i) => vals[l] = a.stats?.[i] || '0')
-              defMap[oppTeam][pos] = (defMap[oppTeam][pos] || 0) + calcFantasyPts(vals, 'ppr', pos)
-            })
-          })
-        })
-      })
-      // Convert to per-game averages
-      const avgMap = {}
-      Object.entries(defMap).forEach(([team, data]) => {
-        const g = Math.max(data.games, 1)
-        avgMap[team] = {
-          QB: data.QB / g,
-          RB: data.RB / g,
-          WR: data.WR / g,
-          TE: data.TE / g,
-          K:  data.K  / g,
-        }
-      })
-      setRankings(avgMap)
-    }).catch(() => {})
-  }, [currentWeek])
-
-  return rankings
+// Normalize ESPN position abbreviations
+function normPos(raw) {
+  if (!raw) return ''
+  const p = raw.toUpperCase().trim()
+  if (['QB','QUARTERBACK'].includes(p)) return 'QB'
+  if (['RB','HB','FB','HALFBACK','FULLBACK','RUNNING BACK'].includes(p)) return 'RB'
+  if (['WR','WIDE RECEIVER'].includes(p)) return 'WR'
+  if (['TE','TIGHT END'].includes(p)) return 'TE'
+  if (['K','PK','KICKER','PLACEKICKER'].includes(p)) return 'K'
+  if (['DEF','D/ST'].includes(p)) return 'DEF'
+  return p
 }
 
-// ── THE FW FORMULA ENGINE ──────────────────────────────────────────────────────
+// Calculate fantasy points from prefixed stat object
+function calcFW(stats, mode) {
+  let pts = 0
+  // Passing
+  pts += (stats.passYds || 0) / 25
+  pts += (stats.passTD  || 0) * 6
+  pts -= (stats.passInt || 0) * 2
+  if ((stats.passYds || 0) >= 300) pts += 3
+  // Rushing
+  pts += (stats.rushYds || 0) / 10
+  pts += (stats.rushTD  || 0) * 6
+  if ((stats.rushYds || 0) >= 100) pts += 3
+  // Receiving
+  pts += (stats.recYds  || 0) / 10
+  pts += (stats.recTD   || 0) * 6
+  if (mode === 'ppr') pts += (stats.rec || 0)
+  if ((stats.recYds || 0) >= 100) pts += 3
+  // Kicking
+  const fgm = stats.fgm || 0
+  const lng  = stats.fgLng || 0
+  if (fgm > 0) pts += fgm * 3 + (lng >= 50 ? 2 : lng >= 40 ? 1 : 0)
+  pts += (stats.xpm || 0) * 1
+  return Math.round(pts * 10) / 10
+}
+
 function useFWFantasyScores(currentWeek, mode) {
-  const [players,  setPlayers]  = useState([])
-  const [loading,  setLoading]  = useState(true)
-  const [debug,    setDebug]    = useState('')
-  const defRankings = useLiveDefenseRankings(currentWeek)
-  const seasonStarted = currentWeek > 1 || isGameSeason()
+  const [players, setPlayers] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [debug,   setDebug]   = useState('')
 
   useEffect(() => {
-    if (!seasonStarted) { setLoading(false); return }
+    if (!isGameSeason()) { setLoading(false); return }
 
-    // Step 1 — pull available weeks of box scores
-    // During preseason: fetch all completed preseason weeks (1 through current)
-    // During regular season: fetch last 5 weeks
-    const weeksToFetch = []
+    const weeks = []
     if (isPreseason()) {
-      for (let w = 1; w <= currentWeek; w++) weeksToFetch.push(w)
+      for (let w = 1; w <= Math.min(currentWeek, 4); w++) weeks.push(w)
     } else {
-      const start = Math.max(1, currentWeek - 4)
-      for (let w = start; w <= currentWeek; w++) weeksToFetch.push(w)
+      for (let w = Math.max(1, currentWeek - 4); w <= currentWeek; w++) weeks.push(w)
     }
 
-    // Fetch directly from ESPN — proxy (Vercel server) gets 403, browser calls work fine
-    const ESPN = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl'
+    setLoading(true)
 
-    Promise.all(
-      weeksToFetch.map(w =>
-        fetch(`${ESPN}/scoreboard?week=${w}&seasontype=${espnSeasonType()}&limit=20`)
-          .then(r => r.json()).catch(() => null)
-      )
-    ).then(async scoreboards => {
+    // Step 1: get all game IDs for these weeks
+    Promise.all(weeks.map(w =>
+      fetch(`${ESPN_NFL}/scoreboard?week=${w}&seasontype=${espnSeasonType()}&limit=20`)
+        .then(r => r.json())
+        .catch(() => ({ events: [] }))
+    ))
+    .then(async boards => {
       const gameIds = []
-      scoreboards.forEach((sb, idx) => {
-        sb?.events?.forEach(ev => gameIds.push({ id:ev.id, week:weeksToFetch[idx] }))
+      boards.forEach((board, i) => {
+        ;(board.events || []).forEach(ev => {
+          if (ev.status?.type?.state === 'post') { // only completed games
+            gameIds.push({ id: ev.id, week: weeks[i] })
+          }
+        })
       })
 
-      const boxScores = await Promise.all(
-        gameIds.slice(0,25).map(g =>
-          fetch(`${ESPN}/summary?event=${g.id}`)
+      if (!gameIds.length) {
+        setDebug('No completed games found')
+        setPlayers([])
+        setLoading(false)
+        return
+      }
+
+      // Step 2: fetch box score summaries
+      const summaries = await Promise.all(
+        gameIds.slice(0, 30).map(g =>
+          fetch(`${ESPN_NFL}/summary?event=${g.id}`)
             .then(r => r.json())
-            .then(d => ({ ...d, week:g.week }))
+            .then(d => ({ ...d, _week: g.week }))
             .catch(() => null)
         )
       )
 
-      // Step 2 — build player stat history
-      const playerMap = {}
-      boxScores.forEach(bs => {
-        if (!bs?.boxscore?.players) return
-        bs.boxscore.players.forEach(teamData => {
-          const team = teamData.team?.abbreviation || ''
-          // Find opponent from this game
-          const comp = bs.header?.competitions?.[0]?.competitors
-          const opp = comp?.find(c => c.team?.abbreviation !== team)?.team?.abbreviation || ''
+      // Step 3: build player map
+      // key = "name|team", value = { name, team, pos, statsByWeek: {week: pts}, targets, carries }
+      const pmap = {}
 
-          teamData.statistics?.forEach(statGroup => {
-            const catPos = CAT_TO_POS[statGroup.name] || 'SKILL'
-            statGroup.athletes?.forEach(a => {
+      summaries.filter(Boolean).forEach(summary => {
+        const week = summary._week
+        ;(summary.boxscore?.players || []).forEach(teamData => {
+          const teamAbbr = teamData.team?.abbreviation || ''
+          ;(teamData.statistics || []).forEach(statGroup => {
+            const cat = statGroup.name // 'passing','rushing','receiving','kicking'
+            ;(statGroup.athletes || []).forEach(a => {
               const name = a.athlete?.displayName || ''
               if (!name) return
-              // ESPN position can be in different places depending on API response
-              const rawPos = a.athlete?.position?.abbreviation 
+
+              // Get position — ESPN stores it on the athlete object
+              const rawPos = a.athlete?.position?.abbreviation
                 || a.athlete?.position?.name
-                || a.position?.abbreviation
                 || ''
-              // Normalize common ESPN position names
-              const posNorm = rawPos.toUpperCase()
-              const athletePos = posNorm === 'HALFBACK' ? 'RB'
-                : posNorm === 'FULLBACK' ? 'RB'
-                : posNorm === 'WIDE RECEIVER' ? 'WR'
-                : posNorm === 'TIGHT END' ? 'TE'
-                : posNorm === 'QUARTERBACK' ? 'QB'
-                : posNorm === 'KICKER' ? 'K'
-                : posNorm || catPos
-              const pos = ['QB','RB','WR','TE','K','DEF'].includes(athletePos) ? athletePos : catPos
-              const key = `${name}|${team}`
-              // Build raw vals from ESPN labels
-              const raw = {}
-              statGroup.labels?.forEach((l, i) => raw[l] = a.stats?.[i] || '0')
+              let pos = normPos(rawPos)
 
-              // Build prefixed stat object to avoid YDS/TD collisions
-              const vals = {}
-              if (statGroup.name === 'passing') {
-                vals.passYds = parseFloat(raw['YDS'] || 0)
-                vals.passTD  = parseFloat(raw['TD']  || 0)
-                vals.INT     = parseFloat(raw['INT'] || 0)
-              } else if (statGroup.name === 'rushing') {
-                vals.rushYds = parseFloat(raw['YDS'] || 0)
-                vals.rushTD  = parseFloat(raw['TD']  || 0)
-                vals.CAR     = parseFloat(raw['CAR'] || 0)
-              } else if (statGroup.name === 'receiving') {
-                vals.recYds  = parseFloat(raw['YDS'] || 0)
-                vals.recTD   = parseFloat(raw['TD']  || 0)
-                vals.REC     = parseFloat(raw['REC'] || 0)
-                vals.TGT     = parseFloat(raw['TGT'] || 0)
-              } else if (statGroup.name === 'kicking') {
-                vals.FGM = parseFloat(raw['FGM'] || 0)
-                vals.XPM = parseFloat(raw['XPM'] || 0)
-                vals.LNG = parseFloat(raw['LNG'] || 0)
+              // Fallback: infer from stat category if no position data
+              if (!pos) {
+                if (cat === 'passing')   pos = 'QB'
+                else if (cat === 'rushing')   pos = 'RB'
+                else if (cat === 'receiving') pos = 'WR'
+                else if (cat === 'kicking')   pos = 'K'
+                else pos = 'OL'
               }
 
-              const pts = calcFantasyPts(vals, mode, pos)
+              // Skip non-skill positions
+              if (!['QB','RB','WR','TE','K'].includes(pos)) return
 
-              if (!playerMap[key]) {
-                playerMap[key] = {
-                  name, team, pos,
-                  weeks: {},
-                  opponents: [],
-                  targets: 0, carries: 0, games: 0,
-                }
-              } else if (athletePos && athletePos !== catPos) {
-                // Update pos if we have a real athlete position (not just category default)
-                playerMap[key].pos = pos
+              const key = `${name}|${teamAbbr}`
+              if (!pmap[key]) {
+                pmap[key] = { name, team: teamAbbr, pos, statsByWeek: {}, targets: 0, carries: 0 }
               }
-              // Merge vals into player's weekly accumulator
-              const wk = bs.week || 0
-              if (!playerMap[key].weeks[wk]) playerMap[key].weeks[wk] = 0
-              playerMap[key].weeks[wk] += pts
-              if (!playerMap[key].opponents.includes(opp) && opp) playerMap[key].opponents.push(opp)
-              playerMap[key].targets += parseFloat(vals['TGT'] || 0)
-              playerMap[key].carries += parseFloat(vals['CAR'] || 0)
+
+              // Update pos if we got a real one (not inferred)
+              if (rawPos && normPos(rawPos)) pmap[key].pos = normPos(rawPos)
+
+              // Build stats for this week
+              if (!pmap[key].statsByWeek[week]) pmap[key].statsByWeek[week] = {}
+              const ws = pmap[key].statsByWeek[week]
+              const labels = statGroup.labels || []
+              const vals   = {}
+              labels.forEach((l, i) => { vals[l] = parseFloat(a.stats?.[i]) || 0 })
+
+              if (cat === 'passing') {
+                ws.passYds  = (ws.passYds  || 0) + (vals['YDS'] || 0)
+                ws.passTD   = (ws.passTD   || 0) + (vals['TD']  || 0)
+                ws.passInt  = (ws.passInt  || 0) + (vals['INT'] || 0)
+              } else if (cat === 'rushing') {
+                ws.rushYds  = (ws.rushYds  || 0) + (vals['YDS'] || 0)
+                ws.rushTD   = (ws.rushTD   || 0) + (vals['TD']  || 0)
+                pmap[key].carries += (vals['CAR'] || 0)
+              } else if (cat === 'receiving') {
+                ws.recYds   = (ws.recYds   || 0) + (vals['YDS'] || 0)
+                ws.recTD    = (ws.recTD    || 0) + (vals['TD']  || 0)
+                ws.rec      = (ws.rec      || 0) + (vals['REC'] || 0)
+                pmap[key].targets += (vals['TGT'] || 0)
+              } else if (cat === 'kicking') {
+                ws.fgm      = (ws.fgm      || 0) + (vals['FGM'] || 0)
+                ws.xpm      = (ws.xpm      || 0) + (vals['XPM'] || 0)
+                ws.fgLng    = Math.max(ws.fgLng || 0, vals['LNG'] || 0)
+              }
             })
           })
         })
       })
 
-      // Step 3 — find next opponent from upcoming schedule
-      const upcomingSb = await fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${currentWeek + 1}&seasontype=${espnSeasonType()}&limit=20`)
-        .then(r => r.json()).catch(() => null)
-      const nextOpp = {} // { TEAM: OPP_TEAM }
-      upcomingSb?.events?.forEach(ev => {
-        const comps = ev.competitions?.[0]?.competitors || []
-        if (comps.length === 2) {
-          nextOpp[comps[0].team?.abbreviation] = comps[1].team?.abbreviation
-          nextOpp[comps[1].team?.abbreviation] = comps[0].team?.abbreviation
-        }
-      })
-
-      // Step 4 — apply FW formula to each player
-      // Convert weeks object to array and set games count
-      Object.values(playerMap).forEach(p => {
-        p.weekArr = Object.values(p.weeks)
-        p.games   = p.weekArr.length
-      })
-
-      const scored = Object.values(playerMap)
-        .filter(p => p.games >= 1 && p.weekArr.reduce((a,b) => a+b, 0) >= 0.5)
+      // Step 4: score each player
+      const posCounts = {}
+      const scored = Object.values(pmap)
         .map(p => {
-          const wkPts = p.weekArr
-          const seasonAvg = wkPts.reduce((a,b) => a+b, 0) / wkPts.length
-          const last1 = wkPts[wkPts.length-1] || 0
-          const last3avg = wkPts.slice(-3).reduce((a,b) => a+b, 0) / Math.min(3, wkPts.length)
-          const opp = nextOpp[p.team] || ''
+          const weekPts = Object.values(p.statsByWeek).map(ws => calcFW(ws, mode))
+          if (!weekPts.length) return null
+          const totalPts  = weekPts.reduce((a, b) => a + b, 0)
+          if (totalPts < 0.5) return null // skip pure DNPs
 
-          // ── COMPONENT 1: Trend Score (35%) ─────────────────────────────
-          // How player is doing vs their own average recently
-          const trendRatio = seasonAvg > 0 ? last3avg / seasonAvg : 1
-          const trendScore = Math.min(10, Math.max(0, trendRatio * 5))
+          posCounts[p.pos] = (posCounts[p.pos] || 0) + 1
 
-          // ── COMPONENT 2: Matchup Score (30%) ────────────────────────────
-          // Pts allowed by upcoming opponent vs this position
-          const defAvg = defRankings[opp]?.[p.pos] || DEF_BASELINE[p.pos] || 20
-          const baseline = DEF_BASELINE[p.pos] || 20
-          const matchupRatio = defAvg / baseline // >1 means generous defense
-          const matchupScore = Math.min(10, Math.max(0, matchupRatio * 5))
+          const games     = weekPts.length
+          const seasonAvg = totalPts / games
+          const last1     = weekPts[weekPts.length - 1] || 0
+          const last3avg  = weekPts.slice(-3).reduce((a, b) => a + b, 0) / Math.min(3, games)
 
-          // ── COMPONENT 3: Usage Score (20%) ──────────────────────────────
-          // Target share / carries as proxy for involvement
-          const usagePerGame = (p.targets + p.carries) / p.games
-          const usageScore = Math.min(10, usagePerGame * 0.5)
+          // FW Formula components
+          const trendRatio  = seasonAvg > 0 ? last3avg / seasonAvg : 1
+          const trendScore  = Math.min(10, Math.max(0, trendRatio * 5))
 
-          // ── COMPONENT 4: Weather Score (10%) ────────────────────────────
-          // Dome teams get 10, outdoor teams default 7 (will update with live weather)
-          const DOME_TEAMS = new Set(['ARI','ATL','DAL','DET','GB','HOU','IND','LA','LAC','MIN','NO','LV','NYG','NYJ'])
-          const gameLocation = nextOpp[p.team] // home team = opp means player travels; home = p.team means home game
-          const isHome = !nextOpp[p.team] || Object.keys(nextOpp).find(k => nextOpp[k] === p.team) === p.team
-          const hostTeam = isHome ? p.team : (opp || p.team)
-          const weatherScore = DOME_TEAMS.has(hostTeam) ? 10 : 7
+          const DOME = new Set(['ARI','ATL','DAL','DET','HOU','IND','LA','LAC','LV','MIN','NO','NYG','NYJ'])
+          const weatherScore = DOME.has(p.team) ? 10 : 7
 
-          // ── COMPONENT 5: Momentum Score (5%) ────────────────────────────
-          // Is the player\'s last game above their last-3 average?
+          const usagePerGame  = (p.targets + p.carries) / games
+          const usageScore    = Math.min(10, usagePerGame * 0.5)
           const momentumScore = last1 > last3avg ? 8 : last1 > last3avg * 0.7 ? 5 : 3
+          const matchupScore  = 5 // neutral default (no upcoming matchup data in preseason)
 
-          // ── FINAL FW SCORE ───────────────────────────────────────────────
           const fwScore = (
             trendScore    * 0.35 +
             matchupScore  * 0.30 +
@@ -2513,32 +2446,38 @@ function useFWFantasyScores(currentWeek, mode) {
             momentumScore * 0.05
           )
 
-          const projPts = last3avg * (fwScore / 7) // scale projection to FW score
+          const projPts = Math.round(last3avg * (fwScore / 7) * 10) / 10
 
           return {
-            ...p,
-            seasonAvg:    Math.round(seasonAvg * 10) / 10,
-            last3avg:     Math.round(last3avg * 10) / 10,
-            last1:        Math.round(last1 * 10) / 10,
-            opp,
-            fwScore:      Math.round(fwScore * 10) / 10,
-            projPts:      Math.round(projPts * 10) / 10,
-            trendScore:   Math.round(trendScore * 10) / 10,
-            matchupScore: Math.round(matchupScore * 10) / 10,
-            usageScore:   Math.round(usageScore * 10) / 10,
+            name:      p.name,
+            team:      p.team,
+            pos:       p.pos,
+            games,
+            seasonAvg: Math.round(seasonAvg * 10) / 10,
+            last1:     Math.round(last1 * 10) / 10,
+            last3avg:  Math.round(last3avg * 10) / 10,
+            opp:       '',
+            fwScore:   Math.round(fwScore * 10) / 10,
+            projPts,
+            trendScore:    Math.round(trendScore    * 10) / 10,
+            matchupScore:  Math.round(matchupScore  * 10) / 10,
+            usageScore:    Math.round(usageScore    * 10) / 10,
             momentumScore,
-            trend: last3avg > seasonAvg * 1.1 ? '🔥 Hot' :
-                   last3avg < seasonAvg * 0.8 ? '❄️ Cold' : '➡️ Steady',
+            trend: last3avg > seasonAvg * 1.1 ? '🔥 Hot'
+                 : last3avg < seasonAvg * 0.8 ? '❄️ Cold'
+                 : '➡️ Steady',
           }
         })
-        .filter(p => p.fwScore > 0)
+        .filter(Boolean)
         .sort((a, b) => b.fwScore - a.fwScore)
 
-      setDebug(`✓ ${gameIds.length} games · ${Object.keys(playerMap).length} raw players · ${scored.length} scored`)
+      const posStr = Object.entries(posCounts).map(([p,n]) => `${p}:${n}`).join(' ')
+      setDebug(`✓ ${gameIds.length} games · ${Object.keys(pmap).length} players · ${scored.length} scored | ${posStr}`)
       setPlayers(scored)
       setLoading(false)
-    }).catch(e => {
-      setDebug(`✗ Error: ${e.message}`)
+    })
+    .catch(e => {
+      setDebug(`✗ ${e.message}`)
       setLoading(false)
     })
   }, [currentWeek, mode])
