@@ -2720,6 +2720,7 @@ function FWFormulaView({ currentWeek, mode }) {
           </div>
           <div style={{fontFamily:'monospace',fontSize:'10px',color:'#888',marginTop:'8px',padding:'8px',background:'#f5f0e8',borderRadius:'4px'}}>
             {debug || 'waiting...'} | view.players={players.length} | filtered={filtered.length}
+            {players.length > 0 && ` | positions: ${[...new Set(players.map(p=>p.pos))].join(',')}`}
           </div>
         </div>
       )}
