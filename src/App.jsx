@@ -2342,30 +2342,56 @@ function useFWFantasyScores(currentWeek, mode) {
           const opp = comp?.find(c => c.team?.abbreviation !== team)?.team?.abbreviation || ''
 
           teamData.statistics?.forEach(statGroup => {
-            const pos = CAT_TO_POS[statGroup.name] || 'SKILL'
+            const catPos = CAT_TO_POS[statGroup.name] || 'SKILL'
             statGroup.athletes?.forEach(a => {
               const name = a.athlete?.displayName || ''
               if (!name) return
+              const athletePos = a.athlete?.position?.abbreviation || catPos
+              const pos = ['QB','RB','WR','TE','K','DEF'].includes(athletePos) ? athletePos : catPos
               const key = `${name}|${team}`
+              // Build raw vals from ESPN labels
+              const raw = {}
+              statGroup.labels?.forEach((l, i) => raw[l] = a.stats?.[i] || '0')
+
+              // Build prefixed stat object to avoid YDS/TD collisions
               const vals = {}
-              statGroup.labels?.forEach((l, i) => vals[l] = a.stats?.[i] || '0')
+              if (statGroup.name === 'passing') {
+                vals.passYds = parseFloat(raw['YDS'] || 0)
+                vals.passTD  = parseFloat(raw['TD']  || 0)
+                vals.INT     = parseFloat(raw['INT'] || 0)
+              } else if (statGroup.name === 'rushing') {
+                vals.rushYds = parseFloat(raw['YDS'] || 0)
+                vals.rushTD  = parseFloat(raw['TD']  || 0)
+                vals.CAR     = parseFloat(raw['CAR'] || 0)
+              } else if (statGroup.name === 'receiving') {
+                vals.recYds  = parseFloat(raw['YDS'] || 0)
+                vals.recTD   = parseFloat(raw['TD']  || 0)
+                vals.REC     = parseFloat(raw['REC'] || 0)
+                vals.TGT     = parseFloat(raw['TGT'] || 0)
+              } else if (statGroup.name === 'kicking') {
+                vals.FGM = parseFloat(raw['FGM'] || 0)
+                vals.XPM = parseFloat(raw['XPM'] || 0)
+                vals.LNG = parseFloat(raw['LNG'] || 0)
+              }
+
               const pts = calcFantasyPts(vals, mode, pos)
-              if (pts < 0.5) return // skip DNPs
 
               if (!playerMap[key]) {
                 playerMap[key] = {
                   name, team, pos,
-                  weeks: [],
+                  weeks: {},
                   opponents: [],
-                  targets: 0, carries: 0, snaps: 0, games: 0,
+                  targets: 0, carries: 0, games: 0,
+                  mergedVals: {},
                 }
               }
-              playerMap[key].weeks.push({ week:bs.week, pts })
-              playerMap[key].opponents.push(opp)
-              playerMap[key].games++
-              // Usage proxies
-              playerMap[key].targets  += parseFloat(vals['TGT'] || 0)
-              playerMap[key].carries  += parseFloat(vals['CAR'] || 0)
+              // Merge vals into player's weekly accumulator
+              const wk = bs.week || 0
+              if (!playerMap[key].weeks[wk]) playerMap[key].weeks[wk] = 0
+              playerMap[key].weeks[wk] += pts
+              if (!playerMap[key].opponents.includes(opp) && opp) playerMap[key].opponents.push(opp)
+              playerMap[key].targets += parseFloat(vals['TGT'] || 0)
+              playerMap[key].carries += parseFloat(vals['CAR'] || 0)
             })
           })
         })
@@ -2384,10 +2410,16 @@ function useFWFantasyScores(currentWeek, mode) {
       })
 
       // Step 4 — apply FW formula to each player
+      // Convert weeks object to array and set games count
+      Object.values(playerMap).forEach(p => {
+        p.weekArr = Object.values(p.weeks)
+        p.games   = p.weekArr.length
+      })
+
       const scored = Object.values(playerMap)
-        .filter(p => p.games >= 1)
+        .filter(p => p.games >= 1 && p.weekArr.reduce((a,b) => a+b, 0) >= 0.5)
         .map(p => {
-          const wkPts = p.weeks.map(w => w.pts)
+          const wkPts = p.weekArr
           const seasonAvg = wkPts.reduce((a,b) => a+b, 0) / wkPts.length
           const last1 = wkPts[wkPts.length-1] || 0
           const last3avg = wkPts.slice(-3).reduce((a,b) => a+b, 0) / Math.min(3, wkPts.length)
@@ -3434,15 +3466,9 @@ function calcFantasyPts(stats, mode, pos) {
   let pts = 0
 
   if (pos === 'K') {
-    // Proper kicker scoring by distance
-    const fgm   = parseInt(stats['FGM'] || stats['FG'] || 0)
-    const fga   = parseInt(stats['FGA'] || 0)
-    const xpm   = parseInt(stats['XPM'] || stats['XP'] || 0)
-    const lng   = parseInt(stats['LNG'] || 0)
-    // Distance-based FG scoring: 3pts <40, 4pts 40-49, 5pts 50+
-    // We only have total FGM and LNG, so approximate:
-    // If longest is 50+, give 5pts for that one, 3 for rest
-    // If longest is 40-49, give 4pts for that one, 3 for rest
+    const fgm = parseInt(stats['FGM'] || stats['FG'] || 0)
+    const xpm = parseInt(stats['XPM'] || stats['XP'] || 0)
+    const lng = parseInt(stats['LNG'] || 0)
     if (fgm > 0) {
       const bonus = lng >= 50 ? 2 : lng >= 40 ? 1 : 0
       pts += (fgm * 3) + bonus
@@ -3452,55 +3478,39 @@ function calcFantasyPts(stats, mode, pos) {
   }
 
   if (pos === 'DEF') {
-    const sacks = parseFloat(stats['SACKS'] || 0)
-    const ints  = parseFloat(stats['INT']   || 0)
-    const fum   = parseFloat(stats['FR']    || 0)
-    const td    = parseFloat(stats['TD']    || 0)
-    pts += sacks * 1
-    pts += ints  * 2
-    pts += fum   * 2
-    pts += td    * 6
+    pts += parseFloat(stats['SACKS'] || 0) * 1
+    pts += parseFloat(stats['INT']   || 0) * 2
+    pts += parseFloat(stats['FR']    || 0) * 2
+    pts += parseFloat(stats['TD']    || 0) * 6
     return Math.round(pts * 10) / 10
   }
 
-  // Skill positions — use pos to avoid stat bleeding between categories
-  if (pos === 'QB') {
-    const passYds = parseFloat(stats['YDS'] || 0)
-    const passTDs = parseFloat(stats['TD']  || 0)
-    const ints    = parseFloat(stats['INT'] || 0)
-    const rushYds = parseFloat(stats['RYDS'] || 0) // QB rushing yards (separate key)
-    const rushTDs = parseFloat(stats['RTD']  || 0)
-    pts += passYds / 25
-    pts += passTDs * 6
-    pts -= ints    * 2
-    pts += rushYds / 10
-    pts += rushTDs * 6
-    // Bonus: 300+ passing yard game
-    if (passYds >= 300) pts += 3
-  } else if (pos === 'RB') {
-    const rushYds = parseFloat(stats['YDS'] || 0)
-    const rushTDs = parseFloat(stats['TD']  || 0)
-    const recYds  = parseFloat(stats['RYDS'] || 0)
-    const recTDs  = parseFloat(stats['RTD']  || 0)
-    const recs    = parseFloat(stats['REC']  || 0)
-    pts += rushYds / 10
-    pts += rushTDs * 6
-    pts += recYds  / 10
-    pts += recTDs  * 6
-    if (mode === 'ppr') pts += recs
-    // Bonus: 100+ rush yard game
-    if (rushYds >= 100) pts += 3
-  } else {
-    // WR, TE
-    const recYds = parseFloat(stats['YDS'] || 0)
-    const recTDs = parseFloat(stats['TD']  || 0)
-    const recs   = parseFloat(stats['REC'] || 0)
-    pts += recYds / 10
-    pts += recTDs * 6
-    if (mode === 'ppr') pts += recs
-    // Bonus: 100+ receiving yard game
-    if (recYds >= 100) pts += 3
-  }
+  // All skill positions — stats object has category prefix to avoid collisions
+  // passing stats: passYds, passTD, INT
+  // rushing stats: rushYds, rushTD, CAR
+  // receiving stats: recYds, recTD, REC, TGT
+  const passYds = parseFloat(stats['passYds'] || 0)
+  const passTDs = parseFloat(stats['passTD']  || 0)
+  const ints    = parseFloat(stats['INT']     || 0)
+  const rushYds = parseFloat(stats['rushYds'] || 0)
+  const rushTDs = parseFloat(stats['rushTD']  || 0)
+  const recYds  = parseFloat(stats['recYds']  || 0)
+  const recTDs  = parseFloat(stats['recTD']   || 0)
+  const recs    = parseFloat(stats['REC']     || 0)
+
+  pts += passYds / 25
+  pts += passTDs * 6
+  pts -= ints    * 2
+  pts += rushYds / 10
+  pts += rushTDs * 6
+  pts += recYds  / 10
+  pts += recTDs  * 6
+  if (mode === 'ppr') pts += recs
+
+  // Bonuses
+  if (passYds >= 300) pts += 3
+  if (rushYds >= 100) pts += 3
+  if (recYds  >= 100) pts += 3
 
   return Math.round(pts * 10) / 10
 }
@@ -3617,7 +3627,7 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos }
         const weekPts = Object.values(p.weeks)
         const total   = weekPts.reduce((a, b) => a + b, 0)
         const avg     = weekPts.length > 0 ? total / weekPts.length : 0
-        const lastWk  = p.weeks[currentWeek] || 0
+        const lastWk  = p.weekArr?.[p.weekArr.length-1] || 0
         const trend   = weekPts.length > 1
           ? lastWk >= avg ? 'hot' : 'cold'
           : 'new'
