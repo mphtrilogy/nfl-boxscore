@@ -2272,7 +2272,6 @@ const KNOWN_TES = new Set([
   'George Kittle','Cameron Latu','Tyler Higbee','Hunter Long','Colby Parkinson',
   'Noah Fant','Zach Ertz','Trey McBride','Elijah Higgins',
   // Additional notable TEs
-  'Woody Marks', // RB - sanity check, should NOT be here
   'Will Mallory','Marlin Klein','Theo Johnson','Dalton Kincaid','Quintin Morris',
   'Charlie Kolar','Devin Asiasi','Durham Smythe','Pharaoh Brown',
 ])
@@ -2502,9 +2501,18 @@ function useFWFantasyScores(currentWeek, mode) {
       const firstSum = summaries.find(Boolean)
       const espnKeys = firstSum ? Object.keys(firstSum).filter(k => !k.startsWith('_')).slice(0,8).join(',') : 'none'
       const bpGroups = firstSum?.boxscore?.players?.[0]?.statistics?.map(s=>s.name).join(',') || 'none'
-      const hasKicking = summaries.some(s => s?.kicking?.length > 0)
-      const hasRosters = summaries.some(s => s?.rosters?.length > 0)
-      setDebug(`✓ ${gameIds.length} games · ${Object.keys(pmap).length} players · ${scored.length} scored | ${posStr || 'NO POSITIONS'} | espnKeys:${espnKeys} | statGroups:${bpGroups} | kicking:${hasKicking} rosters:${hasRosters}`)
+      // Find kicking labels from boxscore
+      const kickGroup  = firstSum?.boxscore?.players?.[0]?.statistics?.find(s=>s.name==='kicking')
+      const passGroup  = firstSum?.boxscore?.players?.[0]?.statistics?.find(s=>s.name==='passing')
+      const kickLabels = kickGroup?.labels?.join(',') || 'none'
+      const passLabels = passGroup?.labels?.join(',') || 'none'
+      const kickCount  = summaries.reduce((n,s) => n + (s?.boxscore?.players||[]).reduce((n2,td) => {
+        return n2 + (td.statistics?.find(sg=>sg.name==='kicking')?.athletes?.length||0)
+      },0),0)
+      const passCount  = summaries.reduce((n,s) => n + (s?.boxscore?.players||[]).reduce((n2,td) => {
+        return n2 + (td.statistics?.find(sg=>sg.name==='passing')?.athletes?.length||0)
+      },0),0)
+      setDebug(`✓ ${gameIds.length} games · ${Object.keys(pmap).length} raw · ${scored.length} scored | pos: ${posStr||'NONE'} | passLabels:${passLabels} | kickLabels:${kickLabels} | passAthletes:${passCount} kickAthletes:${kickCount}`)
       setPlayers(scored)
       setLoading(false)
     })
