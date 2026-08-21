@@ -81,7 +81,7 @@ export default function App() {
   // Sync to ESPN current week when season mode changes
   useEffect(() => {
     if (!seasonStarted) return
-    fetch(`/api/espn/scoreboard?seasontype=${currentSeasonType}&limit=1`)
+    fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=${currentSeasonType}&limit=1`)
       .then(r => r.json())
       .then(data => {
         const w = data?.week?.number
@@ -973,7 +973,7 @@ function PreseasonView({ squad }) {
     if (boxData[id]) return
     setBoxLoad(b => ({ ...b, [id]: true }))
     // Try proxy, fall back to direct ESPN
-    const summaryProxy  = `/api/espn/summary?event=${id}`
+    const summaryProxy  = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${id}`
     const summaryDirect = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${id}`
     fetch(summaryProxy)
       .then(r => r.json())
@@ -2258,7 +2258,7 @@ function useLiveDefenseRankings(currentWeek) {
 
     Promise.all(
       weeksToFetch.map(w =>
-        fetch(`/api/espn/scoreboard?week=${w}&seasontype=${espnSeasonType()}&limit=20`)
+        fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${w}&seasontype=${espnSeasonType()}&limit=20`)
           .then(r => r.json()).catch(() => null)
       )
     ).then(scoreboards => {
@@ -2268,7 +2268,7 @@ function useLiveDefenseRankings(currentWeek) {
       })
       return Promise.all(
         gameIds.slice(0,15).map(id =>
-          fetch(`/api/espn/summary?event=${id}`)
+          fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${id}`)
             .then(r => r.json()).catch(() => null)
         )
       )
@@ -2342,15 +2342,14 @@ function useFWFantasyScores(currentWeek, mode) {
       for (let w = start; w <= currentWeek; w++) weeksToFetch.push(w)
     }
 
+    // Fetch directly from ESPN — proxy (Vercel server) gets 403, browser calls work fine
+    const ESPN = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl'
+
     Promise.all(
-      weeksToFetch.map(w => {
-        const proxy  = `/api/espn/scoreboard?week=${w}&seasontype=${espnSeasonType()}&limit=20`
-        const direct = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${w}&seasontype=${espnSeasonType()}&limit=20`
-        return fetch(proxy)
-          .then(r => r.json())
-          .then(d => d.events?.length > 0 ? d : fetch(direct).then(r => r.json()).catch(() => null))
-          .catch(() => fetch(direct).then(r => r.json()).catch(() => null))
-      })
+      weeksToFetch.map(w =>
+        fetch(`${ESPN}/scoreboard?week=${w}&seasontype=${espnSeasonType()}&limit=20`)
+          .then(r => r.json()).catch(() => null)
+      )
     ).then(async scoreboards => {
       const gameIds = []
       scoreboards.forEach((sb, idx) => {
@@ -2358,14 +2357,12 @@ function useFWFantasyScores(currentWeek, mode) {
       })
 
       const boxScores = await Promise.all(
-        gameIds.slice(0,25).map(g => {
-          const proxy  = `/api/espn/summary?event=${g.id}`
-          const direct = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${g.id}`
-          return fetch(proxy)
+        gameIds.slice(0,25).map(g =>
+          fetch(`${ESPN}/summary?event=${g.id}`)
             .then(r => r.json())
-            .then(d => d.boxscore ? { ...d, week:g.week } : fetch(direct).then(r => r.json()).then(d2 => ({ ...d2, week:g.week })).catch(() => null))
-            .catch(() => fetch(direct).then(r => r.json()).then(d => ({ ...d, week:g.week })).catch(() => null))
-        })
+            .then(d => ({ ...d, week:g.week }))
+            .catch(() => null)
+        )
       )
 
       // Step 2 — build player stat history
@@ -2435,7 +2432,7 @@ function useFWFantasyScores(currentWeek, mode) {
       })
 
       // Step 3 — find next opponent from upcoming schedule
-      const upcomingSb = await fetch(`/api/espn/scoreboard?week=${currentWeek + 1}&seasontype=${espnSeasonType()}&limit=20`)
+      const upcomingSb = await fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${currentWeek + 1}&seasontype=${espnSeasonType()}&limit=20`)
         .then(r => r.json()).catch(() => null)
       const nextOpp = {} // { TEAM: OPP_TEAM }
       upcomingSb?.events?.forEach(ev => {
@@ -3599,7 +3596,7 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos }
       // Fetch all scoreboards in parallel
       const scoreboards = await Promise.all(
         weeksToFetch.map(w =>
-          fetch(`/api/espn/scoreboard?week=${w}&seasontype=${espnSeasonType()}&limit=20`)
+          fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${w}&seasontype=${espnSeasonType()}&limit=20`)
             .then(r => r.json())
             .catch(() => null)
         )
