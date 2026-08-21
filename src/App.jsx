@@ -2372,74 +2372,66 @@ function useFWFantasyScores(currentWeek, mode) {
         )
       )
 
-      // Step 3: build player map
+      // Step 3: build player map — mirrors BoxScoreDrawer parsing exactly
       const pmap = {}
 
+      const addToMap = (name, team, pos, wk, cat, vals, targets=0, carries=0) => {
+        if (!name || name === '—') return
+        if (!['QB','RB','WR','TE','K'].includes(pos)) return
+        // Apply TE correction for ESPN mis-classification
+        const finalPos = pos === 'WR' && KNOWN_TES.has(name) ? 'TE' : pos
+        const key = `${name}|${team}`
+        if (!pmap[key]) pmap[key] = { name, team, pos: finalPos, weekPts: {}, targets: 0, carries: 0 }
+        // Update pos if we got a real TE
+        if (finalPos === 'TE') pmap[key].pos = 'TE'
+        if (pos === 'K') pmap[key].pos = 'K'
+        // Calculate fantasy points using same function as BoxScoreDrawer
+        const pts = calcFpts(vals, cat, mode)
+        if (!pmap[key].weekPts[wk]) pmap[key].weekPts[wk] = 0
+        pmap[key].weekPts[wk] += pts
+        pmap[key].targets += targets
+        pmap[key].carries += carries
+      }
+
       summaries.filter(Boolean).forEach(summary => {
-        const week = summary._week
+        const wk = summary._week
+        const teamsData = summary.boxscore?.players || []
 
-        // Build position lookup from rosters (most reliable source)
-        const posLookup = {}
-        ;(summary.rosters || []).forEach(teamRoster => {
-          ;(teamRoster.entries || []).forEach(entry => {
-            const name = entry.athlete?.displayName || entry.athlete?.fullName || ''
-            const pos  = normPos(entry.athlete?.position?.abbreviation || entry.athlete?.position?.name || '')
-            if (name && pos) posLookup[name] = pos
-          })
-        })
+        teamsData.forEach(td => {
+          const team = td.team?.abbreviation || ''
 
-        // Helper to add/update player
-        const addPlayer = (name, teamAbbr, pos, week, statsUpdate, usage = {}) => {
-          if (!name || !['QB','RB','WR','TE','K'].includes(pos)) return
-          // Fix ESPN's WR mis-classification of TEs
-          const correctedPos = pos === 'WR' && KNOWN_TES.has(name) ? 'TE' : pos
-          const key = `${name}|${teamAbbr}`
-          if (!pmap[key]) pmap[key] = { name, team: teamAbbr, pos: correctedPos, statsByWeek: {}, targets: 0, carries: 0 }
-          // Use roster position if available (more accurate)
-          if (posLookup[name]) pmap[key].pos = posLookup[name]
-          else if (correctedPos !== pos) pmap[key].pos = correctedPos // apply TE correction
-          if (!pmap[key].statsByWeek[week]) pmap[key].statsByWeek[week] = {}
-          const ws = pmap[key].statsByWeek[week]
-          Object.entries(statsUpdate).forEach(([k, v]) => { ws[k] = (ws[k] || 0) + v })
-          if (usage.targets) pmap[key].targets += usage.targets
-          if (usage.carries) pmap[key].carries += usage.carries
-        }
-
-        // Process boxscore.players (passing/rushing/receiving)
-        ;(summary.boxscore?.players || []).forEach(teamData => {
-          const teamAbbr = teamData.team?.abbreviation || ''
-          ;(teamData.statistics || []).forEach(statGroup => {
-            const cat = statGroup.name
-            const labels = statGroup.labels || []
-            ;(statGroup.athletes || []).forEach(a => {
+          // Parse each stat group — same as BoxScoreDrawer PlayerStats
+          ;['passing','rushing','receiving','kicking'].forEach(cat => {
+            const sg = td.statistics?.find(s => s.name === cat)
+            if (!sg) return
+            sg.athletes?.forEach(a => {
               const name = a.athlete?.displayName || ''
               if (!name) return
-              const rawPos = a.athlete?.position?.abbreviation || a.athlete?.position?.name || ''
-              let pos = posLookup[name] || normPos(rawPos) || (cat === 'passing' ? 'QB' : cat === 'rushing' ? 'RB' : 'WR')
+              // Get position from athlete object — same as BoxScoreDrawer line 1529
+              const rawPos = a.athlete?.position?.abbreviation || ''
+              const pos = cat === 'kicking' ? 'K'
+                : normPos(rawPos) || (cat === 'passing' ? 'QB' : cat === 'rushing' ? 'RB' : 'WR')
+
+              // Build vals object — same as BoxScoreDrawer line 1524
               const vals = {}
-              labels.forEach((l, i) => { vals[l] = parseFloat(a.stats?.[i]) || 0 })
-              if (cat === 'passing') {
-                addPlayer(name, teamAbbr, pos, week, { passYds: vals['YDS']||0, passTD: vals['TD']||0, passInt: vals['INT']||0 })
-              } else if (cat === 'rushing') {
-                addPlayer(name, teamAbbr, pos, week, { rushYds: vals['YDS']||0, rushTD: vals['TD']||0 }, { carries: vals['CAR']||0 })
-              } else if (cat === 'receiving') {
-                addPlayer(name, teamAbbr, pos, week, { recYds: vals['YDS']||0, recTD: vals['TD']||0, rec: vals['REC']||0 }, { targets: vals['TGT']||0 })
-              } else if (cat === 'kicking') {
-                addPlayer(name, teamAbbr, 'K', week, { fgm: vals['FGM']||0, xpm: vals['XPM']||0, fgLng: vals['LNG']||0 })
-              }
+              sg.labels?.forEach((lbl, i) => { vals[lbl] = a.stats?.[i] || '0' })
+
+              // Skip if all zeros — same as BoxScoreDrawer line 1525
+              if (!sg.labels?.some(lbl => parseFloat(vals[lbl]) !== 0)) return
+
+              const targets = cat === 'receiving' ? parseFloat(vals['TGT']||0) : 0
+              const carries = cat === 'rushing'   ? parseFloat(vals['CAR']||0) : 0
+              addToMap(name, team, pos, wk, cat, vals, targets, carries)
             })
           })
         })
-
-        // Kicking IS in boxscore.players statGroups - handled above with cat='kicking'
-        // No separate summary.kicking array exists
       })
 
       // Step 4: score each player
       const posCounts = {}
       const scored = Object.values(pmap)
         .map(p => {
-          const weekPts = Object.values(p.statsByWeek).map(ws => calcFW(ws, mode))
+          const weekPts = Object.values(p.weekPts)
           if (!weekPts.length) return null
           const totalPts  = weekPts.reduce((a, b) => a + b, 0)
           if (totalPts < 0.5) return null // skip pure DNPs
