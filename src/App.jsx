@@ -2496,15 +2496,19 @@ function useFWFantasyScores(currentWeek, mode) {
       // Find kicking labels from boxscore
       const kickGroup  = firstSum?.boxscore?.players?.[0]?.statistics?.find(s=>s.name==='kicking')
       const passGroup  = firstSum?.boxscore?.players?.[0]?.statistics?.find(s=>s.name==='passing')
+      const rushGroup  = firstSum?.boxscore?.players?.[0]?.statistics?.find(s=>s.name==='rushing')
       const kickLabels = kickGroup?.labels?.join(',') || 'none'
       const passLabels = passGroup?.labels?.join(',') || 'none'
+      const rushLabels = rushGroup?.labels?.join(',') || 'none'
+      const woodyCheck = Object.values(pmap).find(p => p.name?.includes('Marks'))
       const kickCount  = summaries.reduce((n,s) => n + (s?.boxscore?.players||[]).reduce((n2,td) => {
         return n2 + (td.statistics?.find(sg=>sg.name==='kicking')?.athletes?.length||0)
       },0),0)
       const passCount  = summaries.reduce((n,s) => n + (s?.boxscore?.players||[]).reduce((n2,td) => {
         return n2 + (td.statistics?.find(sg=>sg.name==='passing')?.athletes?.length||0)
       },0),0)
-      setDebug(`✓ ${gameIds.length} games · ${Object.keys(pmap).length} raw · ${scored.length} scored | pos: ${posStr||'NONE'} | passLabels:${passLabels} | kickLabels:${kickLabels} | passAthletes:${passCount} kickAthletes:${kickCount}`)
+      const woodyStr = woodyCheck ? `Woody:${woodyCheck.pos} wkpts:${JSON.stringify(woodyCheck.weekPts)}` : 'Woody:MISSING'
+      setDebug(`✓ ${gameIds.length} games · ${Object.keys(pmap).length} raw · ${scored.length} scored | ${posStr||'NONE'} | rush:${rushLabels} | kick:${kickLabels} | ${woodyStr}`)
       setPlayers(scored)
       setLoading(false)
     })
