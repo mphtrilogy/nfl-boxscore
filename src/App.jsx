@@ -3501,9 +3501,9 @@ function calcFantasyPts(stats, mode, pos) {
   let pts = 0
 
   if (pos === 'K') {
-    const fgm = parseInt(stats['FGM'] || stats['FG'] || 0)
-    const xpm = parseInt(stats['XPM'] || stats['XP'] || 0)
-    const lng = parseInt(stats['LNG'] || 0)
+    const fgm = parseInt(stats['FG'] || stats['FGM'] || 0)
+    const xpm = parseInt(stats['XP'] || stats['XPM'] || 0)
+    const lng = parseInt(stats['LONG'] || stats['LNG'] || 0)
     if (fgm > 0) {
       const bonus = lng >= 50 ? 2 : lng >= 40 ? 1 : 0
       pts += (fgm * 3) + bonus
