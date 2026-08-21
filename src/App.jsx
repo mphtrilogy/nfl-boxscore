@@ -2343,10 +2343,14 @@ function useFWFantasyScores(currentWeek, mode) {
     }
 
     Promise.all(
-      weeksToFetch.map(w =>
-        fetch(`/api/espn/scoreboard?week=${w}&seasontype=${espnSeasonType()}&limit=20`)
-          .then(r => r.json()).catch(() => null)
-      )
+      weeksToFetch.map(w => {
+        const proxy  = `/api/espn/scoreboard?week=${w}&seasontype=${espnSeasonType()}&limit=20`
+        const direct = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${w}&seasontype=${espnSeasonType()}&limit=20`
+        return fetch(proxy)
+          .then(r => r.json())
+          .then(d => d.events?.length > 0 ? d : fetch(direct).then(r => r.json()).catch(() => null))
+          .catch(() => fetch(direct).then(r => r.json()).catch(() => null))
+      })
     ).then(async scoreboards => {
       const gameIds = []
       scoreboards.forEach((sb, idx) => {
@@ -2354,12 +2358,14 @@ function useFWFantasyScores(currentWeek, mode) {
       })
 
       const boxScores = await Promise.all(
-        gameIds.slice(0,25).map(g =>
-          fetch(`/api/espn/summary?event=${g.id}`)
+        gameIds.slice(0,25).map(g => {
+          const proxy  = `/api/espn/summary?event=${g.id}`
+          const direct = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${g.id}`
+          return fetch(proxy)
             .then(r => r.json())
-            .then(data => ({ ...data, week:g.week }))
-            .catch(() => null)
-        )
+            .then(d => d.boxscore ? { ...d, week:g.week } : fetch(direct).then(r => r.json()).then(d2 => ({ ...d2, week:g.week })).catch(() => null))
+            .catch(() => fetch(direct).then(r => r.json()).then(d => ({ ...d, week:g.week })).catch(() => null))
+        })
       )
 
       // Step 2 — build player stat history
