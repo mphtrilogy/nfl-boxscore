@@ -2341,74 +2341,69 @@ function useFWFantasyScores(currentWeek, mode) {
       )
 
       // Step 3: build player map
-      // key = "name|team", value = { name, team, pos, statsByWeek: {week: pts}, targets, carries }
       const pmap = {}
 
       summaries.filter(Boolean).forEach(summary => {
         const week = summary._week
+
+        // Build position lookup from rosters (most reliable source)
+        const posLookup = {}
+        ;(summary.rosters || []).forEach(teamRoster => {
+          ;(teamRoster.entries || []).forEach(entry => {
+            const name = entry.athlete?.displayName || entry.athlete?.fullName || ''
+            const pos  = normPos(entry.athlete?.position?.abbreviation || entry.athlete?.position?.name || '')
+            if (name && pos) posLookup[name] = pos
+          })
+        })
+
+        // Helper to add/update player
+        const addPlayer = (name, teamAbbr, pos, week, statsUpdate, usage = {}) => {
+          if (!name || !['QB','RB','WR','TE','K'].includes(pos)) return
+          const key = `${name}|${teamAbbr}`
+          if (!pmap[key]) pmap[key] = { name, team: teamAbbr, pos, statsByWeek: {}, targets: 0, carries: 0 }
+          // Use roster position if available (more accurate)
+          if (posLookup[name]) pmap[key].pos = posLookup[name]
+          if (!pmap[key].statsByWeek[week]) pmap[key].statsByWeek[week] = {}
+          const ws = pmap[key].statsByWeek[week]
+          Object.entries(statsUpdate).forEach(([k, v]) => { ws[k] = (ws[k] || 0) + v })
+          if (usage.targets) pmap[key].targets += usage.targets
+          if (usage.carries) pmap[key].carries += usage.carries
+        }
+
+        // Process boxscore.players (passing/rushing/receiving)
         ;(summary.boxscore?.players || []).forEach(teamData => {
           const teamAbbr = teamData.team?.abbreviation || ''
           ;(teamData.statistics || []).forEach(statGroup => {
-            const cat = statGroup.name // 'passing','rushing','receiving','kicking'
+            const cat = statGroup.name
+            const labels = statGroup.labels || []
             ;(statGroup.athletes || []).forEach(a => {
               const name = a.athlete?.displayName || ''
               if (!name) return
-
-              // Get position — ESPN stores it on the athlete object
-              const rawPos = a.athlete?.position?.abbreviation
-                || a.athlete?.position?.name
-                || ''
-              let pos = normPos(rawPos)
-
-              // Kicking stat group = always K regardless of position data
-              if (cat === 'kicking') pos = 'K'
-              // Fallback: infer from stat category if no position data
-              else if (!pos) {
-                if (cat === 'passing')        pos = 'QB'
-                else if (cat === 'rushing')   pos = 'RB'
-                else if (cat === 'receiving') pos = 'WR'
-                else pos = 'OL'
-              }
-
-              // Skip non-skill positions
-              if (!['QB','RB','WR','TE','K'].includes(pos)) return
-
-              const key = `${name}|${teamAbbr}`
-              if (!pmap[key]) {
-                pmap[key] = { name, team: teamAbbr, pos, statsByWeek: {}, targets: 0, carries: 0 }
-              }
-
-              // Always update pos with most specific available
-              // Kicking always wins; real athlete position beats category inference
-              if (cat === 'kicking') pmap[key].pos = 'K'
-              else if (rawPos && normPos(rawPos)) pmap[key].pos = normPos(rawPos)
-
-              // Build stats for this week
-              if (!pmap[key].statsByWeek[week]) pmap[key].statsByWeek[week] = {}
-              const ws = pmap[key].statsByWeek[week]
-              const labels = statGroup.labels || []
-              const vals   = {}
+              const rawPos = a.athlete?.position?.abbreviation || a.athlete?.position?.name || ''
+              let pos = posLookup[name] || normPos(rawPos) || (cat === 'passing' ? 'QB' : cat === 'rushing' ? 'RB' : 'WR')
+              const vals = {}
               labels.forEach((l, i) => { vals[l] = parseFloat(a.stats?.[i]) || 0 })
-
               if (cat === 'passing') {
-                ws.passYds  = (ws.passYds  || 0) + (vals['YDS'] || 0)
-                ws.passTD   = (ws.passTD   || 0) + (vals['TD']  || 0)
-                ws.passInt  = (ws.passInt  || 0) + (vals['INT'] || 0)
+                addPlayer(name, teamAbbr, pos, week, { passYds: vals['YDS']||0, passTD: vals['TD']||0, passInt: vals['INT']||0 })
               } else if (cat === 'rushing') {
-                ws.rushYds  = (ws.rushYds  || 0) + (vals['YDS'] || 0)
-                ws.rushTD   = (ws.rushTD   || 0) + (vals['TD']  || 0)
-                pmap[key].carries += (vals['CAR'] || 0)
+                addPlayer(name, teamAbbr, pos, week, { rushYds: vals['YDS']||0, rushTD: vals['TD']||0 }, { carries: vals['CAR']||0 })
               } else if (cat === 'receiving') {
-                ws.recYds   = (ws.recYds   || 0) + (vals['YDS'] || 0)
-                ws.recTD    = (ws.recTD    || 0) + (vals['TD']  || 0)
-                ws.rec      = (ws.rec      || 0) + (vals['REC'] || 0)
-                pmap[key].targets += (vals['TGT'] || 0)
-              } else if (cat === 'kicking') {
-                ws.fgm      = (ws.fgm      || 0) + (vals['FGM'] || 0)
-                ws.xpm      = (ws.xpm      || 0) + (vals['XPM'] || 0)
-                ws.fgLng    = Math.max(ws.fgLng || 0, vals['LNG'] || 0)
+                addPlayer(name, teamAbbr, pos, week, { recYds: vals['YDS']||0, recTD: vals['TD']||0, rec: vals['REC']||0 }, { targets: vals['TGT']||0 })
               }
             })
+          })
+        })
+
+        // Process kicking stats — ESPN puts kickers in summary.kicking[], NOT boxscore.players
+        ;(summary.kicking || []).forEach(teamKicking => {
+          const teamAbbr = teamKicking.team?.abbreviation || ''
+          const labels   = teamKicking.labels || []
+          ;(teamKicking.athletes || []).forEach(a => {
+            const name = a.athlete?.displayName || ''
+            if (!name) return
+            const vals = {}
+            labels.forEach((l, i) => { vals[l] = parseFloat(a.stats?.[i]) || 0 })
+            addPlayer(name, teamAbbr, 'K', week, { fgm: vals['FGM']||0, xpm: vals['XPM']||0, fgLng: vals['LNG']||0 })
           })
         })
       })
