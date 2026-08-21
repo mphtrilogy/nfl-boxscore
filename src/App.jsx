@@ -2325,6 +2325,7 @@ function useLiveDefenseRankings(currentWeek) {
 function useFWFantasyScores(currentWeek, mode) {
   const [players,  setPlayers]  = useState([])
   const [loading,  setLoading]  = useState(true)
+  const [debug,    setDebug]    = useState('')
   const defRankings = useLiveDefenseRankings(currentWeek)
   const seasonStarted = currentWeek > 1 || isGameSeason()
 
@@ -2518,15 +2519,16 @@ function useFWFantasyScores(currentWeek, mode) {
         .filter(p => p.fwScore > 0)
         .sort((a, b) => b.fwScore - a.fwScore)
 
+      setDebug(`✓ ${gameIds.length} games · ${Object.keys(playerMap).length} raw players · ${scored.length} scored`)
       setPlayers(scored)
       setLoading(false)
     }).catch(e => {
-      console.error('FW Engine error:', e)
+      setDebug(`✗ Error: ${e.message}`)
       setLoading(false)
     })
-  }, [currentWeek, mode]) // defRankings intentionally omitted — causes infinite loop
+  }, [currentWeek, mode])
 
-  return { players, loading }
+  return { players, loading, debug }
 }
 
 // ── FW FORMULA VIEW ────────────────────────────────────────────────────────────
@@ -2534,7 +2536,7 @@ function FWFormulaView({ currentWeek, mode }) {
   const [pos, setPos]           = useState('ALL')
   const [showBreakdown, setShowBreakdown] = useState(false)
   const seasonStarted = isGameSeason()
-  const { players, loading }    = useFWFantasyScores(currentWeek, mode)
+  const { players, loading, debug } = useFWFantasyScores(currentWeek, mode)
 
   const POSITIONS = ['ALL','QB','RB','WR','TE','K']
   const filtered = pos === 'ALL'
@@ -2696,6 +2698,7 @@ function FWFormulaView({ currentWeek, mode }) {
           <div className="cs-icon">📊</div>
           <div className="cs-title">No data yet</div>
           <div className="cs-text">FW scores populate after Week 1 games are played.</div>
+          {debug && <div style={{fontFamily:'monospace',fontSize:'10px',color:'#888',marginTop:'8px',padding:'8px',background:'#f5f0e8',borderRadius:'4px'}}>{debug}</div>}
         </div>
       )}
     </div>
