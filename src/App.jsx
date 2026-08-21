@@ -2360,12 +2360,13 @@ function useFWFantasyScores(currentWeek, mode) {
                 || ''
               let pos = normPos(rawPos)
 
+              // Kicking stat group = always K regardless of position data
+              if (cat === 'kicking') pos = 'K'
               // Fallback: infer from stat category if no position data
-              if (!pos) {
-                if (cat === 'passing')   pos = 'QB'
+              else if (!pos) {
+                if (cat === 'passing')        pos = 'QB'
                 else if (cat === 'rushing')   pos = 'RB'
                 else if (cat === 'receiving') pos = 'WR'
-                else if (cat === 'kicking')   pos = 'K'
                 else pos = 'OL'
               }
 
@@ -2377,8 +2378,10 @@ function useFWFantasyScores(currentWeek, mode) {
                 pmap[key] = { name, team: teamAbbr, pos, statsByWeek: {}, targets: 0, carries: 0 }
               }
 
-              // Update pos if we got a real one (not inferred)
-              if (rawPos && normPos(rawPos)) pmap[key].pos = normPos(rawPos)
+              // Always update pos with most specific available
+              // Kicking always wins; real athlete position beats category inference
+              if (cat === 'kicking') pmap[key].pos = 'K'
+              else if (rawPos && normPos(rawPos)) pmap[key].pos = normPos(rawPos)
 
               // Build stats for this week
               if (!pmap[key].statsByWeek[week]) pmap[key].statsByWeek[week] = {}
