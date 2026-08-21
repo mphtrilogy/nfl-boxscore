@@ -2300,10 +2300,16 @@ function useFWFantasyScores(currentWeek, mode) {
   useEffect(() => {
     if (!seasonStarted) { setLoading(false); return }
 
-    // Step 1 — pull last 5 weeks of box scores
+    // Step 1 — pull available weeks of box scores
+    // During preseason: fetch all completed preseason weeks (1 through current)
+    // During regular season: fetch last 5 weeks
     const weeksToFetch = []
-    const start = Math.max(1, currentWeek - 4)
-    for (let w = start; w <= currentWeek; w++) weeksToFetch.push(w)
+    if (isPreseason()) {
+      for (let w = 1; w <= currentWeek; w++) weeksToFetch.push(w)
+    } else {
+      const start = Math.max(1, currentWeek - 4)
+      for (let w = start; w <= currentWeek; w++) weeksToFetch.push(w)
+    }
 
     Promise.all(
       weeksToFetch.map(w =>
@@ -2560,7 +2566,7 @@ function FWFormulaView({ currentWeek, mode }) {
         {POSITIONS.map(p => (
           <button key={p} className={`tc-btn ${pos === p ? 'on' : ''}`} onClick={() => setPos(p)}>{p}</button>
         ))}
-        <span className="fw-week-note">Wk {currentWeek} · Next matchup data</span>
+        <span className="fw-week-note">{isPreseason() ? `PS${currentWeek} · Preseason data` : `Wk ${currentWeek} · Next matchup data`}</span>
       </div>
 
       {loading && (
