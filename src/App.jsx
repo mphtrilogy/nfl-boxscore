@@ -917,38 +917,54 @@ function PreseasonView({ squad }) {
     setLoading(true)
     setGames([])
     setOpenId(null)
-    fetch(`/api/espn/scoreboard?week=${week}&seasontype=1&limit=20`)
+
+    const parseGames = (data) => (data.events || []).map(ev => {
+      const comp = ev.competitions?.[0]
+      const home = comp?.competitors?.find(c => c.homeAway === 'home')
+      const away = comp?.competitors?.find(c => c.homeAway === 'away')
+      if (!home || !away) return null
+      const status = ev.status?.type?.state
+      const isFinal = status === 'post'
+      const isLive  = status === 'in'
+      const d = new Date(ev.date)
+      return {
+        id:        ev.id,
+        home:      home.team?.abbreviation || '',
+        away:      away.team?.abbreviation || '',
+        homeName:  home.team?.displayName || '',
+        awayName:  away.team?.displayName || '',
+        homeScore: isFinal || isLive ? parseInt(home.score) || 0 : null,
+        awayScore: isFinal || isLive ? parseInt(away.score) || 0 : null,
+        status:    isFinal ? 'final' : isLive ? 'live' : 'upcoming',
+        statusDetail: ev.status?.type?.detail || '',
+        time:      d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' }),
+        day:       d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }),
+        network:   comp?.broadcasts?.[0]?.names?.[0] || '',
+        note:      comp?.notes?.[0]?.headline || '',
+      }
+    }).filter(Boolean)
+
+    // Try proxy first, then fall back to direct ESPN
+    const proxyUrl  = `/api/espn/scoreboard?week=${week}&seasontype=1&limit=20`
+    const directUrl = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${week}&seasontype=1&limit=20`
+
+    fetch(proxyUrl)
       .then(r => r.json())
       .then(data => {
-        const parsed = (data.events || []).map(ev => {
-          const comp = ev.competitions?.[0]
-          const home = comp?.competitors?.find(c => c.homeAway === 'home')
-          const away = comp?.competitors?.find(c => c.homeAway === 'away')
-          if (!home || !away) return null
-          const status = ev.status?.type?.state
-          const isFinal = status === 'post'
-          const isLive  = status === 'in'
-          const d = new Date(ev.date)
-          return {
-            id:        ev.id,
-            home:      home.team?.abbreviation || '',
-            away:      away.team?.abbreviation || '',
-            homeName:  home.team?.displayName || '',
-            awayName:  away.team?.displayName || '',
-            homeScore: isFinal || isLive ? parseInt(home.score) || 0 : null,
-            awayScore: isFinal || isLive ? parseInt(away.score) || 0 : null,
-            status:    isFinal ? 'final' : isLive ? 'live' : 'upcoming',
-            statusDetail: ev.status?.type?.detail || '',
-            time:      d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' }),
-            day:       d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }),
-            network:   comp?.broadcasts?.[0]?.names?.[0] || '',
-            note:      comp?.notes?.[0]?.headline || '',
-          }
-        }).filter(Boolean)
-        setGames(parsed)
-        setLoading(false)
+        if (data.events?.length > 0) {
+          setGames(parseGames(data)); setLoading(false)
+        } else {
+          return fetch(directUrl).then(r => r.json()).then(d => {
+            setGames(parseGames(d)); setLoading(false)
+          })
+        }
       })
-      .catch(() => setLoading(false))
+      .catch(() => {
+        fetch(directUrl)
+          .then(r => r.json())
+          .then(d => { setGames(parseGames(d)); setLoading(false) })
+          .catch(() => setLoading(false))
+      })
   }, [week])
 
   const toggleGame = (id) => {
@@ -956,13 +972,28 @@ function PreseasonView({ squad }) {
     setOpenId(id)
     if (boxData[id]) return
     setBoxLoad(b => ({ ...b, [id]: true }))
-    fetch(`/api/espn/summary?event=${id}`)
+    // Try proxy, fall back to direct ESPN
+    const summaryProxy  = `/api/espn/summary?event=${id}`
+    const summaryDirect = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${id}`
+    fetch(summaryProxy)
       .then(r => r.json())
       .then(d => {
-        setBoxData(b => ({ ...b, [id]: d }))
-        setBoxLoad(b => ({ ...b, [id]: false }))
+        if (d.boxscore) {
+          setBoxData(b => ({ ...b, [id]: d }))
+          setBoxLoad(b => ({ ...b, [id]: false }))
+        } else {
+          return fetch(summaryDirect).then(r => r.json()).then(d2 => {
+            setBoxData(b => ({ ...b, [id]: d2 }))
+            setBoxLoad(b => ({ ...b, [id]: false }))
+          })
+        }
       })
-      .catch(() => setBoxLoad(b => ({ ...b, [id]: false })))
+      .catch(() => {
+        fetch(summaryDirect)
+          .then(r => r.json())
+          .then(d => { setBoxData(b => ({ ...b, [id]: d })); setBoxLoad(b => ({ ...b, [id]: false })) })
+          .catch(() => setBoxLoad(b => ({ ...b, [id]: false })))
+      })
   }
 
   const squadPlayers = (() => {
