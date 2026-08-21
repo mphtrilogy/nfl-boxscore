@@ -2470,7 +2470,13 @@ function useFWFantasyScores(currentWeek, mode) {
         .sort((a, b) => b.fwScore - a.fwScore)
 
       const posStr = Object.entries(posCounts).map(([p,n]) => `${p}:${n}`).join(' ')
-      setDebug(`✓ ${gameIds.length} games · ${Object.keys(pmap).length} players · ${scored.length} scored | ${posStr}`)
+      // Inspect first summary to understand ESPN structure
+      const firstSum = summaries.find(Boolean)
+      const espnKeys = firstSum ? Object.keys(firstSum).filter(k => !k.startsWith('_')).slice(0,8).join(',') : 'none'
+      const bpGroups = firstSum?.boxscore?.players?.[0]?.statistics?.map(s=>s.name).join(',') || 'none'
+      const hasKicking = summaries.some(s => s?.kicking?.length > 0)
+      const hasRosters = summaries.some(s => s?.rosters?.length > 0)
+      setDebug(`✓ ${gameIds.length} games · ${Object.keys(pmap).length} players · ${scored.length} scored | ${posStr || 'NO POSITIONS'} | espnKeys:${espnKeys} | statGroups:${bpGroups} | kicking:${hasKicking} rosters:${hasRosters}`)
       setPlayers(scored)
       setLoading(false)
     })
@@ -2645,19 +2651,23 @@ function FWFormulaView({ currentWeek, mode }) {
         </table>
       )}
 
-      {!loading && filtered.length === 0 && (
+      {!loading && players.length === 0 && (
         <div className="leaders-coming-soon">
           <div className="cs-icon">📊</div>
-          <div className="cs-title">{players.length > 0 ? `No ${pos} data yet` : 'No data yet'}</div>
-          <div className="cs-text">
-            {players.length > 0 
-              ? `${players.length} total players scored — ${pos} position data may be limited in preseason. Try ALL or RB/WR tabs.`
-              : 'FW scores populate after Week 1 games are played.'
-            }
-          </div>
+          <div className="cs-title">No data yet</div>
+          <div className="cs-text">FW scores populate after games are played. Data loads from ESPN directly in your browser.</div>
           <div style={{fontFamily:'monospace',fontSize:'10px',color:'#888',marginTop:'8px',padding:'8px',background:'#f5f0e8',borderRadius:'4px'}}>
-            {debug || 'waiting...'} | view.players={players.length} | filtered={filtered.length}
-            {players.length > 0 && ` | positions: ${[...new Set(players.map(p=>p.pos))].join(',')}`}
+            {debug || 'Fetching...'}
+          </div>
+        </div>
+      )}
+      {!loading && players.length > 0 && filtered.length === 0 && (
+        <div className="leaders-coming-soon">
+          <div className="cs-icon">📊</div>
+          <div className="cs-title">No {pos} data</div>
+          <div className="cs-text">{players.length} total players — try ALL or RB/WR tabs.</div>
+          <div style={{fontFamily:'monospace',fontSize:'10px',color:'#888',marginTop:'8px',padding:'8px',background:'#f5f0e8',borderRadius:'4px'}}>
+            {debug}
           </div>
         </div>
       )}
