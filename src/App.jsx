@@ -2381,7 +2381,20 @@ function useFWFantasyScores(currentWeek, mode) {
             statGroup.athletes?.forEach(a => {
               const name = a.athlete?.displayName || ''
               if (!name) return
-              const athletePos = a.athlete?.position?.abbreviation || catPos
+              // ESPN position can be in different places depending on API response
+              const rawPos = a.athlete?.position?.abbreviation 
+                || a.athlete?.position?.name
+                || a.position?.abbreviation
+                || ''
+              // Normalize common ESPN position names
+              const posNorm = rawPos.toUpperCase()
+              const athletePos = posNorm === 'HALFBACK' ? 'RB'
+                : posNorm === 'FULLBACK' ? 'RB'
+                : posNorm === 'WIDE RECEIVER' ? 'WR'
+                : posNorm === 'TIGHT END' ? 'TE'
+                : posNorm === 'QUARTERBACK' ? 'QB'
+                : posNorm === 'KICKER' ? 'K'
+                : posNorm || catPos
               const pos = ['QB','RB','WR','TE','K','DEF'].includes(athletePos) ? athletePos : catPos
               const key = `${name}|${team}`
               // Build raw vals from ESPN labels
@@ -2417,8 +2430,10 @@ function useFWFantasyScores(currentWeek, mode) {
                   weeks: {},
                   opponents: [],
                   targets: 0, carries: 0, games: 0,
-                  mergedVals: {},
                 }
+              } else if (athletePos && athletePos !== catPos) {
+                // Update pos if we have a real athlete position (not just category default)
+                playerMap[key].pos = pos
               }
               // Merge vals into player's weekly accumulator
               const wk = bs.week || 0
@@ -2696,8 +2711,13 @@ function FWFormulaView({ currentWeek, mode }) {
       {!loading && filtered.length === 0 && (
         <div className="leaders-coming-soon">
           <div className="cs-icon">📊</div>
-          <div className="cs-title">No data yet</div>
-          <div className="cs-text">FW scores populate after Week 1 games are played.</div>
+          <div className="cs-title">{players.length > 0 ? `No ${pos} data yet` : 'No data yet'}</div>
+          <div className="cs-text">
+            {players.length > 0 
+              ? `${players.length} total players scored — ${pos} position data may be limited in preseason. Try ALL or RB/WR tabs.`
+              : 'FW scores populate after Week 1 games are played.'
+            }
+          </div>
           {debug && <div style={{fontFamily:'monospace',fontSize:'10px',color:'#888',marginTop:'8px',padding:'8px',background:'#f5f0e8',borderRadius:'4px'}}>{debug}</div>}
         </div>
       )}
