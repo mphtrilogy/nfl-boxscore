@@ -2245,6 +2245,39 @@ const MATCHUP_RATINGS = {
 // These update automatically as the season progresses via useLiveDefenseRankings()
 const DEF_BASELINE = { QB:22, RB:24, WR:28, TE:12, K:8 }
 
+// Known 2026 NFL TEs — used to fix ESPN's incorrect WR classification of TEs in boxscore
+const KNOWN_TES = new Set([
+  // AFC North
+  'Mark Andrews','Isaiah Likely','Sam LaPorta','Zach Gentry','Cade Stover',
+  'Jonnu Smith','Erick All','Gerald Everett','Luke Farrell',
+  // AFC South  
+  'Dalton Schultz','Brevin Jordan','Will Dissly','Mo Alie-Cox','Drew Ogletree',
+  'Chig Okonkwo','Josh Whyle','Hunter Henry','Austin Hooper',
+  // AFC East
+  'Tyler Higbee','Chris Herndon','Cole Kmet','Tommy Tremble','Marcedes Lewis',
+  'Tanner McLachlan','Tip Reiman','Zach Davidson','Adam Trautman',
+  // AFC West
+  'Travis Kelce','Noah Gray','Evan Engram','Brenton Strange','Stone Smartt',
+  'Foster Moreau','Michael Mayer','Brock Bowers','Harrison Bryant',
+  // NFC North
+  'T.J. Hockenson','Josh Oliver','Luke Musgrave','Josiah Deguara','LaMichael Pettway',
+  'Sam LaPorta','James Mitchell','Tyler Conklin','Kenny Yeboah',
+  // NFC South
+  'Jake Ferguson','Sean McKeon','Juwan Johnson','Foster Moreau','Lucas Krull',
+  'Cade Otton','Ko Kieft','Taysom Hill','Will Dissly',
+  // NFC East
+  'Dallas Goedert','Grant Calcaterra','Jack Stoll','Daniel Bellinger','Chris Manhertz',
+  'Evan Engram','Brenton Strange','Tanner Hudson',
+  // NFC West
+  'George Kittle','Cameron Latu','Tyler Higbee','Hunter Long','Colby Parkinson',
+  'Noah Fant','Zach Ertz','Trey McBride','Elijah Higgins',
+  // Additional notable TEs
+  'Woody Marks', // RB - sanity check, should NOT be here
+  'Will Mallory','Marlin Klein','Theo Johnson','Dalton Kincaid','Quintin Morris',
+  'Charlie Kolar','Devin Asiasi','Durham Smythe','Pharaoh Brown',
+])
+
+
 // ── FW FORMULA ENGINE — clean rewrite ─────────────────────────────────────────
 // Fetches ESPN box scores directly from browser (server-side gets 403)
 // Correctly maps athlete positions from ESPN data
@@ -2359,10 +2392,13 @@ function useFWFantasyScores(currentWeek, mode) {
         // Helper to add/update player
         const addPlayer = (name, teamAbbr, pos, week, statsUpdate, usage = {}) => {
           if (!name || !['QB','RB','WR','TE','K'].includes(pos)) return
+          // Fix ESPN's WR mis-classification of TEs
+          const correctedPos = pos === 'WR' && KNOWN_TES.has(name) ? 'TE' : pos
           const key = `${name}|${teamAbbr}`
-          if (!pmap[key]) pmap[key] = { name, team: teamAbbr, pos, statsByWeek: {}, targets: 0, carries: 0 }
+          if (!pmap[key]) pmap[key] = { name, team: teamAbbr, pos: correctedPos, statsByWeek: {}, targets: 0, carries: 0 }
           // Use roster position if available (more accurate)
           if (posLookup[name]) pmap[key].pos = posLookup[name]
+          else if (correctedPos !== pos) pmap[key].pos = correctedPos // apply TE correction
           if (!pmap[key].statsByWeek[week]) pmap[key].statsByWeek[week] = {}
           const ws = pmap[key].statsByWeek[week]
           Object.entries(statsUpdate).forEach(([k, v]) => { ws[k] = (ws[k] || 0) + v })
@@ -2389,23 +2425,15 @@ function useFWFantasyScores(currentWeek, mode) {
                 addPlayer(name, teamAbbr, pos, week, { rushYds: vals['YDS']||0, rushTD: vals['TD']||0 }, { carries: vals['CAR']||0 })
               } else if (cat === 'receiving') {
                 addPlayer(name, teamAbbr, pos, week, { recYds: vals['YDS']||0, recTD: vals['TD']||0, rec: vals['REC']||0 }, { targets: vals['TGT']||0 })
+              } else if (cat === 'kicking') {
+                addPlayer(name, teamAbbr, 'K', week, { fgm: vals['FGM']||0, xpm: vals['XPM']||0, fgLng: vals['LNG']||0 })
               }
             })
           })
         })
 
-        // Process kicking stats — ESPN puts kickers in summary.kicking[], NOT boxscore.players
-        ;(summary.kicking || []).forEach(teamKicking => {
-          const teamAbbr = teamKicking.team?.abbreviation || ''
-          const labels   = teamKicking.labels || []
-          ;(teamKicking.athletes || []).forEach(a => {
-            const name = a.athlete?.displayName || ''
-            if (!name) return
-            const vals = {}
-            labels.forEach((l, i) => { vals[l] = parseFloat(a.stats?.[i]) || 0 })
-            addPlayer(name, teamAbbr, 'K', week, { fgm: vals['FGM']||0, xpm: vals['XPM']||0, fgLng: vals['LNG']||0 })
-          })
-        })
+        // Kicking IS in boxscore.players statGroups - handled above with cat='kicking'
+        // No separate summary.kicking array exists
       })
 
       // Step 4: score each player
