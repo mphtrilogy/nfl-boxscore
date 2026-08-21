@@ -5270,9 +5270,32 @@ function useTeamStats(season) {
   const [error,   setError]   = useState(null)
   useEffect(() => {
     setLoading(true)
-    fetch(`/api/espn/teamstats?season=${season}`)
+    const seasonType = isRegularSeason() ? 2 : 1
+    // Fetch team stats directly from ESPN
+    fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/standings?season=${season}&seasontype=${seasonType}`)
       .then(r => r.json())
-      .then(d => { setData(d.teams || []); setLoading(false) })
+      .then(d => {
+        const teams = []
+        ;(d.children || []).forEach(conf => {
+          ;(conf.children || []).forEach(div => {
+            ;(div.standings?.entries || []).forEach(e => {
+              const team = e.team || {}
+              const stats = {}
+              ;(e.stats || []).forEach(s => { stats[s.name] = s.value })
+              teams.push({
+                abbr: team.abbreviation || '',
+                name: team.displayName || '',
+                logo: team.logos?.[0]?.href || '',
+                wins: stats.wins || 0,
+                losses: stats.losses || 0,
+                ...stats
+              })
+            })
+          })
+        })
+        setData(teams)
+        setLoading(false)
+      })
       .catch(e => { setError(e.message); setLoading(false) })
   }, [season])
   return { teams: data, loading, error }
@@ -5286,9 +5309,31 @@ function usePlayerStats(season, category) {
     if (!category) return
     setLoading(true)
     setData(null)
-    fetch(`/api/espn/playerstats?season=${season}&category=${category}`)
+    // Fetch directly from ESPN — proxy gets 403 server-side
+    const seasonType = isRegularSeason() ? 2 : 1
+    fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/statistics/athletes?season=${season}&seasontype=${seasonType}&limit=50&category=${category}`)
       .then(r => r.json())
-      .then(d => { setData({ athletes: d.athletes || [], labels: d.abbreviations || d.labels || [] }); setLoading(false) })
+      .then(d => {
+        // ESPN returns athletes array with displayName, team, stats, categories
+        const athletes = (d.athletes || []).map(a => {
+          const athlete = a.athlete || a
+          const vals = {}
+          ;(a.categories || []).forEach(cat => {
+            ;(cat.names || []).forEach((name, i) => {
+              vals[name] = parseFloat(cat.values?.[i]) || 0
+            })
+          })
+          return {
+            name:   athlete.displayName || athlete.fullName || '',
+            team:   athlete.team?.abbreviation || '',
+            pos:    athlete.position?.abbreviation || '',
+            espnId: athlete.id || '',
+            ...vals
+          }
+        })
+        setData({ athletes, labels: [] })
+        setLoading(false)
+      })
       .catch(e => { setError(e.message); setLoading(false) })
   }, [season, category])
   return { athletes: data?.athletes, labels: data?.labels, loading, error }
