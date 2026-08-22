@@ -1367,6 +1367,17 @@ function calcFpts(vals, cat, mode='ppr') {
     const base = (v('YDS')/10) + (v('TD')*6)
     return mode === 'ppr' ? base + v('REC') : base
   }
+  if (cat === 'kicking') {
+    // ESPN kicking stats: FG="M/A" string, XP="M/A" string, LONG=int, PTS=total
+    // Prefer ESPN's own PTS total when present — matches standard scoring already
+    const espnPts = parseFloat(vals['PTS'])
+    if (!isNaN(espnPts) && espnPts > 0) return espnPts
+    const fgm = parseInt(String(vals['FG'] || '0').split('/')[0]) || 0
+    const xpm = parseInt(String(vals['XP'] || '0').split('/')[0]) || 0
+    const lng = parseInt(vals['LONG'] || 0)
+    const bonus = lng >= 50 ? 2 : lng >= 40 ? 1 : 0
+    return (fgm > 0 ? fgm * 3 + bonus : 0) + xpm
+  }
   return 0
 }
 
