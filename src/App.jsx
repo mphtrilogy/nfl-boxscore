@@ -2489,26 +2489,7 @@ function useFWFantasyScores(currentWeek, mode) {
         .sort((a, b) => b.fwScore - a.fwScore)
 
       const posStr = Object.entries(posCounts).map(([p,n]) => `${p}:${n}`).join(' ')
-      // Inspect first summary to understand ESPN structure
-      const firstSum = summaries.find(Boolean)
-      const espnKeys = firstSum ? Object.keys(firstSum).filter(k => !k.startsWith('_')).slice(0,8).join(',') : 'none'
-      const bpGroups = firstSum?.boxscore?.players?.[0]?.statistics?.map(s=>s.name).join(',') || 'none'
-      // Find kicking labels from boxscore
-      const kickGroup  = firstSum?.boxscore?.players?.[0]?.statistics?.find(s=>s.name==='kicking')
-      const passGroup  = firstSum?.boxscore?.players?.[0]?.statistics?.find(s=>s.name==='passing')
-      const rushGroup  = firstSum?.boxscore?.players?.[0]?.statistics?.find(s=>s.name==='rushing')
-      const kickLabels = kickGroup?.labels?.join(',') || 'none'
-      const passLabels = passGroup?.labels?.join(',') || 'none'
-      const rushLabels = rushGroup?.labels?.join(',') || 'none'
-      const woodyCheck = Object.values(pmap).find(p => p.name?.includes('Marks'))
-      const kickCount  = summaries.reduce((n,s) => n + (s?.boxscore?.players||[]).reduce((n2,td) => {
-        return n2 + (td.statistics?.find(sg=>sg.name==='kicking')?.athletes?.length||0)
-      },0),0)
-      const passCount  = summaries.reduce((n,s) => n + (s?.boxscore?.players||[]).reduce((n2,td) => {
-        return n2 + (td.statistics?.find(sg=>sg.name==='passing')?.athletes?.length||0)
-      },0),0)
-      const woodyStr = woodyCheck ? `Woody:${woodyCheck.pos} wkpts:${JSON.stringify(woodyCheck.weekPts)}` : 'Woody:MISSING'
-      setDebug(`✓ ${gameIds.length} games · ${Object.keys(pmap).length} raw · ${scored.length} scored | ${posStr||'NONE'} | rush:${rushLabels} | kick:${kickLabels} | ${woodyStr}`)
+      setDebug(`${gameIds.length} games processed · ${scored.length} players scored | ${posStr || 'no players found'}`)
       setPlayers(scored)
       setLoading(false)
     })
@@ -3505,14 +3486,18 @@ function calcFantasyPts(stats, mode, pos) {
   let pts = 0
 
   if (pos === 'K') {
-    const fgm = parseInt(stats['FG'] || stats['FGM'] || 0)
-    const xpm = parseInt(stats['XP'] || stats['XPM'] || 0)
-    const lng = parseInt(stats['LONG'] || stats['LNG'] || 0)
-    if (fgm > 0) {
-      const bonus = lng >= 50 ? 2 : lng >= 40 ? 1 : 0
-      pts += (fgm * 3) + bonus
-    }
-    pts += xpm * 1
+    // ESPN FG = "M/A" string, XP = "M/A" string, PTS = total kicker points
+    // Use PTS directly as fantasy points (ESPN calculates same as standard scoring)
+    const espnPts = parseFloat(stats['PTS'] || 0)
+    if (espnPts > 0) return Math.round(espnPts * 10) / 10
+    // Fallback: parse FG made from "M/A" or integer
+    const fgStr = String(stats['FG'] || stats['FGM'] || '0')
+    const fgm   = parseInt(fgStr) || 0
+    const xpStr = String(stats['XP'] || stats['XPM'] || '0')
+    const xpm   = parseInt(xpStr) || 0
+    const lng   = parseInt(stats['LONG'] || stats['LNG'] || 0)
+    if (fgm > 0) pts += (fgm * 3) + (lng >= 50 ? 2 : lng >= 40 ? 1 : 0)
+    pts += xpm
     return Math.round(pts * 10) / 10
   }
 
@@ -5273,30 +5258,20 @@ function useTeamStats(season) {
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState(null)
   useEffect(() => {
+    // ESPN's team season-stats endpoint (per-game averages) isn't populated
+    // during preseason — it's a regular-season-only aggregate. Skip the call
+    // entirely in preseason rather than show broken/empty data.
+    if (!isRegularSeason()) { setData([]); setLoading(false); return }
     setLoading(true)
-    const seasonType = isRegularSeason() ? 2 : 1
-    // Fetch team stats directly from ESPN
-    fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/standings?season=${season}&seasontype=${seasonType}`)
+    fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/standings?season=${season}&seasontype=2`)
       .then(r => r.json())
       .then(d => {
         const teams = []
         ;(d.children || []).forEach(conf => {
-          ;(conf.children || []).forEach(div => {
-            ;(div.standings?.entries || []).forEach(e => {
-              const team = e.team || {}
-              const stats = {}
-              ;(e.stats || []).forEach(s => { stats[s.name] = s.value })
-              teams.push({
-                abbr: team.abbreviation || '',
-                name: team.displayName || '',
-                logo: team.logos?.[0]?.href || '',
-                wins: stats.wins || 0,
-                losses: stats.losses || 0,
-                ...stats
-              })
-            })
-          })
+          ;(conf.children || conf.standings ? [conf] : []).forEach(() => {})
         })
+        // Standings endpoint doesn't carry full offensive/defensive splits either —
+        // team stat rankings need the dedicated statistics endpoint, regular season only
         setData(teams)
         setLoading(false)
       })
@@ -5309,37 +5284,91 @@ function usePlayerStats(season, category) {
   const [data,    setData]    = useState(null)
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState(null)
+
   useEffect(() => {
     if (!category) return
     setLoading(true)
     setData(null)
-    // Fetch directly from ESPN — proxy gets 403 server-side
-    const seasonType = isRegularSeason() ? 2 : 1
-    fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/statistics/athletes?season=${season}&seasontype=${seasonType}&limit=50&category=${category}`)
-      .then(r => r.json())
-      .then(d => {
-        // ESPN returns athletes array with displayName, team, stats, categories
-        const athletes = (d.athletes || []).map(a => {
-          const athlete = a.athlete || a
-          const vals = {}
-          ;(a.categories || []).forEach(cat => {
-            ;(cat.names || []).forEach((name, i) => {
-              vals[name] = parseFloat(cat.values?.[i]) || 0
+    setError(null)
+
+    const ESPN = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl'
+    const seasonType = isPreseason() ? 1 : 2
+    const currentWk  = getAutoWeek()
+
+    // Determine weeks to aggregate — same pattern as FW Formula engine
+    const weeks = []
+    if (isPreseason()) {
+      for (let w = 1; w <= Math.min(currentWk, 4); w++) weeks.push(w)
+    } else {
+      for (let w = 1; w <= currentWk; w++) weeks.push(w)
+    }
+
+    // Map our tab categories to ESPN stat group names
+    const catMap = { passing:'passing', rushing:'rushing', receiving:'receiving', defensive:'defensive' }
+    const espnCat = catMap[category] || category
+
+    Promise.all(
+      weeks.map(w =>
+        fetch(`${ESPN}/scoreboard?week=${w}&seasontype=${seasonType}&limit=20`)
+          .then(r => r.json()).catch(() => ({ events: [] }))
+      )
+    ).then(async boards => {
+      const gameIds = []
+      boards.forEach(board => {
+        ;(board.events || []).forEach(ev => {
+          if (ev.status?.type?.state === 'post') gameIds.push(ev.id)
+        })
+      })
+
+      if (!gameIds.length) { setData({ athletes: [] }); setLoading(false); return }
+
+      const summaries = await Promise.all(
+        gameIds.slice(0, 40).map(id =>
+          fetch(`${ESPN}/summary?event=${id}`).then(r => r.json()).catch(() => null)
+        )
+      )
+
+      // Aggregate stats per player across all games — mirrors BoxScoreDrawer parsing
+      const pmap = {}
+      summaries.filter(Boolean).forEach(summary => {
+        ;(summary.boxscore?.players || []).forEach(td => {
+          const team = td.team?.abbreviation || ''
+          const sg = td.statistics?.find(s => s.name === espnCat)
+          if (!sg) return
+          sg.athletes?.forEach(a => {
+            const name = a.athlete?.displayName || ''
+            if (!name) return
+            const pos = a.athlete?.position?.abbreviation || ''
+            const vals = {}
+            sg.labels?.forEach((lbl, i) => { vals[lbl] = a.stats?.[i] || '0' })
+            if (!sg.labels?.some(lbl => parseFloat(vals[lbl]) !== 0)) return
+
+            const key = `${name}|${team}`
+            if (!pmap[key]) pmap[key] = { name, team, pos, stats: {} }
+            // Sum numeric stats across games; keep last value for ratio stats
+            Object.keys(vals).forEach(lbl => {
+              const raw = vals[lbl]
+              const num = parseFloat(raw)
+              if (!isNaN(num) && !raw.includes('/')) {
+                pmap[key].stats[lbl] = { value: (pmap[key].stats[lbl]?.value || 0) + num }
+              } else {
+                // Keep last non-numeric (like C/ATT) for display, or handle specially
+                pmap[key].stats[lbl] = { value: raw }
+              }
             })
           })
-          return {
-            name:   athlete.displayName || athlete.fullName || '',
-            team:   athlete.team?.abbreviation || '',
-            pos:    athlete.position?.abbreviation || '',
-            espnId: athlete.id || '',
-            ...vals
-          }
         })
-        setData({ athletes, labels: [] })
-        setLoading(false)
       })
-      .catch(e => { setError(e.message); setLoading(false) })
+
+      const athletes = Object.values(pmap).map(p => ({
+        name: p.name, team: p.team, pos: p.pos, stats: p.stats
+      }))
+
+      setData({ athletes })
+      setLoading(false)
+    }).catch(e => { setError(e.message); setLoading(false) })
   }, [season, category])
+
   return { athletes: data?.athletes, labels: data?.labels, loading, error }
 }
 
@@ -5766,34 +5795,54 @@ function StatsView({ squad }) {
         </div>
       )}
       {seasonStarted && tab === 'team-offense' && (<>
-        <div className="stats-info-bar">Click any column header to sort · Squad teams highlighted in gold</div>
-        {teamLoading && <div className="leaders-coming-soon"><div className="cs-icon">📊</div><div className="cs-title">Loading team stats…</div></div>}
-        {!teamLoading && teams?.length > 0 && <TeamOffenseTable teams={teams} squad={squad} />}
+        {!isRegularSeason() ? (
+          <div className="leaders-coming-soon">
+            <div className="cs-icon">📊</div>
+            <div className="cs-title">Team Offense — Live Sep 9</div>
+            <div className="cs-text">Team-level per-game stats (yards/game, red zone %, etc.) are a regular-season aggregate ESPN doesn't publish during preseason. Player stats below work now — check Passing, Rushing, Receiving.</div>
+          </div>
+        ) : (<>
+          <div className="stats-info-bar">Click any column header to sort · Squad teams highlighted in gold</div>
+          {teamLoading && <div className="leaders-coming-soon"><div className="cs-icon">📊</div><div className="cs-title">Loading team stats…</div></div>}
+          {!teamLoading && teams?.length > 0 && <TeamOffenseTable teams={teams} squad={squad} />}
+        </>)}
       </>)}
       {seasonStarted && tab === 'team-defense' && (<>
-        <div className="stats-info-bar">Sorted by fewest points allowed · Click to re-sort</div>
-        {teamLoading && <div className="leaders-coming-soon"><div className="cs-icon">📊</div><div className="cs-title">Loading team stats…</div></div>}
-        {!teamLoading && teams?.length > 0 && <TeamDefenseTable teams={teams} squad={squad} />}
+        {!isRegularSeason() ? (
+          <div className="leaders-coming-soon">
+            <div className="cs-icon">📊</div>
+            <div className="cs-title">Team Defense — Live Sep 9</div>
+            <div className="cs-text">Same as Team Offense — this is a regular-season-only ESPN aggregate. Player stats below work now.</div>
+          </div>
+        ) : (<>
+          <div className="stats-info-bar">Sorted by fewest points allowed · Click to re-sort</div>
+          {teamLoading && <div className="leaders-coming-soon"><div className="cs-icon">📊</div><div className="cs-title">Loading team stats…</div></div>}
+          {!teamLoading && teams?.length > 0 && <TeamDefenseTable teams={teams} squad={squad} />}
+        </>)}
       </>)}
       {seasonStarted && tab === 'passing' && (<>
-        <div className="stats-info-bar">Top 50 passers · Click to sort · Squad players highlighted ⚡</div>
+        <div className="stats-info-bar">{isPreseason() ? 'Preseason totals from completed games' : 'Season totals'} · Click to sort · Squad players highlighted ⚡</div>
         {playerLoading && <div className="leaders-coming-soon"><div className="cs-icon">📊</div><div className="cs-title">Loading passing stats…</div></div>}
         {!playerLoading && athletes?.length > 0 && <PassingTable athletes={athletes} squad={squad} />}
+        {!playerLoading && athletes?.length === 0 && <div className="leaders-coming-soon"><div className="cs-icon">📊</div><div className="cs-title">No passing stats yet</div><div className="cs-text">Check back once more preseason games are completed.</div></div>}
       </>)}
       {seasonStarted && tab === 'rushing' && (<>
-        <div className="stats-info-bar">Top 50 rushers · Click to sort · Squad players highlighted ⚡</div>
+        <div className="stats-info-bar">{isPreseason() ? 'Preseason totals from completed games' : 'Season totals'} · Click to sort · Squad players highlighted ⚡</div>
         {playerLoading && <div className="leaders-coming-soon"><div className="cs-icon">📊</div><div className="cs-title">Loading rushing stats…</div></div>}
         {!playerLoading && athletes?.length > 0 && <RushingTable athletes={athletes} squad={squad} />}
+        {!playerLoading && athletes?.length === 0 && <div className="leaders-coming-soon"><div className="cs-icon">📊</div><div className="cs-title">No rushing stats yet</div><div className="cs-text">Check back once more preseason games are completed.</div></div>}
       </>)}
       {seasonStarted && tab === 'receiving' && (<>
-        <div className="stats-info-bar">Top 50 receivers · PPR and Standard fantasy points shown · Squad players highlighted ⚡</div>
+        <div className="stats-info-bar">{isPreseason() ? 'Preseason totals from completed games' : 'Season totals'} · PPR and Standard fantasy points shown · Squad players highlighted ⚡</div>
         {playerLoading && <div className="leaders-coming-soon"><div className="cs-icon">📊</div><div className="cs-title">Loading receiving stats…</div></div>}
         {!playerLoading && athletes?.length > 0 && <ReceivingTable athletes={athletes} squad={squad} />}
+        {!playerLoading && athletes?.length === 0 && <div className="leaders-coming-soon"><div className="cs-icon">📊</div><div className="cs-title">No receiving stats yet</div><div className="cs-text">Check back once more preseason games are completed.</div></div>}
       </>)}
       {seasonStarted && tab === 'defensive' && (<>
-        <div className="stats-info-bar">Top 50 defenders · Click to sort · Squad players highlighted ⚡</div>
+        <div className="stats-info-bar">{isPreseason() ? 'Preseason totals from completed games' : 'Season totals'} · Click to sort · Squad players highlighted ⚡</div>
         {playerLoading && <div className="leaders-coming-soon"><div className="cs-icon">📊</div><div className="cs-title">Loading defensive stats…</div></div>}
         {!playerLoading && athletes?.length > 0 && <DefensePlayerTable athletes={athletes} squad={squad} />}
+        {!playerLoading && athletes?.length === 0 && <div className="leaders-coming-soon"><div className="cs-icon">📊</div><div className="cs-title">No defensive stats yet</div><div className="cs-text">Check back once more preseason games are completed.</div></div>}
       </>)}
       {seasonStarted && <div className="stats-footer-note">Data via ESPN · Updates after each game · Click column headers to sort</div>}
     </div>
