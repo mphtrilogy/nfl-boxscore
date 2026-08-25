@@ -4117,12 +4117,14 @@ function InjuriesView() {
     setLoading(true)
     try {
       // Fetch injuries for all 32 teams in parallel
+      // Note: sports.core.api.espn.com returns $ref pointers, not full data —
+      // site.api.espn.com/.../teams/{id}?enable=injuries gives resolved objects
       const teams = Object.keys(ESPN_TEAM_IDS)
       const results = await Promise.all(
         teams.map(abbr =>
-          fetch(`/api/espn-core/teams/${ESPN_TEAM_IDS[abbr]}/injuries`)
+          fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/${ESPN_TEAM_IDS[abbr]}?enable=injuries`)
             .then(r => r.json())
-            .then(data => ({ abbr, items: data.items || [] }))
+            .then(data => ({ abbr, items: data.team?.injuries || [] }))
             .catch(() => ({ abbr, items: [] }))
         )
       )
@@ -4134,9 +4136,9 @@ function InjuriesView() {
           name:     inj.athlete?.displayName || '—',
           pos:      inj.athlete?.position?.abbreviation || '—',
           status:   inj.status || '—',
-          detail:   inj.detail || '',
-          side:     inj.side || '',
-          type:     inj.type || '',
+          detail:   inj.details?.detail || inj.longComment || inj.shortComment || '',
+          side:     inj.details?.side || '',
+          type:     inj.details?.type || '',
           date:     inj.date ? new Date(inj.date).toLocaleDateString('en-US', {month:'short', day:'numeric'}) : '',
         })).sort((a, b) => {
           const order = ['Out','Doubtful','Questionable','Probable','IR','PUP']
@@ -6754,23 +6756,28 @@ function Sidebar({ activeWeek, setActiveView, squad }) {
       .catch(() => {})
   }, [])
 
-  // Injuries (top 6)
+  // Injuries (top 6) — sample a handful of teams via resolved site.api endpoint
   useEffect(() => {
-    fetch('/api/espn-core/injuries?limit=20')
-      .then(r => r.json())
-      .then(d => {
-        const items = (d.items || [])
-          .filter(inj => inj.athlete?.displayName && inj.status)
-          .slice(0, 6)
-          .map(inj => ({
+    const sampleTeams = ['KC','BUF','PHI','SF','DAL','BAL']
+    Promise.all(
+      sampleTeams.map(abbr =>
+        fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/${ESPN_TEAM_IDS[abbr]}?enable=injuries`)
+          .then(r => r.json())
+          .then(d => (d.team?.injuries || []).map(inj => ({
             name:   inj.athlete?.displayName || '',
-            team:   inj.athlete?.team?.abbreviation || '',
+            team:   abbr,
             pos:    inj.athlete?.position?.abbreviation || '',
-            status: inj.type?.description || inj.status || '',
-          }))
-        setInjuries(items)
-      })
-      .catch(() => {})
+            status: inj.status || '',
+          })))
+          .catch(() => [])
+      )
+    ).then(results => {
+      const items = results.flat()
+        .filter(inj => inj.name && inj.status)
+        .filter(inj => ['Out','Doubtful'].includes(inj.status))
+        .slice(0, 6)
+      setInjuries(items)
+    })
   }, [])
 
   // Next few games
