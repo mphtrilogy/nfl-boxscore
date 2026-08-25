@@ -1466,10 +1466,10 @@ function PlayerStats({ espnData, cat, game: g }) {
       { key:'AVG',   label:'YPA',   title:'Yards Per Attempt' },
       { key:'TD',    label:'TD',    title:'Touchdown Passes' },
       { key:'INT',   label:'INT',   title:'Interceptions' },
-      { key:'SCK',   label:'SCK',   title:'Sacks Taken' },
-      { key:'LNG',   label:'LNG',   title:'Longest Pass' },
+      { key:'SACKS', label:'SCK',   title:'Sacks Taken' },
+      { key:'LONG',  label:'LNG',   title:'Longest Pass' },
       { key:'QBR',   label:'QBR',   title:'ESPN QBR' },
-      { derived:(v) => v['RTNG']||v['RTG']||'—', label:'RTG', title:'Passer Rating' },
+      { derived:(v) => v['RTG']||v['RTNG']||'—', label:'RTG', title:'Passer Rating' },
       { fpts:true, std:true, label:'FPTS', title:'Fantasy Pts (STD)' },
     ],
     rushing: [
@@ -1477,19 +1477,19 @@ function PlayerStats({ espnData, cat, game: g }) {
       { key:'YDS', label:'YDS', title:'Rushing Yards' },
       { key:'AVG', label:'YPC', title:'Yards Per Carry' },
       { key:'TD',  label:'TD',  title:'Rushing TDs' },
-      { key:'LNG', label:'LNG', title:'Long Run' },
+      { key:'LONG', label:'LNG', title:'Long Run' },
       { key:'20+', label:'20+', title:'Runs 20+ Yards' },
       { key:'FUM', label:'FUM', title:'Fumbles' },
       { fpts:true, std:true, label:'FPTS', title:'Fantasy Pts (STD)' },
     ],
     receiving: [
       { key:'REC',  label:'REC',  title:'Receptions' },
-      { key:'TGT',  label:'TGT',  title:'Targets' },
+      { key:'TGTS', label:'TGT',  title:'Targets' },
       { key:'YDS',  label:'YDS',  title:'Receiving Yards' },
       { key:'AVG',  label:'YPR',  title:'Yards Per Reception' },
       { key:'YAC',  label:'YAC',  title:'Yards After Catch' },
       { key:'TD',   label:'TD',   title:'Receiving TDs' },
-      { key:'LNG',  label:'LNG',  title:'Long Reception' },
+      { key:'LONG', label:'LNG',  title:'Long Reception' },
       { key:'20+',  label:'20+',  title:'Receptions 20+ Yards' },
       { key:'FD',   label:'FD',   title:'First Downs' },
       { key:'FUM',  label:'FUM',  title:'Fumbles' },
@@ -2430,7 +2430,7 @@ function useFWFantasyScores(currentWeek, mode) {
               // Skip if all zeros — same as BoxScoreDrawer line 1525
               if (!sg.labels?.some(lbl => parseFloat(vals[lbl]) !== 0)) return
 
-              const targets = cat === 'receiving' ? parseFloat(vals['TGT']||0) : 0
+              const targets = cat === 'receiving' ? parseFloat(vals['TGTS']||vals['TGT']||0) : 0
               const carries = cat === 'rushing'   ? parseFloat(vals['CAR']||0) : 0
               addToMap(name, team, pos, wk, cat, vals, targets, carries)
             })
@@ -5547,8 +5547,8 @@ function PassingTable({ athletes, squad }) {
       yds:    v('YDS'), td: v('TD'), int: v('INT'),
       cmpPct: v('PCT') || (v('CMP') && v('ATT') ? v('CMP')/v('ATT')*100 : 0),
       ypa:    v('AVG') || (v('YDS') && v('ATT') ? v('YDS')/v('ATT') : 0),
-      rating: v('QBR') || v('passer_rating') || 0,
-      long:   v('LNG'), sacks: v('SACK') || 0,
+      rating: v('RTG') || v('QBR') || 0,
+      long:   v('LONG') || v('LNG'), sacks: v('SACKS') || v('SACK') || 0,
       _fpts:  v('YDS')/25 + v('TD')*6 - v('INT')*2,
     }
   }).filter(r => r.yds > 0 || r.td > 0)
@@ -5601,7 +5601,7 @@ function RushingTable({ athletes, squad }) {
       name: a.name, team: a.team, pos: a.pos,
       yds: v('YDS'), att: v('CAR') || v('ATT'), td: v('TD'),
       ypc: v('AVG') || (v('YDS') && v('CAR') ? v('YDS')/v('CAR') : 0),
-      long: v('LNG'), fum: v('FUM') || 0, ypg: v('YDS/G') || 0,
+      long: v('LONG') || v('LNG'), fum: v('FUM') || 0, ypg: v('YDS/G') || 0,
       _fpts: v('YDS')/10 + v('TD')*6,
     }
   }).filter(r => r.yds > 0 || r.att > 0)
@@ -5654,9 +5654,9 @@ function ReceivingTable({ athletes, squad }) {
     const v = (k) => a.stats[k]?.value ?? 0
     return {
       name: a.name, team: a.team, pos: a.pos,
-      yds: v('YDS'), rec: v('REC'), tgt: v('TGT'), td: v('TD'),
+      yds: v('YDS'), rec: v('REC'), tgt: v('TGTS') || v('TGT'), td: v('TD'),
       ypr: v('AVG') || (v('YDS') && v('REC') ? v('YDS')/v('REC') : 0),
-      ypg: v('YDS/G') || 0, long: v('LNG'),
+      ypg: v('YDS/G') || 0, long: v('LONG') || v('LNG'),
       _fpts_ppr: v('YDS')/10 + v('TD')*6 + v('REC'),
       _fpts_std: v('YDS')/10 + v('TD')*6,
     }
