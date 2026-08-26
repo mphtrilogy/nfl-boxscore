@@ -1219,7 +1219,7 @@ function GameCard({ game: g, isOpen, onToggle, index, squad }) {
       style={{ animationDelay: `${index * 0.04}s` }}
     >
       {/* HEADER — always visible, click to toggle */}
-      <div className="card-head" onClick={() => { console.log('card clicked, current isOpen:', isOpen); onToggle() }}>
+      <div className="card-head" onClick={onToggle}>
         {g.note && <div className="card-note">{g.note}</div>}
         {g.intl  && <div className="card-intl">🌍 {g.intlCity}</div>}
         {/* Squad badge */}
@@ -6853,7 +6853,7 @@ function Sidebar({ activeWeek, setActiveView, squad }) {
 
   // Next few games
   useEffect(() => {
-    fetch(`/api/espn/scoreboard?week=${activeWeek}&seasontype=${espnSeasonType()}&limit=20`)
+    fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${activeWeek}&seasontype=${espnSeasonType()}&limit=20`)
       .then(r => r.json())
       .then(d => setEvents(d.events || []))
       .catch(() => {})
