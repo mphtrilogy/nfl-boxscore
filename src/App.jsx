@@ -130,10 +130,11 @@ export default function App() {
         const live = seasonStarted ? liveGames.find(lg =>
           lg.home === g.home && lg.away === g.away
         ) : null
-        if (live) return { ...g, ...live }
+        if (live) return { ...g, ...live, network: live.network || g.tv }
         // No live match yet (game hasn't been played/ESPN has no data for it) —
-        // always mark as upcoming so GameCard renders the Game Info drawer
-        return { ...g, status: 'upcoming', homeScore: g.homeScore ?? null, awayScore: g.awayScore ?? null }
+        // always mark as upcoming so GameCard renders the Game Info drawer.
+        // Normalize tv → network since that's what GameCard/GameInfoDrawer read.
+        return { ...g, status: 'upcoming', homeScore: g.homeScore ?? null, awayScore: g.awayScore ?? null, network: g.tv }
       })
 
   // Detect if any game is live (for auto-refresh indicator)
@@ -1774,13 +1775,29 @@ function GameInfoDrawer({ game: g }) {
   const weatherCity = isOutdoor ? STADIUM_CITIES[homeTeam] : null
   const weather = useWeather(seasonStarted && weatherCity ? weatherCity : null)
 
-  // Parse odds for display
-  const parseOdds = (oddsStr) => {
-    if (!oddsStr) return null
-    // Format: "KC -3.5" or "Over/Under 47.5"
-    const parts = oddsStr.split(' ')
-    return oddsStr
-  }
+  // Fetch live odds directly — separate spread + over/under, not just g.odds string
+  const [odds, setOdds] = useState(null)
+  useEffect(() => {
+    if (!seasonStarted || !g.home || !g.away) return
+    const seasonType = isPreseason() ? 1 : 2
+    fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${g.week}&seasontype=${seasonType}&limit=20`)
+      .then(r => r.json())
+      .then(data => {
+        const ev = (data.events || []).find(e => {
+          const comp = e.competitions?.[0]
+          const teams = (comp?.competitors || []).map(c => c.team?.abbreviation)
+          return teams.includes(g.home) && teams.includes(g.away)
+        })
+        const o = ev?.competitions?.[0]?.odds?.[0]
+        if (o) {
+          setOdds({
+            spread: o.details || null,
+            overUnder: o.overUnder || null,
+          })
+        }
+      })
+      .catch(() => {})
+  }, [g.home, g.away, g.week, seasonStarted])
 
   return (
     <div className="game-info-drawer">
@@ -1814,10 +1831,22 @@ function GameInfoDrawer({ game: g }) {
           <a href={ROSTER_LINKS[g.home]} target="_blank" rel="noopener" className="sb-google-link">{g.home} Roster ↗</a>
         </span>
       </div>
-      {g.odds  && (
+      {(odds?.spread || g.odds) && (
         <div className="gi-row gi-odds">
           <span>Spread</span>
-          <span className="gi-odds-val">{g.odds}</span>
+          <span className="gi-odds-val">{odds?.spread || g.odds}</span>
+        </div>
+      )}
+      {odds?.overUnder && (
+        <div className="gi-row gi-odds">
+          <span>Over/Under</span>
+          <span className="gi-odds-val">{odds.overUnder}</span>
+        </div>
+      )}
+      {seasonStarted && !odds?.spread && !g.odds && (
+        <div className="gi-row">
+          <span>Spread</span>
+          <span style={{color:'var(--muted-lt)', fontStyle:'italic'}}>Lines not posted yet</span>
         </div>
       )}
       {/* Weather widget for outdoor games */}
