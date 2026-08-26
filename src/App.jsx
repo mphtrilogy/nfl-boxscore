@@ -1219,7 +1219,7 @@ function GameCard({ game: g, isOpen, onToggle, index, squad }) {
       style={{ animationDelay: `${index * 0.04}s` }}
     >
       {/* HEADER — always visible, click to toggle */}
-      <div className="card-head" onClick={onToggle}>
+      <div className="card-head" onClick={() => { console.log('card clicked, current isOpen:', isOpen); onToggle() }}>
         {g.note && <div className="card-note">{g.note}</div>}
         {g.intl  && <div className="card-intl">🌍 {g.intlCity}</div>}
         {/* Squad badge */}
