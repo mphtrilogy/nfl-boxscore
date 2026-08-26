@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useScoreboard, useBoxScore, useTeamSchedule, useWeekSchedule, parseESPNGame } from './hooks/useESPN'
 import { SCHEDULE_2026, WEEK_META, ALL_TEAMS } from './data/schedule2026'
 import { ti, networkColor, fmt, TEAMS } from './utils/teams'
@@ -73,10 +73,38 @@ export default function App() {
   // Current ESPN season type based on toggle (1=preseason, 2=regular)
   const currentSeasonType = espnSeasonType()
 
-  // useScoreboard — regular season hook (preseason has its own fetch in PreseasonView)
-  const { data: espnData, loading, error, lastUpdated, refresh } = useScoreboard(
-    seasonStarted ? activeWeek : null
-  )
+  // Direct-browser scoreboard fetch — the /api/espn proxy gets blocked by ESPN (403
+  // on server-side requests), so every data fetch on this site goes straight to
+  // ESPN from the browser instead, same as Preseason/FW Formula/Stats.
+  const [espnData, setEspnData]     = useState(null)
+  const [loading, setLoading]       = useState(true)
+  const [error, setError]           = useState(null)
+  const [lastUpdated, setLastUpdated] = useState(null)
+
+  const fetchScoreboard = useCallback(() => {
+    if (!seasonStarted) { setLoading(false); return }
+    setLoading(true)
+    fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${activeWeek}&seasontype=${currentSeasonType}&limit=20`)
+      .then(r => { if (!r.ok) throw new Error(`ESPN ${r.status}`); return r.json() })
+      .then(data => {
+        setEspnData(data)
+        setLastUpdated(new Date())
+        setError(null)
+        setLoading(false)
+      })
+      .catch(e => {
+        setError(e.message)
+        setLoading(false)
+      })
+  }, [activeWeek, currentSeasonType, seasonStarted])
+
+  useEffect(() => {
+    fetchScoreboard()
+    const interval = setInterval(fetchScoreboard, 60000)
+    return () => clearInterval(interval)
+  }, [fetchScoreboard])
+
+  const refresh = fetchScoreboard
 
   // Sync to ESPN current week when season mode changes
   useEffect(() => {
