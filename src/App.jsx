@@ -127,12 +127,13 @@ export default function App() {
   // Merge live scores into schedule — only during season
   // In preseason, games come directly from ESPN (not in SCHEDULE_2026)
   const mergedGames = SCHEDULE_2026.filter(g => g.week === activeWeek).map(g => {
-        if (!seasonStarted) return { ...g, status: 'upcoming', homeScore: null, awayScore: null }
-        const live = liveGames.find(lg =>
+        const live = seasonStarted ? liveGames.find(lg =>
           lg.home === g.home && lg.away === g.away
-        )
+        ) : null
         if (live) return { ...g, ...live }
-        return g
+        // No live match yet (game hasn't been played/ESPN has no data for it) —
+        // always mark as upcoming so GameCard renders the Game Info drawer
+        return { ...g, status: 'upcoming', homeScore: g.homeScore ?? null, awayScore: g.awayScore ?? null }
       })
 
   // Detect if any game is live (for auto-refresh indicator)
