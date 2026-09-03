@@ -1826,6 +1826,38 @@ function calcFW(stats, mode) {
   return Math.round(pts * 10) / 10
 }
 
+// Search ESPN's full player database by name — finds ANY real NFL player,
+// active or injured, regardless of whether they've recorded box score stats.
+// Confirmed response shape: data.results[] groups, each with .contents[],
+// entries have .type:"player", .displayName, .subtitle (team name only —
+// no position field, so we can't filter/label position from this endpoint).
+function useESPNPlayerSearch(query) {
+  const [results, setResults] = useState([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!query || query.length < 3) { setResults([]); return }
+    setLoading(true)
+    const t = setTimeout(() => {
+      fetch(`https://site.web.api.espn.com/apis/search/v2?limit=20&query=${encodeURIComponent(query)}&sport=football`)
+        .then(r => r.json())
+        .then(data => {
+          const allItems = (data?.results || []).flatMap(group => group.contents || [])
+          const players = allItems
+            .filter(i => i.type === 'player')
+            .map(i => ({ name: i.displayName || '', team: i.subtitle || '' }))
+            .filter(p => p.name)
+          setResults(players)
+          setLoading(false)
+        })
+        .catch(() => { setResults([]); setLoading(false) })
+    }, 300)
+    return () => clearTimeout(t)
+  }, [query])
+
+  return { results, loading }
+}
+
 function useFWFantasyScores(currentWeek, mode) {
   const [players, setPlayers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -2016,9 +2048,21 @@ function FWFormulaView({ currentWeek, mode, watchlist = [], toggleWatch }) {
   const seasonStarted = isGameSeason()
   const { players, loading, debug } = useFWFantasyScores(currentWeek, mode)
 
+  // Live ESPN player search — finds real players even with zero recorded stats
+  // (injured, limited snaps, etc). Only queried once the FW-scored search comes
+  // up empty, so it doesn't fire on every keystroke unnecessarily.
+  const { results: espnMatches, loading: espnSearching } = useESPNPlayerSearch(search)
+
   const POSITIONS = ['ALL','QB','RB','WR','TE','K']
   const watchSet = new Set(watchlist)
   const posFiltered = pos === 'ALL' ? players : players.filter(p => p.pos === pos)
+
+  // Names on the watchlist with no scored data yet (injured, hasn't played, etc)
+  // — show them as placeholder rows so they don't silently vanish from the view
+  const scoredNames = new Set(players.map(p => p.name))
+  const unscoredWatchlist = watchlist
+    .filter(name => !scoredNames.has(name))
+    .map(name => ({ name, pos: '—', team: '—', fwScore: null, noData: true }))
 
   // Searching by name checks the FULL scored list, not just the top 40/25 —
   // this is what surfaces low-ranked rookies who are still in the data
@@ -2026,7 +2070,7 @@ function FWFormulaView({ currentWeek, mode, watchlist = [], toggleWatch }) {
   const filtered = search.length >= 2
     ? posFiltered.filter(p => p.name.toLowerCase().includes(searchLower))
     : showWatchOnly
-      ? posFiltered.filter(p => watchSet.has(p.name))
+      ? [...posFiltered.filter(p => watchSet.has(p.name)), ...(pos === 'ALL' ? unscoredWatchlist : [])]
       : posFiltered.slice(0, pos === 'ALL' ? 40 : 25)
 
   const handleManualAdd = () => {
@@ -2174,7 +2218,7 @@ function FWFormulaView({ currentWeek, mode, watchlist = [], toggleWatch }) {
           </thead>
           <tbody>
             {filtered.map((p, i) => (
-              <tr key={i} className={`fw-row ${watchSet.has(p.name) ? 'fw-watched' : ''}`}>
+              <tr key={i} className={`fw-row ${watchSet.has(p.name) ? 'fw-watched' : ''} ${p.noData ? 'fw-nodata' : ''}`}>
                 <td>
                   <button
                     className={`fw-star-btn ${watchSet.has(p.name) ? 'on' : ''}`}
@@ -2183,30 +2227,40 @@ function FWFormulaView({ currentWeek, mode, watchlist = [], toggleWatch }) {
                     aria-label={watchSet.has(p.name) ? `Remove ${p.name} from watchlist` : `Add ${p.name} to watchlist`}
                   >{watchSet.has(p.name) ? '★' : '☆'}</button>
                 </td>
-                <td>
-                  <div className="fw-score-cell" style={{background: scoreColor(p.fwScore)}}>
-                    <div className="fw-score-num">{p.fwScore}</div>
-                    <div className="fw-score-lbl">{scoreLabel(p.fwScore)}</div>
-                  </div>
-                </td>
-                <td className="fw-name">{p.name}</td>
-                <td className="fw-pos">{p.pos}</td>
-                <td className="fw-team">{p.team}</td>
-                <td className="fw-opp">{p.opp || '—'}</td>
-                <td className="fw-proj">{p.projPts}</td>
-                <td className={`fw-last ${p.last1 > p.seasonAvg ? 'fw-up' : 'fw-dn'}`}>{p.last1}</td>
-                <td className="fw-avg">{p.last3avg}</td>
-                <td className="fw-trend">{p.trend}</td>
-                <td>
-                  <div className="fw-mini-bar">
-                    <div style={{width:`${p.matchupScore * 10}%`, background: scoreColor(p.matchupScore)}} />
-                  </div>
-                </td>
-                <td>
+                {p.noData ? (
+                  <>
+                    <td><div className="fw-score-cell fw-score-empty"><div className="fw-score-lbl">No data yet</div></div></td>
+                    <td className="fw-name">{p.name}</td>
+                    <td colSpan={8} className="fw-nodata-note">Tracking — will show FW scores once they log a game</td>
+                  </>
+                ) : (
+                  <>
+                    <td>
+                      <div className="fw-score-cell" style={{background: scoreColor(p.fwScore)}}>
+                        <div className="fw-score-num">{p.fwScore}</div>
+                        <div className="fw-score-lbl">{scoreLabel(p.fwScore)}</div>
+                      </div>
+                    </td>
+                    <td className="fw-name">{p.name}</td>
+                    <td className="fw-pos">{p.pos}</td>
+                    <td className="fw-team">{p.team}</td>
+                    <td className="fw-opp">{p.opp || '—'}</td>
+                    <td className="fw-proj">{p.projPts}</td>
+                    <td className={`fw-last ${p.last1 > p.seasonAvg ? 'fw-up' : 'fw-dn'}`}>{p.last1}</td>
+                    <td className="fw-avg">{p.last3avg}</td>
+                    <td className="fw-trend">{p.trend}</td>
+                    <td>
+                      <div className="fw-mini-bar">
+                        <div style={{width:`${p.matchupScore * 10}%`, background: scoreColor(p.matchupScore)}} />
+                      </div>
+                    </td>
+                    <td>
                   <div className="fw-mini-bar">
                     <div style={{width:`${p.usageScore * 10}%`, background:'#4a90d9'}} />
                   </div>
                 </td>
+                  </>
+                )}
               </tr>
             ))}
           </tbody>
@@ -2235,25 +2289,45 @@ function FWFormulaView({ currentWeek, mode, watchlist = [], toggleWatch }) {
           <div className="cs-icon">🔍</div>
           <div className="cs-title">No scored data for "{search}"</div>
           <div className="cs-text">
-            They may not have logged stats in a game we've processed yet — common for
-            deep backups and recent call-ups. You can still add them by name below;
-            they'll show FW scores once real box score data comes in.
+            No box score stats yet — common for injured players, deep backups, or
+            recent call-ups. Search below to confirm and add them anyway; they'll
+            show real FW scores as soon as they log a game.
           </div>
-          <div className="fw-manual-add-row">
-            <input
-              className="fw-search-input"
-              placeholder="Confirm exact name to add…"
-              value={manualAdd || search}
-              onChange={e => setManualAdd(e.target.value)}
-            />
-            <button
-              className="tc-btn fw-watch-toggle"
-              onClick={() => {
-                const name = (manualAdd || search).trim()
-                if (name) { toggleWatch?.(name); setManualAdd(''); setSearch('') }
-              }}
-            >☆ Add to Watchlist</button>
-          </div>
+          {espnSearching && (
+            <div className="fw-espn-searching">🔍 Checking ESPN's player database…</div>
+          )}
+          {!espnSearching && espnMatches.length > 0 && (
+            <div className="fw-espn-matches">
+              {espnMatches.map((p, i) => (
+                <button
+                  key={i}
+                  className={`fw-espn-match-btn ${watchSet.has(p.name) ? 'on' : ''}`}
+                  onClick={() => { toggleWatch?.(p.name); setSearch('') }}
+                >
+                  <span>{watchSet.has(p.name) ? '★' : '☆'} {p.name}</span>
+                  <span className="fw-espn-match-team">{p.team}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {!espnSearching && espnMatches.length === 0 && search.length >= 3 && (
+            <div className="fw-manual-add-row">
+              <div className="cs-text" style={{marginBottom:8}}>No ESPN match either — double check the spelling, or add the exact name manually:</div>
+              <input
+                className="fw-search-input"
+                placeholder="Confirm exact name to add…"
+                value={manualAdd || search}
+                onChange={e => setManualAdd(e.target.value)}
+              />
+              <button
+                className="tc-btn fw-watch-toggle"
+                onClick={() => {
+                  const name = (manualAdd || search).trim()
+                  if (name) { toggleWatch?.(name); setManualAdd(''); setSearch('') }
+                }}
+              >☆ Add to Watchlist</button>
+            </div>
+          )}
         </div>
       )}
       {!loading && players.length > 0 && filtered.length === 0 && !showWatchOnly && !search && (
