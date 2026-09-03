@@ -703,7 +703,8 @@ function useESPNRosters(teams) {
       }
     } catch(e) {}
 
-    // Fetch rosters for selected teams from ESPN
+    // Fetch rosters for selected teams directly from ESPN — the /api/espn proxy
+    // gets blocked server-side (403), same as every other endpoint on this site
     setLoading(true)
     const FANTASY_POS = ['QB','RB','WR','TE','K']
 
@@ -711,7 +712,7 @@ function useESPNRosters(teams) {
       teams.map(abbr => {
         const id = ESPN_TEAM_IDS[abbr]
         if (!id) return Promise.resolve([])
-        return fetch(`/api/espn/teams/${id}/roster`)
+        return fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/${id}/roster`)
           .then(r => r.ok ? r.json() : null)
           .then(data => {
             if (!data) return []
@@ -724,7 +725,10 @@ function useESPNRosters(teams) {
                 : pos.includes('Tight End') ? 'TE'
                 : pos.includes('Kicker') || pos.includes('Place') ? 'K' : null
               if (!posAbbr) return
-              ;(group.items || []).slice(0, posAbbr === 'QB' ? 2 : posAbbr === 'K' ? 1 : posAbbr === 'TE' ? 2 : 4)
+              // No cap — once you've selected a team, show the full roster at
+              // each position. Rookies and depth-chart risers often sit below
+              // veteran starters in ESPN's roster order, so capping cuts them out.
+              ;(group.items || [])
                 .forEach(a => {
                   if (a.fullName || a.displayName) {
                     teamPlayers.push({
