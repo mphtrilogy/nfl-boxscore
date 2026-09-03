@@ -738,6 +738,7 @@ function useESPNPlayerSearch(query) {
 function useESPNRosters(teams) {
   const [players,  setPlayers]  = useState([])
   const [loading,  setLoading]  = useState(false)
+  const [debug,    setDebug]    = useState('')
 
   useEffect(() => {
     if (!teams || teams.length === 0) { setPlayers([]); return }
@@ -764,7 +765,10 @@ function useESPNRosters(teams) {
         const id = ESPN_TEAM_IDS[abbr]
         if (!id) return Promise.resolve([])
         return fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/${id}/roster`)
-          .then(r => r.ok ? r.json() : null)
+          .then(r => {
+            if (!r.ok) throw new Error(`${abbr}: HTTP ${r.status}`)
+            return r.json()
+          })
           .then(data => {
             if (!data) return []
             const teamPlayers = []
@@ -792,10 +796,11 @@ function useESPNRosters(teams) {
             })
             return teamPlayers
           })
-          .catch(() => [])
+          .catch(e => { setDebug(prev => prev + ` | ${e.message}`); return [] })
       })
     ).then(results => {
       const allPlayers = results.flat()
+      setDebug(prev => `fetched:${teams.length} teams, got:${allPlayers.length} players${prev}`)
 
       // Update cache
       try {
@@ -812,7 +817,7 @@ function useESPNRosters(teams) {
     })
   }, [JSON.stringify(teams)])
 
-  return { players, loading }
+  return { players, loading, debug }
 }
 
 function SquadModal({ squad, onSave, onClose }) {
@@ -822,7 +827,7 @@ function SquadModal({ squad, onSave, onClose }) {
   const [posFilter,      setPosFilter]      = useState('ALL')
 
   // Live ESPN roster data for selected teams — always current
-  const { players: espnPlayers, loading: rosterLoading } = useESPNRosters(pendingTeams)
+  const { players: espnPlayers, loading: rosterLoading, debug: rosterDebug } = useESPNRosters(pendingTeams)
 
   // Live ESPN search by name — catches rookies and anyone missing from the static list
   const { results: searchResults, loading: searching, debug: searchDebug } = useESPNPlayerSearch(playerSearch)
@@ -943,6 +948,11 @@ function SquadModal({ squad, onSave, onClose }) {
                   : <span style={{fontWeight:400,color:'var(--muted-lt)',marginLeft:8}}>{ALL_SQUAD_PLAYERS.length}+ players — select teams above for live rosters</span>
               }
             </div>
+            {pendingTeams.length > 0 && rosterDebug && (
+              <div style={{fontFamily:'var(--font-mono)',fontSize:8,color:'var(--accent)',padding:'4px 8px',background:'var(--paper-mid)',borderRadius:2,marginBottom:6,wordBreak:'break-all'}}>
+                {rosterDebug}
+              </div>
+            )}
             {/* Position filter */}
             <div style={{display:'flex',gap:4,marginBottom:8,flexWrap:'wrap'}}>
               {['ALL','QB','RB','WR','TE','K'].map(p => (
