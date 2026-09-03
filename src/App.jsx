@@ -689,6 +689,7 @@ const ROSTER_CACHE_TTL = 6 * 60 * 60 * 1000 // 6 hours
 function useESPNPlayerSearch(query) {
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
+  const [debug, setDebug] = useState('')
 
   useEffect(() => {
     if (!query || query.length < 3) { setResults([]); return }
@@ -697,24 +698,33 @@ function useESPNPlayerSearch(query) {
       fetch(`https://site.web.api.espn.com/apis/search/v2?limit=25&query=${encodeURIComponent(query)}&sport=football`)
         .then(r => r.json())
         .then(data => {
-          const items = data?.results?.flatMap(group => group.contents || []) || []
-          const players = items
-            .filter(i => i.type === 'player' && i.sport === 'nfl')
+          // Debug: capture raw shape so we can see exactly what ESPN returns
+          const groupCount = data?.results?.length || 0
+          const firstGroup = data?.results?.[0]
+          const firstGroupType = firstGroup?.type || 'none'
+          const contentCount = firstGroup?.contents?.length || 0
+          const firstItem = firstGroup?.contents?.[0]
+          setDebug(`groups:${groupCount} firstType:${firstGroupType} items:${contentCount} sample:${JSON.stringify(firstItem)?.slice(0,300)}`)
+
+          // Try multiple possible shapes rather than one guessed structure
+          const allItems = (data?.results || []).flatMap(group => group.contents || [])
+          const players = allItems
             .map(i => ({
-              name: i.displayName || i.name || '',
-              pos:  i.subtitle?.split(' ')?.[0] || i.position || '',
-              team: i.subtitle?.split(' ')?.slice(-1)[0] || '',
+              name: i.displayName || i.name || i.shortName || '',
+              pos:  i.subtitle?.split(' ')?.[0] || i.position?.abbreviation || i.position || '',
+              team: i.subtitle?.split(' ')?.slice(-1)[0] || i.team?.abbreviation || '',
+              rawType: i.type || '',
             }))
-            .filter(p => p.name && ['QB','RB','WR','TE','K'].includes(p.pos))
+            .filter(p => p.name)
           setResults(players)
           setLoading(false)
         })
-        .catch(() => { setResults([]); setLoading(false) })
+        .catch(e => { setDebug(`error: ${e.message}`); setResults([]); setLoading(false) })
     }, 300) // debounce
     return () => clearTimeout(t)
   }, [query])
 
-  return { results, loading }
+  return { results, loading, debug }
 }
 
 function useESPNRosters(teams) {
@@ -807,7 +817,7 @@ function SquadModal({ squad, onSave, onClose }) {
   const { players: espnPlayers, loading: rosterLoading } = useESPNRosters(pendingTeams)
 
   // Live ESPN search by name — catches rookies and anyone missing from the static list
-  const { results: searchResults, loading: searching } = useESPNPlayerSearch(playerSearch)
+  const { results: searchResults, loading: searching, debug: searchDebug } = useESPNPlayerSearch(playerSearch)
 
   // When teams are selected: show their live ESPN roster
   // When no teams selected: show full static list for browsing
@@ -938,6 +948,11 @@ function SquadModal({ squad, onSave, onClose }) {
               value={playerSearch} onChange={e => setPlayerSearch(e.target.value)} />
             {rosterLoading && <div style={{fontFamily:'var(--font-mono)',fontSize:9,color:'var(--gold)',padding:'4px 0'}}>⚡ Fetching live rosters from ESPN…</div>}
             {searching && playerSearch.length >= 3 && <div style={{fontFamily:'var(--font-mono)',fontSize:9,color:'var(--gold)',padding:'4px 0'}}>🔍 Searching all NFL players…</div>}
+            {playerSearch.length >= 3 && searchDebug && (
+              <div style={{fontFamily:'var(--font-mono)',fontSize:8,color:'var(--muted-lt)',padding:'4px 8px',background:'var(--paper-mid)',borderRadius:2,wordBreak:'break-all',marginBottom:4}}>
+                {searchDebug}
+              </div>
+            )}
             <div className="squad-player-grid">
               {allVisible.map((p,i) => (
                 <button key={i}
