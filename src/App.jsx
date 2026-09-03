@@ -55,17 +55,43 @@ export default function App() {
     localStorage.setItem('fw-font', fontTheme)
   }, [fontTheme])
 
-  // ── MY FANTASY SQUAD ──────────────────────────────────────────────────────
-  const [squad, setSquad] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('fw_squad_v1')) || {teams:[],players:[],on:false} }
-    catch(e) { return {teams:[],players:[],on:false} }
+  // ── WATCHLIST ─────────────────────────────────────────────────────────────
+  // Players you're tracking from FW Formula. Replaces the old team/roster-picker
+  // squad system — no static player list, no roster fetch, nothing to go stale.
+  // Add/remove happens directly from FW Formula rows.
+  const [watchlist, setWatchlist] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('fw_watchlist_v1')) || [] }
+    catch(e) { return [] }
   })
-  const saveSquad = (sq) => {
-    const newSquad = { teams: sq.teams || [], players: sq.players || [], on: !!sq.on }
-    localStorage.setItem('fw_squad_v1', JSON.stringify(newSquad))
-    setSquad(newSquad)
+  const [watchOn, setWatchOn] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('fw_watchlist_on')) ?? true }
+    catch(e) { return true }
+  })
+  const toggleWatch = (name) => {
+    setWatchlist(prev => {
+      const next = prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]
+      localStorage.setItem('fw_watchlist_v1', JSON.stringify(next))
+      // Sync to newsletter if subscribed — same mechanism the old squad picker used
+      const email = localStorage.getItem('fw-nl-email')
+      if (email) {
+        fetch('/api/newsletter/update-squad', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, squadPlayers: next.join(','), favTeam: 'All' }),
+        }).catch(() => {})
+      }
+      return next
+    })
   }
-  const [squadModalOpen, setSquadModalOpen] = useState(false)
+  const setWatchOnPersist = (on) => {
+    setWatchOn(on)
+    localStorage.setItem('fw_watchlist_on', JSON.stringify(on))
+  }
+  // Backward-compat shape for the ~80 places across the app that read `squad`
+  // for highlighting (box scores, stats tables, leaders, newsletter signup).
+  // teams stays empty forever — team-following was dropped in favor of the
+  // watchlist, which is more precise and never goes stale.
+  const squad = { teams: [], players: watchlist, on: watchOn }
 
   // Season gate — open for preseason (Aug 7) and regular season (Sep 9)
   const seasonStarted = isGameSeason()
@@ -217,8 +243,7 @@ export default function App() {
 
       {/* ── MASTHEAD ── */}
       <Masthead lastUpdated={lastUpdated} hasLiveGame={hasLiveGame} onRefresh={refresh} fontTheme={fontTheme} setFontTheme={setFontTheme} onHamburger={() => setDrawerOpen(true)} />
-      <SquadBar squad={squad} onOpen={() => setSquadModalOpen(true)} onToggle={(on) => saveSquad({teams:squad.teams||[], players:squad.players||[], on})} />
-      {squadModalOpen && <SquadModal squad={squad} onSave={(sq) => { saveSquad(sq); setSquadModalOpen(false) }} onClose={() => setSquadModalOpen(false)} />}
+      <WatchlistBar watchlist={watchlist} watchOn={watchOn} onToggle={setWatchOnPersist} onRemove={toggleWatch} setActiveView={setActiveView} />
 
       {/* ── TOP NAV ── */}
       <nav className="top-nav">
@@ -273,6 +298,7 @@ export default function App() {
             mode={fantMode} setMode={setFantMode}
             currentWeek={activeWeek}
             squad={squad}
+            watchlist={watchlist} toggleWatch={toggleWatch}
             trendsMode={trendsMode} setTrendsMode={setTrendsMode}
             trendsRange={trendsRange} setTrendsRange={setTrendsRange}
             trendsPos={trendsPos} setTrendsPos={setTrendsPos}
@@ -518,714 +544,49 @@ function WeekSelector({ active, onChange }) {
   )
 }
 
-// ── MY FANTASY SQUAD COMPONENTS ──────────────────────────────────────────────
-// ── COMPREHENSIVE PLAYER LIST — all fantasy-relevant starters + key backups ──
-const ALL_SQUAD_PLAYERS = [
-  // ── QBs ────────────────────────────────────────────────────────────────────
-  {name:'Lamar Jackson',      pos:'QB',team:'BAL'},{name:'Josh Allen',           pos:'QB',team:'BUF'},
-  {name:'Patrick Mahomes',    pos:'QB',team:'KC'}, {name:'Jalen Hurts',          pos:'QB',team:'PHI'},
-  {name:'Joe Burrow',         pos:'QB',team:'CIN'},{name:'Jayden Daniels',       pos:'QB',team:'WAS'},
-  {name:'Sam Darnold',        pos:'QB',team:'SEA'},{name:'Geno Smith',           pos:'QB',team:'NYJ'},
-  {name:'Brock Purdy',        pos:'QB',team:'SF'}, {name:'C.J. Stroud',          pos:'QB',team:'HOU'},
-  {name:'Tua Tagovailoa',     pos:'QB',team:'MIA'},{name:'Jordan Love',          pos:'QB',team:'GB'},
-  {name:'Dak Prescott',       pos:'QB',team:'DAL'},{name:'Anthony Richardson',   pos:'QB',team:'IND'},
-  {name:'Caleb Williams',     pos:'QB',team:'CHI'},{name:'Drake Maye',           pos:'QB',team:'NE'},
-  {name:'Bo Nix',             pos:'QB',team:'DEN'},{name:'Baker Mayfield',       pos:'QB',team:'TB'},
-  {name:'Kirk Cousins',       pos:'QB',team:'LV'},{name:'Justin Herbert',       pos:'QB',team:'LAC'},
-  {name:'Justin Fields',      pos:'QB',team:'PIT'},{name:'Matthew Stafford',     pos:'QB',team:'LA'},
-  {name:'Deshaun Watson',     pos:'QB',team:'CLE'},{name:'Trevor Lawrence',      pos:'QB',team:'JAC'},
-  {name:'Will Levis',         pos:'QB',team:'TEN'},{name:'Daniel Jones',         pos:'QB',team:'NYG'},
-  {name:'Aaron Rodgers',      pos:'QB',team:'NYJ'},{name:'Derek Carr',           pos:'QB',team:'NO'},
-  {name:'Bryce Young',        pos:'QB',team:'CAR'},{name:'Aidan O\'Connell',     pos:'QB',team:'LV'},
-  {name:'Fernando Mendoza',   pos:'QB',team:'LV'}, {name:'Kyler Murray',         pos:'QB',team:'MIN'},
-  {name:'Sam Howell',         pos:'QB',team:'WAS'},{name:'Malik Willis',         pos:'QB',team:'TEN'},
-  {name:'Jacoby Brissett',    pos:'QB',team:'NE'}, {name:'Carson Wentz',         pos:'QB',team:'LA'},
-  // ── RBs ────────────────────────────────────────────────────────────────────
-  {name:'Saquon Barkley',     pos:'RB',team:'PHI'},{name:"De\'Von Achane",        pos:'RB',team:'MIA'},
-  {name:'Bijan Robinson',     pos:'RB',team:'ATL'},{name:'Jahmyr Gibbs',         pos:'RB',team:'DET'},
-  {name:'Derrick Henry',      pos:'RB',team:'BAL'},{name:'Jonathan Taylor',      pos:'RB',team:'IND'},
-  {name:'James Cook',         pos:'RB',team:'BUF'},{name:'Tony Pollard',         pos:'RB',team:'TEN'},
-  {name:'Josh Jacobs',        pos:'RB',team:'GB'}, {name:'Joe Mixon',            pos:'RB',team:'HOU'},
-  {name:'Breece Hall',        pos:'RB',team:'NYJ'},{name:'Kenneth Walker III',   pos:'RB',team:'SEA'},
-  {name:'David Montgomery',   pos:'RB',team:'DET'},{name:'Rachaad White',        pos:'RB',team:'TB'},
-  {name:'Travis Etienne',     pos:'RB',team:'JAC'},{name:'Chuba Hubbard',        pos:'RB',team:'CAR'},
-  {name:'Isiah Pacheco',      pos:'RB',team:'KC'}, {name:'Kyren Williams',       pos:'RB',team:'LA'},
-  {name:'Aaron Jones',        pos:'RB',team:'MIN'},{name:'Alvin Kamara',         pos:'RB',team:'NO'},
-  {name:"D\'Andre Swift",      pos:'RB',team:'CHI'},{name:'Javonte Williams',     pos:'RB',team:'DEN'},
-  {name:'Brian Robinson',     pos:'RB',team:'WAS'},{name:'Rhamondre Stevenson',  pos:'RB',team:'NE'},
-  {name:'Zack Moss',          pos:'RB',team:'CIN'},{name:'James Conner',         pos:'RB',team:'ARI'},
-  {name:'Cam Akers',          pos:'RB',team:'MIN'},{name:'Tank Bigsby',          pos:'RB',team:'JAC'},
-  {name:'Gus Edwards',        pos:'RB',team:'LAC'},{name:'Jerome Ford',          pos:'RB',team:'CLE'},
-  {name:'Miles Sanders',      pos:'RB',team:'CAR'},{name:'Roschon Johnson',      pos:'RB',team:'CHI'},
-  {name:'Tyjae Spears',       pos:'RB',team:'TEN'},{name:'Dameon Pierce',        pos:'RB',team:'HOU'},
-  {name:'Jaleel McLaughlin',  pos:'RB',team:'DEN'},{name:'Rico Dowdle',          pos:'RB',team:'DAL'},
-  {name:'Jeremiyah Love',     pos:'RB',team:'ARI'},{name:'Jadarian Price',       pos:'RB',team:'SEA'},
-  {name:'Kareem Hunt',        pos:'RB',team:'KC'}, {name:'Antonio Gibson',       pos:'RB',team:'WAS'},
-  {name:'Ezekiel Elliott',    pos:'RB',team:'NE'}, {name:'Raheem Mostert',       pos:'RB',team:'MIA'},
-  {name:'De\'Veon Smith',     pos:'RB',team:'PHI'},{name:'Jordan Mason',         pos:'RB',team:'SF'},
-  // ── WRs ────────────────────────────────────────────────────────────────────
-  {name:"Ja\'Marr Chase",      pos:'WR',team:'CIN'},{name:'CeeDee Lamb',          pos:'WR',team:'DAL'},
-  {name:'Tyreek Hill',        pos:'WR',team:'MIA'},{name:'Justin Jefferson',     pos:'WR',team:'MIN'},
-  {name:'A.J. Brown',         pos:'WR',team:'NE'},{name:'Davante Adams',        pos:'WR',team:'NYJ'},
-  {name:'Malik Nabers',       pos:'WR',team:'NYG'},{name:'DK Metcalf',           pos:'WR',team:'SEA'},
-  {name:'Stefon Diggs',       pos:'WR',team:'HOU'},{name:'Puka Nacua',           pos:'WR',team:'LA'},
-  {name:'Drake London',       pos:'WR',team:'ATL'},{name:'Amon-Ra St. Brown',    pos:'WR',team:'DET'},
-  {name:'DeVonta Smith',      pos:'WR',team:'PHI'},{name:'Brandon Aiyuk',        pos:'WR',team:'SF'},
-  {name:'Jaylen Waddle',      pos:'WR',team:'MIA'},{name:'Terry McLaurin',       pos:'WR',team:'WAS'},
-  {name:'Mike Evans',         pos:'WR',team:'TB'}, {name:'Chris Olave',          pos:'WR',team:'NO'},
-  {name:'Hollywood Brown',    pos:'WR',team:'KC'}, {name:'Rashee Rice',          pos:'WR',team:'KC'},
-  {name:'George Pickens',     pos:'WR',team:'PIT'},{name:'Keenan Allen',         pos:'WR',team:'CHI'},
-  {name:'Tee Higgins',        pos:'WR',team:'CIN'},{name:'Courtland Sutton',     pos:'WR',team:'DEN'},
-  {name:'Jaxon Smith-Njigba', pos:'WR',team:'SEA'},{name:'Gabe Davis',           pos:'WR',team:'JAC'},
-  {name:'DJ Moore',           pos:'WR',team:'CHI'},{name:'Amari Cooper',         pos:'WR',team:'BUF'},
-  {name:'Zay Flowers',        pos:'WR',team:'BAL'},{name:'Romeo Doubs',          pos:'WR',team:'GB'},
-  {name:'Marvin Harrison Jr.',pos:'WR',team:'ARI'},{name:'Calvin Ridley',        pos:'WR',team:'TEN'},
-  {name:'Diontae Johnson',    pos:'WR',team:'CAR'},{name:'Odell Beckham Jr.',    pos:'WR',team:'NYG'},
-  {name:'Brandin Cooks',      pos:'WR',team:'DAL'},{name:'Tyler Lockett',        pos:'WR',team:'SEA'},
-  {name:'Josh Downs',         pos:'WR',team:'IND'},{name:'Adam Thielen',         pos:'WR',team:'CAR'},
-  {name:'Rashid Shaheed',     pos:'WR',team:'NO'}, {name:'Wan\'Dale Robinson',   pos:'WR',team:'NYG'},
-  {name:'Nathanael Dell',     pos:'WR',team:'HOU'},{name:'Tank Dell',            pos:'WR',team:'HOU'},
-  {name:'Quentin Johnston',   pos:'WR',team:'LAC'},{name:'Rome Odunze',          pos:'WR',team:'CHI'},
-  {name:'Jakobi Meyers',      pos:'WR',team:'LV'}, {name:'Hunter Renfrow',       pos:'WR',team:'LV'},
-  {name:'Michael Pittman',    pos:'WR',team:'PIT'},{name:'Alec Pierce',          pos:'WR',team:'IND'},
-  {name:'Darnell Mooney',     pos:'WR',team:'ATL'},{name:'Christian Kirk',       pos:'WR',team:'JAC'},
-  {name:'Curtis Samuel',      pos:'WR',team:'BUF'},{name:'Elijah Moore',         pos:'WR',team:'CLE'},
-  {name:'Carnell Tate',       pos:'WR',team:'TEN'},{name:'Travis Hunter',        pos:'WR',team:'CLE'},
-  {name:'Emeka Egbuka',       pos:'WR',team:'MIA'},{name:'Makai Lemon',          pos:'WR',team:'PHI'},
-  {name:'Omar Cooper Jr.',    pos:'WR',team:'NYJ'},{name:'Jordyn Tyson',         pos:'WR',team:'NO'},
-  {name:'Demarcus Robinson',  pos:'WR',team:'LA'}, {name:'Van Jefferson',        pos:'WR',team:'ATL'},
-  {name:'Kendrick Bourne',      pos:'WR',team:'NE'},
-  {name:'Jerry Jeudy',        pos:'WR',team:'CLE'},{name:'Cedric Tillman',       pos:'WR',team:'CLE'},
-  // ── TEs ────────────────────────────────────────────────────────────────────
-  {name:'Travis Kelce',       pos:'TE',team:'KC'}, {name:'Sam LaPorta',          pos:'TE',team:'DET'},
-  {name:'Mark Andrews',       pos:'TE',team:'BAL'},{name:'Trey McBride',         pos:'TE',team:'ARI'},
-  {name:'Brock Bowers',       pos:'TE',team:'LV'}, {name:'Kyle Pitts',           pos:'TE',team:'ATL'},
-  {name:'George Kittle',      pos:'TE',team:'SF'}, {name:'Dallas Goedert',       pos:'TE',team:'PHI'},
-  {name:'David Njoku',        pos:'TE',team:'CLE'},{name:'Evan Engram',          pos:'TE',team:'JAC'},
-  {name:'Cole Kmet',          pos:'TE',team:'CHI'},{name:'T.J. Hockenson',       pos:'TE',team:'MIN'},
-  {name:'Jake Ferguson',      pos:'TE',team:'DAL'},{name:'Dalton Kincaid',       pos:'TE',team:'BUF'},
-  {name:'Chigoziem Okonkwo',  pos:'TE',team:'TEN'},{name:'Hunter Henry',         pos:'TE',team:'NE'},
-  {name:'Mike Gesicki',       pos:'TE',team:'CIN'},{name:'Logan Thomas',         pos:'TE',team:'WAS'},
-  {name:'Isaiah Likely',      pos:'TE',team:'BAL'},{name:'Tucker Kraft',         pos:'TE',team:'GB'},
-  {name:'Cade Otton',         pos:'TE',team:'TB'}, {name:'Jonnu Smith',          pos:'TE',team:'MIA'},
-  {name:'Tyler Conklin',      pos:'TE',team:'NYJ'},{name:'Gerald Everett',       pos:'TE',team:'LAC'},
-  {name:'Juwan Johnson',      pos:'TE',team:'NO'}, {name:'Austin Hooper',        pos:'TE',team:'TEN'},
-  {name:'Dawson Knox',        pos:'TE',team:'BUF'},{name:'Noah Fant',            pos:'TE',team:'SEA'},
-  {name:'Tyler Higbee',       pos:'TE',team:'LA'}, {name:'Foster Moreau',        pos:'TE',team:'NO'},
-  {name:'Kenyon Sadiq',       pos:'TE',team:'NYJ'},{name:'Tyler Warren',         pos:'TE',team:'IND'},
-  {name:'Colston Loveland',   pos:'TE',team:'ARI'},{name:'Oscar Delp',           pos:'TE',team:'NO'},
+// ── WATCHLIST BAR ──────────────────────────────────────────────────────────
+// Top bar showing your tracked players. Each pill has its own remove button —
+// no modal needed, no dead-end "+N" tag. Click a name to jump to FW Formula.
+function WatchlistBar({ watchlist, watchOn, onToggle, onRemove, setActiveView }) {
+  const [expanded, setExpanded] = useState(false)
+  const visible = expanded ? watchlist : watchlist.slice(0, 5)
+  const hasMore = watchlist.length > 5
 
-  // ── ADDED/CORRECTED ──────────────────────────────────────────────────────
-  {name:'Garrett Wilson',       pos:'WR',team:'NYJ'},{name:'Mason Taylor',         pos:'TE',team:'NYJ'},
-  {name:'Josh Reynolds',        pos:'WR',team:'NYJ'},{name:'Myles Garrett',        pos:'DE',team:'LA'},
-  {name:'Micah Parsons',        pos:'LB',team:'DAL'},{name:'Jared Verse',          pos:'EDGE',team:'CLE'},
-  {name:'Stefon Diggs',         pos:'WR',team:'HOU'},{name:'DeAndre Hopkins',      pos:'WR',team:'KC'},
-  {name:'Trey Sermon',          pos:'RB',team:'PHI'},{name:'Clyde Edwards-Helaire', pos:'RB',team:'KC'},
-  {name:'Irvin Charles',        pos:'WR',team:'SEA'},{name:'Braxton Berrios',      pos:'WR',team:'NYG'},
-  {name:'JuJu Smith-Schuster',  pos:'WR',team:'KC'}, {name:'Odell Beckham Jr.',    pos:'WR',team:'NYG'},
-  // ── Ks ─────────────────────────────────────────────────────────────────────
-  {name:'Justin Tucker',      pos:'K', team:'BAL'},{name:'Harrison Butker',      pos:'K', team:'KC'},
-  {name:'Evan McPherson',     pos:'K', team:'CIN'},{name:'Tyler Bass',           pos:'K', team:'BUF'},
-  {name:'Brandon Aubrey',     pos:'K', team:'DAL'},{name:'Jake Elliott',         pos:'K', team:'PHI'},
-  {name:"Ka\'imi Fairbairn",   pos:'K', team:'HOU'},{name:'Younghoe Koo',         pos:'K', team:'ATL'},
-  {name:'Cairo Santos',       pos:'K', team:'CHI'},{name:'Jason Sanders',        pos:'K', team:'MIA'},
-  {name:'Greg Zuerlein',      pos:'K', team:'NYJ'},{name:'Matt Gay',             pos:'K', team:'IND'},
-  {name:'Wil Lutz',           pos:'K', team:'DEN'},{name:'Matt Ammendola',       pos:'K', team:'NO'},
-  {name:'Cameron Dicker',     pos:'K', team:'LAC'},{name:'Chris Boswell',        pos:'K', team:'PIT'},
-]
-
-const SQUAD_DIVISIONS = [
-  {conf:'AFC',div:'AFC East', teams:['BUF','MIA','NE','NYJ']},
-  {conf:'AFC',div:'AFC North',teams:['BAL','CIN','CLE','PIT']},
-  {conf:'AFC',div:'AFC South',teams:['HOU','IND','JAC','TEN']},
-  {conf:'AFC',div:'AFC West', teams:['DEN','KC','LV','LAC']},
-  {conf:'NFC',div:'NFC East', teams:['DAL','NYG','PHI','WAS']},
-  {conf:'NFC',div:'NFC North',teams:['CHI','DET','GB','MIN']},
-  {conf:'NFC',div:'NFC South',teams:['ATL','CAR','NO','TB']},
-  {conf:'NFC',div:'NFC West', teams:['ARI','LA','LAC','SEA','SF']},
-]
-
-function SquadBar({ squad, onOpen, onToggle }) {
-  const total = (squad.teams?.length||0) + (squad.players?.length||0)
-  const allItems = [...(squad.teams||[]), ...(squad.players||[])]
-  const hiddenItems = allItems.slice(5)
   return (
     <div className="squad-bar">
-      <button className="squad-btn" onClick={onOpen}>
-        ⚡ My Fantasy Squad
-        {total > 0 && <span className="squad-btn-count">{total}</span>}
+      <button className="squad-btn" onClick={() => setActiveView('Fantasy')}>
+        ⭐ My Watchlist
+        {watchlist.length > 0 && <span className="squad-btn-count">{watchlist.length}</span>}
       </button>
-      {squad.on && total > 0 && (
+      {watchOn && watchlist.length > 0 && (
         <div className="squad-pills">
-          {allItems.slice(0,5).map((t,i) => (
-            <span key={i} className="squad-pill">{t}</span>
+          {visible.map((name, i) => (
+            <span key={i} className="squad-pill watch-pill">
+              {name}
+              <button
+                className="watch-pill-remove"
+                onClick={() => onRemove(name)}
+                title={`Remove ${name} from watchlist`}
+                aria-label={`Remove ${name}`}
+              >×</button>
+            </span>
           ))}
-          {total > 5 && (
-            <button
-              className="squad-pill squad-pill-more"
-              onClick={onOpen}
-              title={hiddenItems.join(', ')}
-            >+{total-5}</button>
+          {hasMore && (
+            <button className="squad-pill squad-pill-more" onClick={() => setExpanded(e => !e)}>
+              {expanded ? 'Show less' : `+${watchlist.length - 5}`}
+            </button>
           )}
         </div>
       )}
+      {watchlist.length === 0 && (
+        <span className="watch-empty-hint">Star players in FW Formula to build your watchlist ⚡</span>
+      )}
       <div className="squad-toggle-wrap">
-        <span className="squad-toggle-lbl">Highlight Squad</span>
+        <span className="squad-toggle-lbl">Highlight Watchlist</span>
         <label className="squad-toggle">
-          <input type="checkbox" checked={!!squad.on} onChange={e => onToggle(e.target.checked)} />
+          <input type="checkbox" checked={!!watchOn} onChange={e => onToggle(e.target.checked)} />
           <span className="squad-track" />
         </label>
-      </div>
-    </div>
-  )
-}
-
-// ── ESPN TEAM IDs for roster API ─────────────────────────────────────────────
-const ESPN_TEAM_IDS = {
-  ARI:22,ATL:1, BAL:33,BUF:2, CAR:29,CHI:3, CIN:4, CLE:5,
-  DAL:6, DEN:7, DET:8, GB:9,  HOU:34,IND:11,JAC:30,KC:12,
-  LA:14, LAC:24,LV:13, MIA:15,MIN:16,NE:17, NO:18, NYG:19,
-  NYJ:20,PHI:21,PIT:23,SEA:26,SF:25, TB:27, TEN:10,WAS:28,
-}
-
-// Cache key so we don\'t re-fetch on every modal open
-const ROSTER_CACHE_KEY = 'fw_rosters_v1'
-const ROSTER_CACHE_TTL = 6 * 60 * 60 * 1000 // 6 hours
-
-// Search ESPN's full player database by name — catches rookies, recent signings,
-// and anyone not in the hand-written ALL_SQUAD_PLAYERS fallback list.
-function useESPNPlayerSearch(query) {
-  const [results, setResults] = useState([])
-  const [loading, setLoading] = useState(false)
-
-  useEffect(() => {
-    if (!query || query.length < 3) { setResults([]); return }
-    setLoading(true)
-    const t = setTimeout(() => {
-      fetch(`https://site.web.api.espn.com/apis/search/v2?limit=25&query=${encodeURIComponent(query)}&sport=football`)
-        .then(r => r.json())
-        .then(data => {
-          // Confirmed shape: data.results is an array of groups, each with
-          // .type and .contents[]. Player entries have type:"player",
-          // displayName, and subtitle (team name only — no position field).
-          const allItems = (data?.results || []).flatMap(group => group.contents || [])
-          const players = allItems
-            .filter(i => i.type === 'player')
-            .map(i => ({
-              name: i.displayName || '',
-              pos:  '', // ESPN search doesn't return position — shown as unknown
-              team: i.subtitle || '',
-            }))
-            .filter(p => p.name)
-          setResults(players)
-          setLoading(false)
-        })
-        .catch(() => { setResults([]); setLoading(false) })
-    }, 300) // debounce
-    return () => clearTimeout(t)
-  }, [query])
-
-  return { results, loading }
-}
-
-function useESPNRosters(teams) {
-  const [players,  setPlayers]  = useState([])
-  const [loading,  setLoading]  = useState(false)
-  const [debug,    setDebug]    = useState('')
-
-  useEffect(() => {
-    if (!teams || teams.length === 0) { setPlayers([]); return }
-
-    // Check cache first
-    try {
-      const cached = JSON.parse(localStorage.getItem(ROSTER_CACHE_KEY) || '{}')
-      const now = Date.now()
-      const allCached = teams.every(t => cached[t] && (now - cached[t].ts) < ROSTER_CACHE_TTL)
-      if (allCached) {
-        const all = teams.flatMap(t => cached[t].players || [])
-        setPlayers(all)
-        return
-      }
-    } catch(e) {}
-
-    // Fetch rosters for selected teams directly from ESPN — the /api/espn proxy
-    // gets blocked server-side (403), same as every other endpoint on this site
-    setLoading(true)
-    const FANTASY_POS = ['QB','RB','WR','TE','K']
-
-    Promise.all(
-      teams.map(abbr => {
-        const id = ESPN_TEAM_IDS[abbr]
-        if (!id) return Promise.resolve([])
-        return fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/${id}/roster`)
-          .then(r => {
-            if (!r.ok) throw new Error(`${abbr}: HTTP ${r.status}`)
-            return r.json()
-          })
-          .then(data => {
-            if (!data) return []
-            const teamPlayers = []
-            ;(data.athletes || []).forEach(group => {
-              const pos = group.position || group.name || ''
-              const posAbbr = pos.includes('Quarterback') ? 'QB'
-                : pos.includes('Running Back') ? 'RB'
-                : pos.includes('Wide Receiver') ? 'WR'
-                : pos.includes('Tight End') ? 'TE'
-                : pos.includes('Kicker') || pos.includes('Place') ? 'K' : null
-              if (!posAbbr) return
-              // No cap — once you've selected a team, show the full roster at
-              // each position. Rookies and depth-chart risers often sit below
-              // veteran starters in ESPN's roster order, so capping cuts them out.
-              ;(group.items || [])
-                .forEach(a => {
-                  if (a.fullName || a.displayName) {
-                    teamPlayers.push({
-                      name: a.fullName || a.displayName,
-                      pos:  posAbbr,
-                      team: abbr,
-                    })
-                  }
-                })
-            })
-            return teamPlayers
-          })
-          .catch(e => { setDebug(prev => prev + ` | ${e.message}`); return [] })
-      })
-    ).then(results => {
-      const allPlayers = results.flat()
-      setDebug(prev => `fetched:${teams.length} teams, got:${allPlayers.length} players${prev}`)
-
-      // Update cache
-      try {
-        const cached = JSON.parse(localStorage.getItem(ROSTER_CACHE_KEY) || '{}')
-        const now = Date.now()
-        teams.forEach((t, i) => {
-          cached[t] = { players: results[i] || [], ts: now }
-        })
-        localStorage.setItem(ROSTER_CACHE_KEY, JSON.stringify(cached))
-      } catch(e) {}
-
-      setPlayers(allPlayers)
-      setLoading(false)
-    })
-  }, [JSON.stringify(teams)])
-
-  return { players, loading, debug }
-}
-
-function SquadModal({ squad, onSave, onClose }) {
-  const [pendingTeams,   setPendingTeams]   = useState([...(squad.teams  ||[])])
-  const [pendingPlayers, setPendingPlayers] = useState([...(squad.players||[])])
-  const [playerSearch,   setPlayerSearch]   = useState('')
-  const [posFilter,      setPosFilter]      = useState('ALL')
-
-  // Live ESPN roster data for selected teams — always current
-  const { players: espnPlayers, loading: rosterLoading, debug: rosterDebug } = useESPNRosters(pendingTeams)
-
-  // Live ESPN search by name — catches rookies and anyone missing from the static list
-  const { results: searchResults, loading: searching } = useESPNPlayerSearch(playerSearch)
-
-  // When teams are selected: show their live ESPN roster
-  // When no teams selected: show full static list for browsing
-  const baseList = pendingTeams.length > 0 && espnPlayers.length > 0
-    ? espnPlayers
-    : ALL_SQUAD_PLAYERS
-
-  const lowerSearch = playerSearch.toLowerCase()
-  const localMatches = baseList.filter(p => {
-    const matchesSearch = !playerSearch ||
-      p.name.toLowerCase().includes(lowerSearch) ||
-      p.team.toLowerCase().includes(lowerSearch)
-    const matchesPos = posFilter === 'ALL' || p.pos === posFilter
-    return matchesSearch && matchesPos
-  })
-
-  // Merge in live search results not already covered by the local list —
-  // this is what surfaces rookies/recent players like a 2025 draft pick.
-  // Note: ESPN's search endpoint doesn't return position data (only name +
-  // team in `subtitle`), so we can't reliably filter live results by position.
-  // Show them regardless of posFilter rather than silently hiding real matches.
-  const localNames = new Set(localMatches.map(p => p.name.toLowerCase()))
-  const liveOnlyMatches = playerSearch.length >= 3
-    ? searchResults.filter(p => !localNames.has(p.name.toLowerCase()))
-    : []
-
-  const allVisible = [...localMatches, ...liveOnlyMatches]
-
-  const toggleTeam = (t) =>
-    setPendingTeams(prev => prev.includes(t) ? prev.filter(x=>x!==t) : [...prev,t])
-  const togglePlayer = (p) =>
-    setPendingPlayers(prev => prev.includes(p) ? prev.filter(x=>x!==p) : [...prev,p])
-
-  const [syncStatus, setSyncStatus] = useState(null) // null | 'syncing' | 'synced' | 'no-sub'
-
-  const handleSave = async () => {
-    const hasSquad = pendingTeams.length > 0 || pendingPlayers.length > 0
-    const newSquad = {
-      teams:   [...pendingTeams],
-      players: [...pendingPlayers],
-      on:      hasSquad,
-    }
-    onSave(newSquad)
-
-    // Auto-sync to newsletter if they\'re subscribed
-    // Silently updates squad_players in Supabase so emails stay current
-    const email = localStorage.getItem('fw-nl-email')
-    if (email && pendingPlayers.length > 0) {
-      setSyncStatus('syncing')
-      try {
-        const r = await fetch('/api/newsletter/update-squad', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email,
-            squadPlayers: pendingPlayers.join(','),
-            favTeam:      pendingTeams[0] || 'All',
-          }),
-        })
-        setSyncStatus(r.ok ? 'synced' : 'no-sub')
-      } catch {
-        setSyncStatus('no-sub')
-      }
-    }
-  }
-
-  return (
-    <div className="squad-overlay" onClick={e => e.target.className==='squad-overlay' && onClose()}>
-      <div className="squad-modal">
-        <div className="squad-modal-head">
-          <div>
-            <div className="squad-modal-title">⚡ My Fantasy Squad</div>
-            <div className="squad-modal-sub">Select teams & players · Saved locally · Never shared</div>
-          </div>
-          <button className="squad-modal-close" onClick={onClose}>✕</button>
-        </div>
-
-        <div className="squad-modal-body">
-          {/* TEAMS */}
-          <div className="squad-section">
-            <div className="squad-section-title">📋 My Teams</div>
-            <div className="squad-conf-grid">
-              {['AFC','NFC'].map(conf => (
-                <div key={conf}>
-                  <div className="squad-conf-label">{conf}</div>
-                  <div className="squad-div-grid">
-                    {SQUAD_DIVISIONS.filter(d=>d.conf===conf).map(d => (
-                      <div key={d.div}>
-                        <div className="squad-div-label">{d.div}</div>
-                        <div className="squad-team-row">
-                          {d.teams.map(t => (
-                            <button key={t}
-                              className={`squad-team-btn ${pendingTeams.includes(t)?'on':''}`}
-                              onClick={() => toggleTeam(t)}>
-                              {t}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* PLAYERS */}
-          <div className="squad-section">
-            <div className="squad-section-title">
-              🏈 My Fantasy Players
-              {rosterLoading
-                ? <span style={{fontWeight:400,color:'var(--gold)',marginLeft:8}}>Loading live rosters from ESPN…</span>
-                : pendingTeams.length > 0 && espnPlayers.length > 0
-                  ? <span style={{fontWeight:400,color:'var(--muted-lt)',marginLeft:8}}>ESPN rosters · {espnPlayers.length} players · May lag 1-3 days on recent moves</span>
-                  : <span style={{fontWeight:400,color:'var(--muted-lt)',marginLeft:8}}>{ALL_SQUAD_PLAYERS.length}+ players — select teams above for live rosters</span>
-              }
-            </div>
-            {pendingTeams.length > 0 && rosterDebug && (
-              <div style={{fontFamily:'var(--font-mono)',fontSize:8,color:'var(--accent)',padding:'4px 8px',background:'var(--paper-mid)',borderRadius:2,marginBottom:6,wordBreak:'break-all'}}>
-                {rosterDebug}
-              </div>
-            )}
-            {/* Position filter */}
-            <div style={{display:'flex',gap:4,marginBottom:8,flexWrap:'wrap'}}>
-              {['ALL','QB','RB','WR','TE','K'].map(p => (
-                <button key={p}
-                  className={`squad-team-btn ${posFilter === p ? 'on' : ''}`}
-                  style={{padding:'3px 8px',fontSize:9}}
-                  onClick={() => setPosFilter(p)}>{p}</button>
-              ))}
-            </div>
-            <input className="squad-player-search" placeholder="Search by name or team (e.g. Geno, SEA, Chiefs)…"
-              value={playerSearch} onChange={e => setPlayerSearch(e.target.value)} />
-            {rosterLoading && <div style={{fontFamily:'var(--font-mono)',fontSize:9,color:'var(--gold)',padding:'4px 0'}}>⚡ Fetching live rosters from ESPN…</div>}
-            {searching && playerSearch.length >= 3 && <div style={{fontFamily:'var(--font-mono)',fontSize:9,color:'var(--gold)',padding:'4px 0'}}>🔍 Searching all NFL players…</div>}
-            <div className="squad-player-grid">
-              {allVisible.map((p,i) => (
-                <button key={i}
-                  className={`squad-player-btn ${pendingPlayers.includes(p.name)?'on':''}`}
-                  onClick={() => togglePlayer(p.name)}>
-                  <span className="squad-pos">{p.pos || '·'}</span>
-                  <span className="squad-pname">{p.name}</span>
-                  <span className="squad-pteam">{p.team}</span>
-                </button>
-              ))}
-              {allVisible.length === 0 && playerSearch.length >= 3 && !searching && (
-                <div style={{fontFamily:'var(--font-mono)',fontSize:9,color:'var(--muted-lt)',padding:8,gridColumn:'1/-1'}}>
-                  No players found for "{playerSearch}"
-                </div>
-              )}
-            </div>
-            {pendingPlayers.length > 0 && (
-              <div style={{marginTop:8,padding:'6px 8px',background:'rgba(200,168,75,.08)',borderRadius:2,fontFamily:'var(--font-mono)',fontSize:9,color:'var(--gold)'}}>
-                ⚡ {pendingPlayers.length} player{pendingPlayers.length!==1?'s':''} selected: {pendingPlayers.slice(0,5).join(', ')}{pendingPlayers.length>5?` +${pendingPlayers.length-5} more`:''}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="squad-modal-foot">
-          <button className="squad-foot-btn danger" onClick={() => { setPendingTeams([]); setPendingPlayers([]) }}>Clear All</button>
-          <button className="squad-foot-btn secondary" onClick={onClose}>Cancel</button>
-          <button className="squad-foot-btn primary" onClick={handleSave}>
-            {syncStatus === 'syncing' ? 'Saving…' : 'Save Squad ✓'}
-          </button>
-          {syncStatus === 'synced'  && <span className="squad-sync-ok">⚡ Newsletter synced</span>}
-          {syncStatus === 'no-sub' && <span className="squad-sync-hint">Subscribe in footer to sync with newsletter</span>}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── SCORES VIEW ───────────────────────────────────────────────────────────────
-// ═══════════════════════════════════════════════════════════════════════════
-// ── PRESEASON VIEW — self-contained, no shared hooks ──────────────────────
-// ═══════════════════════════════════════════════════════════════════════════
-function PreseasonView({ squad }) {
-  const [week,     setWeek]     = useState(1)
-  const [games,    setGames]    = useState([])
-  const [loading,  setLoading]  = useState(false)
-  const [openId,   setOpenId]   = useState(null)
-  const [boxData,  setBoxData]  = useState({})
-  const [boxLoad,  setBoxLoad]  = useState({})
-
-  const WEEKS = [1, 2, 3, 4]
-  const WEEK_DATES = {
-    1: 'Hall of Fame + Aug 7–11, 2026',
-    2: 'Aug 13–15, 2026',
-    3: 'Aug 20–23, 2026',
-    4: 'Aug 27–29, 2026',
-  }
-
-  useEffect(() => {
-    setLoading(true)
-    setGames([])
-    setOpenId(null)
-
-    const parseGames = (data) => (data.events || []).map(ev => {
-      const comp = ev.competitions?.[0]
-      const home = comp?.competitors?.find(c => c.homeAway === 'home')
-      const away = comp?.competitors?.find(c => c.homeAway === 'away')
-      if (!home || !away) return null
-      const status = ev.status?.type?.state
-      const isFinal = status === 'post'
-      const isLive  = status === 'in'
-      const d = new Date(ev.date)
-      return {
-        id:        ev.id,
-        home:      home.team?.abbreviation || '',
-        away:      away.team?.abbreviation || '',
-        homeName:  home.team?.displayName || '',
-        awayName:  away.team?.displayName || '',
-        homeScore: isFinal || isLive ? parseInt(home.score) || 0 : null,
-        awayScore: isFinal || isLive ? parseInt(away.score) || 0 : null,
-        status:    isFinal ? 'final' : isLive ? 'live' : 'upcoming',
-        statusDetail: ev.status?.type?.detail || '',
-        time:      d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' }),
-        day:       d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }),
-        network:   comp?.broadcasts?.[0]?.names?.[0] || '',
-        note:      comp?.notes?.[0]?.headline || '',
-      }
-    }).filter(Boolean)
-
-    // Try proxy first, then fall back to direct ESPN
-    const proxyUrl  = `/api/espn/scoreboard?week=${week}&seasontype=1&limit=20`
-    const directUrl = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${week}&seasontype=1&limit=20`
-
-    fetch(proxyUrl)
-      .then(r => r.json())
-      .then(data => {
-        if (data.events?.length > 0) {
-          setGames(parseGames(data)); setLoading(false)
-        } else {
-          return fetch(directUrl).then(r => r.json()).then(d => {
-            setGames(parseGames(d)); setLoading(false)
-          })
-        }
-      })
-      .catch(() => {
-        fetch(directUrl)
-          .then(r => r.json())
-          .then(d => { setGames(parseGames(d)); setLoading(false) })
-          .catch(() => setLoading(false))
-      })
-  }, [week])
-
-  const toggleGame = (id) => {
-    if (openId === id) { setOpenId(null); return }
-    setOpenId(id)
-    if (boxData[id]) return
-    setBoxLoad(b => ({ ...b, [id]: true }))
-    // Try proxy, fall back to direct ESPN
-    const summaryProxy  = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${id}`
-    const summaryDirect = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${id}`
-    fetch(summaryProxy)
-      .then(r => r.json())
-      .then(d => {
-        if (d.boxscore) {
-          setBoxData(b => ({ ...b, [id]: d }))
-          setBoxLoad(b => ({ ...b, [id]: false }))
-        } else {
-          return fetch(summaryDirect).then(r => r.json()).then(d2 => {
-            setBoxData(b => ({ ...b, [id]: d2 }))
-            setBoxLoad(b => ({ ...b, [id]: false }))
-          })
-        }
-      })
-      .catch(() => {
-        fetch(summaryDirect)
-          .then(r => r.json())
-          .then(d => { setBoxData(b => ({ ...b, [id]: d })); setBoxLoad(b => ({ ...b, [id]: false })) })
-          .catch(() => setBoxLoad(b => ({ ...b, [id]: false })))
-      })
-  }
-
-  const squadPlayers = (() => {
-    try { return JSON.parse(localStorage.getItem('fw-squad') || '{}')?.players || [] }
-    catch { return [] }
-  })()
-
-  return (
-    <div>
-      <div className="section-bar">
-        <h2>2026 NFL Preseason</h2>
-        <div className="sb-rule" />
-        <span className="sb-ct">Real box scores · Hall of Fame + Weeks 1–4</span>
-      </div>
-
-      {/* Week selector */}
-      <div className="week-selector">
-        <div className="week-label-row">
-          <span className="ws-label">Week</span>
-          <div className="ws-pills">
-            {WEEKS.map(w => (
-              <button key={w} className={`ws-btn ${week === w ? 'on' : ''}`}
-                onClick={() => setWeek(w)}>PS{w}</button>
-            ))}
-          </div>
-        </div>
-        <div className="week-meta-bar">
-          <span className="wm-label">Preseason Week {week}</span>
-          <span className="wm-dates">{WEEK_DATES[week]}</span>
-        </div>
-      </div>
-
-      {/* Games */}
-      {loading && (
-        <div className="leaders-coming-soon">
-          <div className="cs-icon">🏈</div>
-          <div className="cs-title">Loading preseason scores…</div>
-        </div>
-      )}
-
-      {!loading && games.length === 0 && (
-        <div className="leaders-coming-soon">
-          <div className="cs-icon">📅</div>
-          <div className="cs-title">No games yet for Preseason Week {week}</div>
-          <div className="cs-text">Check back once the games are scheduled.</div>
-        </div>
-      )}
-
-      <div className="games-grid">
-        {games.map(g => {
-          const isOpen   = openId === g.id
-          const isFinal  = g.status === 'final'
-          const isLive   = g.status === 'live'
-          const homeWin  = isFinal && g.homeScore > g.awayScore
-          const awayWin  = isFinal && g.awayScore > g.homeScore
-          const box      = boxData[g.id]
-          const boxLoading = boxLoad[g.id]
-          const periods  = box ? (box.header?.competitions?.[0]?.competitors || []) : []
-          const awayPeriods = periods.find(c => c.homeAway === 'away')?.linescores || []
-          const homePeriods = periods.find(c => c.homeAway === 'home')?.linescores || []
-          const qLabels  = awayPeriods.map((_, i) => i < 4 ? `Q${i+1}` : 'OT')
-
-          return (
-            <div key={g.id} className="game-card featured">
-              <div className="card-head">
-                {g.note && <div className="card-note">{g.note}</div>}
-
-                {/* Linescore table */}
-                {(isFinal || isLive) && qLabels.length > 0 ? (
-                  <table className="ls-table">
-                    <thead>
-                      <tr>
-                        <th className="lt-team"></th>
-                        {qLabels.map((q,i) => <th key={i}>{q}</th>)}
-                        <th className="lt-total">T</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr className={awayWin ? 'lwin' : ''}>
-                        <td className="lt-team">{g.away}</td>
-                        {awayPeriods.map((p,i) => <td key={i}>{p.value ?? 0}</td>)}
-                        <td className="lt-total">{g.awayScore}</td>
-                      </tr>
-                      <tr className={homeWin ? 'lwin' : ''}>
-                        <td className="lt-team">{g.home}</td>
-                        {homePeriods.map((p,i) => <td key={i}>{p.value ?? 0}</td>)}
-                        <td className="lt-total">{g.homeScore}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                ) : (
-                  <div className="matchup">
-                    <div className={`team-row ${awayWin ? 'winner' : isFinal ? 'loser' : ''}`}>
-                      <span className="team-abv">{g.away}</span>
-                      <span className="team-score">{g.awayScore ?? '–'}</span>
-                    </div>
-                    <div className={`team-row ${homeWin ? 'winner' : isFinal ? 'loser' : ''}`}>
-                      <span className="team-abv">{g.home}</span>
-                      <span className="team-score">{g.homeScore ?? '–'}</span>
-                    </div>
-                  </div>
-                )}
-
-                <div className="card-status-row">
-                  <span className={`card-status ${isFinal ? 'final' : isLive ? 'live' : ''}`}>
-                    {isLive ? `🔴 ${g.statusDetail}` : isFinal ? 'FINAL' : `${g.day} · ${g.time}`}
-                  </span>
-                  {g.network && <span className="card-network">{g.network}</span>}
-                </div>
-
-                {(isFinal || isLive) && (
-                  <button className="card-toggle-hint" onClick={() => toggleGame(g.id)}>
-                    {isOpen ? '▲ Hide Box Score' : '▼ Full Box Score'}
-                  </button>
-                )}
-              </div>
-
-              {isOpen && (
-                <div className="drawer">
-                  {boxLoading && <div className="drawer-loading">Loading box score…</div>}
-                  {!boxLoading && box && (
-                    <BoxScoreDrawer espnData={box} loading={false} game={{ home: g.home, away: g.away }} />
-                  )}
-                </div>
-              )}
-            </div>
-          )
-        })}
       </div>
     </div>
   )
@@ -2646,16 +2007,19 @@ function useFWFantasyScores(currentWeek, mode) {
 }
 
 // ── FW FORMULA VIEW ────────────────────────────────────────────────────────────
-function FWFormulaView({ currentWeek, mode }) {
+function FWFormulaView({ currentWeek, mode, watchlist = [], toggleWatch }) {
   const [pos, setPos]           = useState('ALL')
   const [showBreakdown, setShowBreakdown] = useState(false)
+  const [showWatchOnly, setShowWatchOnly] = useState(false)
   const seasonStarted = isGameSeason()
   const { players, loading, debug } = useFWFantasyScores(currentWeek, mode)
 
   const POSITIONS = ['ALL','QB','RB','WR','TE','K']
-  const filtered = pos === 'ALL'
-    ? players.slice(0, 40)
-    : players.filter(p => p.pos === pos).slice(0, 25)
+  const watchSet = new Set(watchlist)
+  const posFiltered = pos === 'ALL' ? players : players.filter(p => p.pos === pos)
+  const filtered = showWatchOnly
+    ? posFiltered.filter(p => watchSet.has(p.name))
+    : posFiltered.slice(0, pos === 'ALL' ? 40 : 25)
 
   const scoreColor = (s) =>
     s >= 7.5 ? '#1a5c1a' : s >= 6.5 ? '#4ade80' : s >= 5.5 ? '#c8a84b' :
@@ -2748,6 +2112,10 @@ function FWFormulaView({ currentWeek, mode }) {
         {POSITIONS.map(p => (
           <button key={p} className={`tc-btn ${pos === p ? 'on' : ''}`} onClick={() => setPos(p)}>{p}</button>
         ))}
+        <button
+          className={`tc-btn fw-watch-toggle ${showWatchOnly ? 'on' : ''}`}
+          onClick={() => setShowWatchOnly(w => !w)}
+        >⭐ Watchlist{watchlist.length > 0 ? ` (${watchlist.length})` : ''}</button>
         <span className="fw-week-note">{isPreseason() ? `PS${currentWeek} · Preseason data` : `Wk ${currentWeek} · Next matchup data`}</span>
       </div>
 
@@ -2761,6 +2129,7 @@ function FWFormulaView({ currentWeek, mode }) {
         <table className="fw-table">
           <thead>
             <tr>
+              <th></th>
               <th>FW Score</th>
               <th>Player</th>
               <th>Pos</th>
@@ -2776,7 +2145,15 @@ function FWFormulaView({ currentWeek, mode }) {
           </thead>
           <tbody>
             {filtered.map((p, i) => (
-              <tr key={i} className="fw-row">
+              <tr key={i} className={`fw-row ${watchSet.has(p.name) ? 'fw-watched' : ''}`}>
+                <td>
+                  <button
+                    className={`fw-star-btn ${watchSet.has(p.name) ? 'on' : ''}`}
+                    onClick={() => toggleWatch?.(p.name)}
+                    title={watchSet.has(p.name) ? `Remove ${p.name} from watchlist` : `Add ${p.name} to watchlist`}
+                    aria-label={watchSet.has(p.name) ? `Remove ${p.name} from watchlist` : `Add ${p.name} to watchlist`}
+                  >{watchSet.has(p.name) ? '★' : '☆'}</button>
+                </td>
                 <td>
                   <div className="fw-score-cell" style={{background: scoreColor(p.fwScore)}}>
                     <div className="fw-score-num">{p.fwScore}</div>
@@ -2817,7 +2194,14 @@ function FWFormulaView({ currentWeek, mode }) {
           </div>
         </div>
       )}
-      {!loading && players.length > 0 && filtered.length === 0 && (
+      {!loading && players.length > 0 && filtered.length === 0 && showWatchOnly && (
+        <div className="leaders-coming-soon">
+          <div className="cs-icon">⭐</div>
+          <div className="cs-title">Your watchlist is empty</div>
+          <div className="cs-text">Click the ☆ next to any player above to start tracking them here.</div>
+        </div>
+      )}
+      {!loading && players.length > 0 && filtered.length === 0 && !showWatchOnly && (
         <div className="leaders-coming-soon">
           <div className="cs-icon">📊</div>
           <div className="cs-title">No {pos} data</div>
@@ -3574,7 +2958,7 @@ class TabErrorBoundary extends React.Component {
   }
 }
 
-function FantasyView({ mode, setMode, currentWeek, squad, trendsMode, setTrendsMode, trendsRange, setTrendsRange, trendsPos, setTrendsPos }) {
+function FantasyView({ mode, setMode, currentWeek, squad, watchlist, toggleWatch, trendsMode, setTrendsMode, trendsRange, setTrendsRange, trendsPos, setTrendsPos }) {
   const [tab, setTab] = useState('leaders')
   const TABS = [
     { id:'leaders',   label:'📊 Leaders' },
@@ -3606,7 +2990,7 @@ function FantasyView({ mode, setMode, currentWeek, squad, trendsMode, setTrendsM
         ))}
       </div>
       {tab === 'leaders'  && <TabErrorBoundary><FantasyLeadersView mode={mode} squad={squad} /></TabErrorBoundary>}
-      {tab === 'fw'       && <TabErrorBoundary><FWFormulaView currentWeek={currentWeek} mode={mode} squad={squad} /></TabErrorBoundary>}
+      {tab === 'fw'       && <TabErrorBoundary><FWFormulaView currentWeek={currentWeek} mode={mode} squad={squad} watchlist={watchlist} toggleWatch={toggleWatch} /></TabErrorBoundary>}
       {tab === 'startsit' && <TabErrorBoundary><StartSitView mode={mode} /></TabErrorBoundary>}
       {tab === 'matchups' && <TabErrorBoundary><MatchupRaterView /></TabErrorBoundary>}
       {tab === 'waiver'   && <TabErrorBoundary><WaiverWireView /></TabErrorBoundary>}
