@@ -647,6 +647,8 @@ const SQUAD_DIVISIONS = [
 
 function SquadBar({ squad, onOpen, onToggle }) {
   const total = (squad.teams?.length||0) + (squad.players?.length||0)
+  const allItems = [...(squad.teams||[]), ...(squad.players||[])]
+  const hiddenItems = allItems.slice(5)
   return (
     <div className="squad-bar">
       <button className="squad-btn" onClick={onOpen}>
@@ -655,10 +657,16 @@ function SquadBar({ squad, onOpen, onToggle }) {
       </button>
       {squad.on && total > 0 && (
         <div className="squad-pills">
-          {[...(squad.teams||[]),...(squad.players||[])].slice(0,5).map((t,i) => (
+          {allItems.slice(0,5).map((t,i) => (
             <span key={i} className="squad-pill">{t}</span>
           ))}
-          {total > 5 && <span className="squad-pill">+{total-5}</span>}
+          {total > 5 && (
+            <button
+              className="squad-pill squad-pill-more"
+              onClick={onOpen}
+              title={hiddenItems.join(', ')}
+            >+{total-5}</button>
+          )}
         </div>
       )}
       <div className="squad-toggle-wrap">
