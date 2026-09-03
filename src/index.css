@@ -848,6 +848,39 @@ body::before {
 }
 .fw-manual-add-row .fw-search-input{max-width:240px}
 
+/* ESPN live player search results */
+.fw-espn-searching{
+  font-family:var(--font-mono);font-size:10px;color:var(--gold);
+  margin-top:10px;
+}
+.fw-espn-matches{
+  display:flex;flex-direction:column;gap:4px;
+  max-width:400px;margin:12px auto 0;
+}
+.fw-espn-match-btn{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:8px 12px;border:1px solid var(--rule-hvy);border-radius:var(--r);
+  background:var(--paper);cursor:pointer;
+  font-family:var(--font-mono);font-size:11px;color:var(--ink);
+  transition:all .12s;
+}
+.fw-espn-match-btn:hover{border-color:var(--gold);background:rgba(200,168,75,.06)}
+.fw-espn-match-btn.on{border-color:var(--gold);background:rgba(200,168,75,.12);color:var(--gold);font-weight:700}
+.fw-espn-match-team{color:var(--muted-lt);font-size:9px}
+
+/* No-data watchlist placeholder rows */
+.fw-row.fw-nodata{opacity:.65;font-style:italic}
+.fw-score-cell.fw-score-empty{
+  background:var(--paper-dark)!important;
+  color:var(--muted-lt);
+}
+.fw-score-cell.fw-score-empty .fw-score-lbl{font-size:8px;letter-spacing:.04em}
+.fw-nodata-note{
+  font-family:var(--font-mono);font-size:9px;color:var(--muted-lt);
+  font-style:italic;
+}
+
+
 .fw-week-note{font-family:var(--font-mono);font-size:8px;color:var(--muted-lt);margin-left:auto;letter-spacing:.06em}
 
 .fw-table{width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:10px}
