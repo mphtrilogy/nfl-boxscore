@@ -1834,28 +1834,34 @@ function calcFW(stats, mode) {
 function useESPNPlayerSearch(query) {
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
+  const [debug, setDebug] = useState('')
 
   useEffect(() => {
-    if (!query || query.length < 3) { setResults([]); return }
+    if (!query || query.length < 3) { setResults([]); setDebug(''); return }
     setLoading(true)
     const t = setTimeout(() => {
       fetch(`https://site.web.api.espn.com/apis/search/v2?limit=20&query=${encodeURIComponent(query)}&sport=football`)
-        .then(r => r.json())
+        .then(r => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`)
+          return r.json()
+        })
         .then(data => {
+          const groupCount = data?.results?.length || 0
           const allItems = (data?.results || []).flatMap(group => group.contents || [])
-          const players = allItems
-            .filter(i => i.type === 'player')
+          const playerItems = allItems.filter(i => i.type === 'player')
+          const players = playerItems
             .map(i => ({ name: i.displayName || '', team: i.subtitle || '' }))
             .filter(p => p.name)
+          setDebug(`groups:${groupCount} totalItems:${allItems.length} playerItems:${playerItems.length} final:${players.length}`)
           setResults(players)
           setLoading(false)
         })
-        .catch(() => { setResults([]); setLoading(false) })
+        .catch(e => { setDebug(`error: ${e.message}`); setResults([]); setLoading(false) })
     }, 300)
     return () => clearTimeout(t)
   }, [query])
 
-  return { results, loading }
+  return { results, loading, debug }
 }
 
 function useFWFantasyScores(currentWeek, mode) {
@@ -2051,7 +2057,7 @@ function FWFormulaView({ currentWeek, mode, watchlist = [], toggleWatch }) {
   // Live ESPN player search — finds real players even with zero recorded stats
   // (injured, limited snaps, etc). Only queried once the FW-scored search comes
   // up empty, so it doesn't fire on every keystroke unnecessarily.
-  const { results: espnMatches, loading: espnSearching } = useESPNPlayerSearch(search)
+  const { results: espnMatches, loading: espnSearching, debug: espnDebug } = useESPNPlayerSearch(search)
 
   const POSITIONS = ['ALL','QB','RB','WR','TE','K']
   const watchSet = new Set(watchlist)
@@ -2295,6 +2301,11 @@ function FWFormulaView({ currentWeek, mode, watchlist = [], toggleWatch }) {
           </div>
           {espnSearching && (
             <div className="fw-espn-searching">🔍 Checking ESPN's player database…</div>
+          )}
+          {search.length >= 3 && (
+            <div style={{fontFamily:'monospace',fontSize:'9px',color:'#888',marginTop:'8px',padding:'6px 8px',background:'#f5f0e8',borderRadius:'4px',wordBreak:'break-all'}}>
+              espn search debug: {espnDebug || 'not yet fired'}
+            </div>
           )}
           {!espnSearching && espnMatches.length > 0 && (
             <div className="fw-espn-matches">
