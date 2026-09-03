@@ -697,7 +697,6 @@ const ROSTER_CACHE_TTL = 6 * 60 * 60 * 1000 // 6 hours
 function useESPNPlayerSearch(query) {
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
-  const [debug, setDebug] = useState('')
 
   useEffect(() => {
     if (!query || query.length < 3) { setResults([]); return }
@@ -706,33 +705,27 @@ function useESPNPlayerSearch(query) {
       fetch(`https://site.web.api.espn.com/apis/search/v2?limit=25&query=${encodeURIComponent(query)}&sport=football`)
         .then(r => r.json())
         .then(data => {
-          // Debug: capture raw shape so we can see exactly what ESPN returns
-          const groupCount = data?.results?.length || 0
-          const firstGroup = data?.results?.[0]
-          const firstGroupType = firstGroup?.type || 'none'
-          const contentCount = firstGroup?.contents?.length || 0
-          const firstItem = firstGroup?.contents?.[0]
-          setDebug(`groups:${groupCount} firstType:${firstGroupType} items:${contentCount} sample:${JSON.stringify(firstItem)?.slice(0,300)}`)
-
-          // Try multiple possible shapes rather than one guessed structure
+          // Confirmed shape: data.results is an array of groups, each with
+          // .type and .contents[]. Player entries have type:"player",
+          // displayName, and subtitle (team name only — no position field).
           const allItems = (data?.results || []).flatMap(group => group.contents || [])
           const players = allItems
+            .filter(i => i.type === 'player')
             .map(i => ({
-              name: i.displayName || i.name || i.shortName || '',
-              pos:  i.subtitle?.split(' ')?.[0] || i.position?.abbreviation || i.position || '',
-              team: i.subtitle?.split(' ')?.slice(-1)[0] || i.team?.abbreviation || '',
-              rawType: i.type || '',
+              name: i.displayName || '',
+              pos:  '', // ESPN search doesn't return position — shown as unknown
+              team: i.subtitle || '',
             }))
             .filter(p => p.name)
           setResults(players)
           setLoading(false)
         })
-        .catch(e => { setDebug(`error: ${e.message}`); setResults([]); setLoading(false) })
+        .catch(() => { setResults([]); setLoading(false) })
     }, 300) // debounce
     return () => clearTimeout(t)
   }, [query])
 
-  return { results, loading, debug }
+  return { results, loading }
 }
 
 function useESPNRosters(teams) {
@@ -830,7 +823,7 @@ function SquadModal({ squad, onSave, onClose }) {
   const { players: espnPlayers, loading: rosterLoading, debug: rosterDebug } = useESPNRosters(pendingTeams)
 
   // Live ESPN search by name — catches rookies and anyone missing from the static list
-  const { results: searchResults, loading: searching, debug: searchDebug } = useESPNPlayerSearch(playerSearch)
+  const { results: searchResults, loading: searching } = useESPNPlayerSearch(playerSearch)
 
   // When teams are selected: show their live ESPN roster
   // When no teams selected: show full static list for browsing
@@ -848,13 +841,13 @@ function SquadModal({ squad, onSave, onClose }) {
   })
 
   // Merge in live search results not already covered by the local list —
-  // this is what surfaces rookies/recent players like a 2025 draft pick
+  // this is what surfaces rookies/recent players like a 2025 draft pick.
+  // Note: ESPN's search endpoint doesn't return position data (only name +
+  // team in `subtitle`), so we can't reliably filter live results by position.
+  // Show them regardless of posFilter rather than silently hiding real matches.
   const localNames = new Set(localMatches.map(p => p.name.toLowerCase()))
   const liveOnlyMatches = playerSearch.length >= 3
-    ? searchResults.filter(p =>
-        !localNames.has(p.name.toLowerCase()) &&
-        (posFilter === 'ALL' || p.pos === posFilter)
-      )
+    ? searchResults.filter(p => !localNames.has(p.name.toLowerCase()))
     : []
 
   const allVisible = [...localMatches, ...liveOnlyMatches]
@@ -966,17 +959,12 @@ function SquadModal({ squad, onSave, onClose }) {
               value={playerSearch} onChange={e => setPlayerSearch(e.target.value)} />
             {rosterLoading && <div style={{fontFamily:'var(--font-mono)',fontSize:9,color:'var(--gold)',padding:'4px 0'}}>⚡ Fetching live rosters from ESPN…</div>}
             {searching && playerSearch.length >= 3 && <div style={{fontFamily:'var(--font-mono)',fontSize:9,color:'var(--gold)',padding:'4px 0'}}>🔍 Searching all NFL players…</div>}
-            {playerSearch.length >= 3 && searchDebug && (
-              <div style={{fontFamily:'var(--font-mono)',fontSize:8,color:'var(--muted-lt)',padding:'4px 8px',background:'var(--paper-mid)',borderRadius:2,wordBreak:'break-all',marginBottom:4}}>
-                {searchDebug}
-              </div>
-            )}
             <div className="squad-player-grid">
               {allVisible.map((p,i) => (
                 <button key={i}
                   className={`squad-player-btn ${pendingPlayers.includes(p.name)?'on':''}`}
                   onClick={() => togglePlayer(p.name)}>
-                  <span className="squad-pos">{p.pos}</span>
+                  <span className="squad-pos">{p.pos || '·'}</span>
                   <span className="squad-pname">{p.name}</span>
                   <span className="squad-pteam">{p.team}</span>
                 </button>
