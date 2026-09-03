@@ -2011,15 +2011,31 @@ function FWFormulaView({ currentWeek, mode, watchlist = [], toggleWatch }) {
   const [pos, setPos]           = useState('ALL')
   const [showBreakdown, setShowBreakdown] = useState(false)
   const [showWatchOnly, setShowWatchOnly] = useState(false)
+  const [search, setSearch]     = useState('')
+  const [manualAdd, setManualAdd] = useState('')
   const seasonStarted = isGameSeason()
   const { players, loading, debug } = useFWFantasyScores(currentWeek, mode)
 
   const POSITIONS = ['ALL','QB','RB','WR','TE','K']
   const watchSet = new Set(watchlist)
   const posFiltered = pos === 'ALL' ? players : players.filter(p => p.pos === pos)
-  const filtered = showWatchOnly
-    ? posFiltered.filter(p => watchSet.has(p.name))
-    : posFiltered.slice(0, pos === 'ALL' ? 40 : 25)
+
+  // Searching by name checks the FULL scored list, not just the top 40/25 —
+  // this is what surfaces low-ranked rookies who are still in the data
+  const searchLower = search.trim().toLowerCase()
+  const filtered = search.length >= 2
+    ? posFiltered.filter(p => p.name.toLowerCase().includes(searchLower))
+    : showWatchOnly
+      ? posFiltered.filter(p => watchSet.has(p.name))
+      : posFiltered.slice(0, pos === 'ALL' ? 40 : 25)
+
+  const handleManualAdd = () => {
+    const name = manualAdd.trim()
+    if (name && !watchSet.has(name)) {
+      toggleWatch?.(name)
+      setManualAdd('')
+    }
+  }
 
   const scoreColor = (s) =>
     s >= 7.5 ? '#1a5c1a' : s >= 6.5 ? '#4ade80' : s >= 5.5 ? '#c8a84b' :
@@ -2119,6 +2135,19 @@ function FWFormulaView({ currentWeek, mode, watchlist = [], toggleWatch }) {
         <span className="fw-week-note">{isPreseason() ? `PS${currentWeek} · Preseason data` : `Wk ${currentWeek} · Next matchup data`}</span>
       </div>
 
+      {/* Search — finds any scored player regardless of table rank cutoff */}
+      <div className="fw-search-row">
+        <input
+          className="fw-search-input"
+          placeholder="Search any scored player by name…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+        {search.length >= 2 && (
+          <span className="fw-search-count">{filtered.length} match{filtered.length !== 1 ? 'es' : ''}</span>
+        )}
+      </div>
+
       {loading && (
         <div className="sch-loading">
           ⚡ FW Formula computing… pulling ESPN box scores, defensive rankings…
@@ -2194,14 +2223,40 @@ function FWFormulaView({ currentWeek, mode, watchlist = [], toggleWatch }) {
           </div>
         </div>
       )}
-      {!loading && players.length > 0 && filtered.length === 0 && showWatchOnly && (
+      {!loading && players.length > 0 && filtered.length === 0 && showWatchOnly && !search && (
         <div className="leaders-coming-soon">
           <div className="cs-icon">⭐</div>
           <div className="cs-title">Your watchlist is empty</div>
           <div className="cs-text">Click the ☆ next to any player above to start tracking them here.</div>
         </div>
       )}
-      {!loading && players.length > 0 && filtered.length === 0 && !showWatchOnly && (
+      {!loading && players.length > 0 && filtered.length === 0 && search.length >= 2 && (
+        <div className="leaders-coming-soon">
+          <div className="cs-icon">🔍</div>
+          <div className="cs-title">No scored data for "{search}"</div>
+          <div className="cs-text">
+            They may not have logged stats in a game we've processed yet — common for
+            deep backups and recent call-ups. You can still add them by name below;
+            they'll show FW scores once real box score data comes in.
+          </div>
+          <div className="fw-manual-add-row">
+            <input
+              className="fw-search-input"
+              placeholder="Confirm exact name to add…"
+              value={manualAdd || search}
+              onChange={e => setManualAdd(e.target.value)}
+            />
+            <button
+              className="tc-btn fw-watch-toggle"
+              onClick={() => {
+                const name = (manualAdd || search).trim()
+                if (name) { toggleWatch?.(name); setManualAdd(''); setSearch('') }
+              }}
+            >☆ Add to Watchlist</button>
+          </div>
+        </div>
+      )}
+      {!loading && players.length > 0 && filtered.length === 0 && !showWatchOnly && !search && (
         <div className="leaders-coming-soon">
           <div className="cs-icon">📊</div>
           <div className="cs-title">No {pos} data</div>
