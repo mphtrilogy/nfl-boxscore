@@ -684,6 +684,39 @@ const ESPN_TEAM_IDS = {
 const ROSTER_CACHE_KEY = 'fw_rosters_v1'
 const ROSTER_CACHE_TTL = 6 * 60 * 60 * 1000 // 6 hours
 
+// Search ESPN's full player database by name — catches rookies, recent signings,
+// and anyone not in the hand-written ALL_SQUAD_PLAYERS fallback list.
+function useESPNPlayerSearch(query) {
+  const [results, setResults] = useState([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!query || query.length < 3) { setResults([]); return }
+    setLoading(true)
+    const t = setTimeout(() => {
+      fetch(`https://site.web.api.espn.com/apis/search/v2?limit=25&query=${encodeURIComponent(query)}&sport=football`)
+        .then(r => r.json())
+        .then(data => {
+          const items = data?.results?.flatMap(group => group.contents || []) || []
+          const players = items
+            .filter(i => i.type === 'player' && i.sport === 'nfl')
+            .map(i => ({
+              name: i.displayName || i.name || '',
+              pos:  i.subtitle?.split(' ')?.[0] || i.position || '',
+              team: i.subtitle?.split(' ')?.slice(-1)[0] || '',
+            }))
+            .filter(p => p.name && ['QB','RB','WR','TE','K'].includes(p.pos))
+          setResults(players)
+          setLoading(false)
+        })
+        .catch(() => { setResults([]); setLoading(false) })
+    }, 300) // debounce
+    return () => clearTimeout(t)
+  }, [query])
+
+  return { results, loading }
+}
+
 function useESPNRosters(teams) {
   const [players,  setPlayers]  = useState([])
   const [loading,  setLoading]  = useState(false)
@@ -773,6 +806,9 @@ function SquadModal({ squad, onSave, onClose }) {
   // Live ESPN roster data for selected teams — always current
   const { players: espnPlayers, loading: rosterLoading } = useESPNRosters(pendingTeams)
 
+  // Live ESPN search by name — catches rookies and anyone missing from the static list
+  const { results: searchResults, loading: searching } = useESPNPlayerSearch(playerSearch)
+
   // When teams are selected: show their live ESPN roster
   // When no teams selected: show full static list for browsing
   const baseList = pendingTeams.length > 0 && espnPlayers.length > 0
@@ -780,13 +816,25 @@ function SquadModal({ squad, onSave, onClose }) {
     : ALL_SQUAD_PLAYERS
 
   const lowerSearch = playerSearch.toLowerCase()
-  const allVisible = baseList.filter(p => {
+  const localMatches = baseList.filter(p => {
     const matchesSearch = !playerSearch ||
       p.name.toLowerCase().includes(lowerSearch) ||
       p.team.toLowerCase().includes(lowerSearch)
     const matchesPos = posFilter === 'ALL' || p.pos === posFilter
     return matchesSearch && matchesPos
   })
+
+  // Merge in live search results not already covered by the local list —
+  // this is what surfaces rookies/recent players like a 2025 draft pick
+  const localNames = new Set(localMatches.map(p => p.name.toLowerCase()))
+  const liveOnlyMatches = playerSearch.length >= 3
+    ? searchResults.filter(p =>
+        !localNames.has(p.name.toLowerCase()) &&
+        (posFilter === 'ALL' || p.pos === posFilter)
+      )
+    : []
+
+  const allVisible = [...localMatches, ...liveOnlyMatches]
 
   const toggleTeam = (t) =>
     setPendingTeams(prev => prev.includes(t) ? prev.filter(x=>x!==t) : [...prev,t])
@@ -889,6 +937,7 @@ function SquadModal({ squad, onSave, onClose }) {
             <input className="squad-player-search" placeholder="Search by name or team (e.g. Geno, SEA, Chiefs)…"
               value={playerSearch} onChange={e => setPlayerSearch(e.target.value)} />
             {rosterLoading && <div style={{fontFamily:'var(--font-mono)',fontSize:9,color:'var(--gold)',padding:'4px 0'}}>⚡ Fetching live rosters from ESPN…</div>}
+            {searching && playerSearch.length >= 3 && <div style={{fontFamily:'var(--font-mono)',fontSize:9,color:'var(--gold)',padding:'4px 0'}}>🔍 Searching all NFL players…</div>}
             <div className="squad-player-grid">
               {allVisible.map((p,i) => (
                 <button key={i}
