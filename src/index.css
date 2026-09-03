@@ -856,6 +856,8 @@ body::before {
 .squad-btn-count{background:var(--ink);color:var(--gold);border-radius:10px;padding:1px 6px;font-size:8px;font-weight:700}
 .squad-pills{display:flex;gap:4px;flex-wrap:wrap;flex:1}
 .squad-pill{background:rgba(200,168,75,.2);color:var(--gold);border:1px solid rgba(200,168,75,.4);padding:1px 7px;border-radius:10px;font-family:var(--font-mono);font-size:8px;font-weight:700;letter-spacing:.06em}
+.squad-pill-more{cursor:pointer;transition:background .12s,color .12s}
+.squad-pill-more:hover{background:var(--gold);color:var(--ink)}
 .squad-toggle-wrap{display:flex;align-items:center;gap:8px;margin-left:auto}
 .squad-toggle-lbl{font-family:var(--font-mono);font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:rgba(245,240,232,.5)}
 .squad-toggle{position:relative;width:38px;height:20px;cursor:pointer;flex-shrink:0}
