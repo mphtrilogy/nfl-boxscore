@@ -1701,52 +1701,6 @@ function LeadersView({ tab, setTab }) {
 }
 
 // ── FANTASY VIEW ──────────────────────────────────────────────────────────────
-// ── START/SIT PLAYER DATABASE ─────────────────────────────────────────────────
-// Static player pool for Start/Sit analysis (updates with real data during season)
-const PLAYER_POOL = [
-  // QBs
-  { name:'Patrick Mahomes',  team:'KC',  pos:'QB', proj:28.4, matchup:'vs DEN', matchupRating:8, lastWk:34.2, avgPts:27.1 },
-  { name:'Josh Allen',       team:'BUF', pos:'QB', proj:26.8, matchup:'vs NE',  matchupRating:9, lastWk:31.5, avgPts:25.9 },
-  { name:'Lamar Jackson',    team:'BAL', pos:'QB', proj:25.2, matchup:'vs CLE', matchupRating:7, lastWk:22.1, avgPts:24.8 },
-  { name:'Jalen Hurts',      team:'PHI', pos:'QB', proj:24.6, matchup:'vs DAL', matchupRating:6, lastWk:28.4, avgPts:23.9 },
-  { name:'Joe Burrow',       team:'CIN', pos:'QB', proj:23.8, matchup:'vs PIT', matchupRating:7, lastWk:19.2, avgPts:22.6 },
-  { name:'Dak Prescott',     team:'DAL', pos:'QB', proj:22.4, matchup:'vs PHI', matchupRating:5, lastWk:24.1, avgPts:21.8 },
-  { name:'Jordan Love',      team:'GB',  pos:'QB', proj:21.9, matchup:'vs MIN', matchupRating:6, lastWk:18.7, avgPts:20.4 },
-  { name:'Tua Tagovailoa',   team:'MIA', pos:'QB', proj:21.2, matchup:'vs NYJ', matchupRating:8, lastWk:25.6, avgPts:21.0 },
-  { name:'CJ Stroud',        team:'HOU', pos:'QB', proj:20.8, matchup:'vs IND', matchupRating:9, lastWk:22.3, avgPts:20.1 },
-  { name:'Sam Darnold',      team:'SEA', pos:'QB', proj:20.1, matchup:'vs SF',  matchupRating:4, lastWk:17.4, avgPts:19.2 },
-  { name:'Fernando Mendoza', team:'LV',  pos:'QB', proj:18.4, matchup:'vs KC',  matchupRating:3, lastWk:null, avgPts:null },
-  // RBs
-  { name:'Bijan Robinson',   team:'ATL', pos:'RB', proj:18.6, matchup:'vs NO',  matchupRating:8, lastWk:22.4, avgPts:17.8 },
-  { name:'Breece Hall',      team:'NYJ', pos:'RB', proj:17.2, matchup:'vs MIA', matchupRating:6, lastWk:14.8, avgPts:16.4 },
-  { name:'Jahmyr Gibbs',     team:'DET', pos:'RB', proj:16.9, matchup:'vs GB',  matchupRating:7, lastWk:19.2, avgPts:16.1 },
-  { name:"De\'Von Achane",   team:'MIA', pos:'RB', proj:16.4, matchup:'vs NYJ', matchupRating:8, lastWk:12.1, avgPts:15.8 },
-  { name:'Saquon Barkley',   team:'PHI', pos:'RB', proj:15.8, matchup:'vs DAL', matchupRating:6, lastWk:18.4, avgPts:15.2 },
-  { name:'Tony Pollard',     team:'TEN', pos:'RB', proj:14.2, matchup:'vs JAC', matchupRating:7, lastWk:11.6, avgPts:13.8 },
-  { name:'Kenneth Walker',   team:'SEA', pos:'RB', proj:13.8, matchup:'vs SF',  matchupRating:4, lastWk:16.2, avgPts:14.1 },
-  { name:'Jeremiyah Love',   team:'ARI', pos:'RB', proj:13.2, matchup:'vs LAR', matchupRating:6, lastWk:null, avgPts:null },
-  // WRs
-  { name:'Tyreek Hill',      team:'MIA', pos:'WR', proj:18.4, matchup:'vs NYJ', matchupRating:8, lastWk:24.6, avgPts:17.2 },
-  { name:'CeeDee Lamb',      team:'DAL', pos:'WR', proj:17.8, matchup:'vs PHI', matchupRating:5, lastWk:21.2, avgPts:17.0 },
-  { name:'Stefon Diggs',     team:'HOU', pos:'WR', proj:16.2, matchup:'vs IND', matchupRating:9, lastWk:14.8, avgPts:15.6 },
-  { name:"Ja\'Marr Chase",   team:'CIN', pos:'WR', proj:16.0, matchup:'vs PIT', matchupRating:7, lastWk:18.4, avgPts:15.4 },
-  { name:'A.J. Brown',       team:'NE',  pos:'WR', proj:15.6, matchup:'vs DAL', matchupRating:5, lastWk:17.2, avgPts:15.0 },
-  { name:'Malik Nabers',     team:'NYG', pos:'WR', proj:14.8, matchup:'vs WAS', matchupRating:6, lastWk:12.4, avgPts:14.2 },
-  { name:'Davante Adams',    team:'NYJ', pos:'WR', proj:14.2, matchup:'vs MIA', matchupRating:6, lastWk:16.8, avgPts:13.8 },
-  { name:'Carnell Tate',     team:'TEN', pos:'WR', proj:12.4, matchup:'vs JAC', matchupRating:7, lastWk:null, avgPts:null },
-  // TEs
-  { name:'Sam LaPorta',      team:'DET', pos:'TE', proj:14.2, matchup:'vs GB',  matchupRating:7, lastWk:16.8, avgPts:13.4 },
-  { name:'Mark Andrews',     team:'BAL', pos:'TE', proj:13.6, matchup:'vs CLE', matchupRating:7, lastWk:11.2, avgPts:12.8 },
-  { name:'Travis Kelce',     team:'KC',  pos:'TE', proj:12.8, matchup:'vs DEN', matchupRating:8, lastWk:14.6, avgPts:12.2 },
-  { name:'Kyle Pitts',       team:'ATL', pos:'TE', proj:11.4, matchup:'vs NO',  matchupRating:8, lastWk:8.4,  avgPts:10.8 },
-  { name:'Trey McBride',     team:'ARI', pos:'TE', proj:10.8, matchup:'vs LAR', matchupRating:6, lastWk:12.2, avgPts:10.4 },
-]
-
-const MATCHUP_RATINGS = {
-  1:'🔴 Nightmare', 2:'🔴 Very Hard', 3:'🔴 Hard',
-  4:'🟠 Below Avg', 5:'🟡 Average', 6:'🟡 Slight Edge',
-  7:'🟢 Good', 8:'🟢 Great', 9:'🟢 Excellent', 10:'🟢 Dream'
-}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // THE FINAL WHISTLE FANTASY SCORE ENGINE
@@ -2364,7 +2318,7 @@ function FWFormulaView({ currentWeek, mode, watchlist = [], toggleWatch }) {
   )
 }
 
-function StartSitView({ mode }) {
+function StartSitView({ mode, currentWeek }) {
   const [playerA, setPlayerA] = useState(null)
   const [playerB, setPlayerB] = useState(null)
   const [searchA, setSearchA] = useState('')
@@ -2372,32 +2326,72 @@ function StartSitView({ mode }) {
   const [showA,   setShowA]   = useState(false)
   const [showB,   setShowB]   = useState(false)
 
+  // Real live FW Formula data — same engine, same players, same scores
+  // shown everywhere else on the site. No separate static player list.
+  const { players, loading } = useFWFantasyScores(currentWeek, mode)
+
+  // Live ESPN search fallback — same pattern used in FW Formula and the
+  // watchlist, so a player like Mike Evans is always findable even if
+  // they're outside the FW-scored top ranks for whatever reason.
+  const { results: espnA } = useESPNPlayerSearch(searchA)
+  const { results: espnB } = useESPNPlayerSearch(searchB)
+
+  const scoredNames = new Set(players.map(p => p.name.toLowerCase()))
+
   const filteredA = searchA.length > 1
-    ? PLAYER_POOL.filter(p => p.name.toLowerCase().includes(searchA.toLowerCase())).slice(0,8)
+    ? [
+        ...players.filter(p => p.name.toLowerCase().includes(searchA.toLowerCase())).slice(0,8),
+        ...espnA.filter(p => !scoredNames.has(p.name.toLowerCase())).map(p => ({ name:p.name, team:p.team, pos:'', noData:true })).slice(0,4),
+      ]
     : []
   const filteredB = searchB.length > 1
-    ? PLAYER_POOL.filter(p => p.name.toLowerCase().includes(searchB.toLowerCase())).slice(0,8)
+    ? [
+        ...players.filter(p => p.name.toLowerCase().includes(searchB.toLowerCase())).slice(0,8),
+        ...espnB.filter(p => !scoredNames.has(p.name.toLowerCase())).map(p => ({ name:p.name, team:p.team, pos:'', noData:true })).slice(0,4),
+      ]
     : []
 
-  const scorePlayer = (p) => {
-    if (!p) return 0
-    let score = 0
-    score += (p.proj || 0) * 3
-    score += (p.matchupRating || 5) * 2
-    score += (p.lastWk || p.avgPts || 0) * 0.5
-    return score
-  }
+  // Score directly from real FW Formula fields — fwScore is already a
+  // 0-10 blend of trend/matchup/usage/weather/momentum, so it IS the
+  // recommendation signal; no separate ad-hoc formula needed.
+  const scorePlayer = (p) => p?.fwScore ?? null
 
   const scoreA = scorePlayer(playerA)
   const scoreB = scorePlayer(playerB)
-  const recommendation = playerA && playerB
+  const recommendation = playerA && playerB && scoreA != null && scoreB != null
     ? scoreA > scoreB ? { start: playerA, sit: playerB } : { start: playerB, sit: playerA }
     : null
 
   const gradeColor = (rating) => {
-    if (rating >= 8) return '#1a4a1a'
-    if (rating >= 6) return '#c8a84b'
+    if (rating == null) return 'var(--muted-lt)'
+    if (rating >= 7.5) return '#1a5c1a'
+    if (rating >= 5.5) return '#c8a84b'
     return '#8b1a1a'
+  }
+
+  const renderCard = (p, isWinner) => {
+    if (!p) return null
+    return (
+      <div className={`ss-player-card ${isWinner === true ? 'winner' : isWinner === false ? 'loser' : ''}`}>
+        <div className="ss-card-header">
+          <div className="ss-card-name">{p.name}</div>
+          <div className="ss-card-meta">{p.pos || '—'} · {p.team || '—'}{p.opp ? ` · vs ${p.opp}` : ''}</div>
+        </div>
+        {p.noData ? (
+          <div style={{padding:'16px', fontFamily:'var(--font-mono)', fontSize:11, color:'var(--muted-lt)', fontStyle:'italic'}}>
+            No FW score yet — hasn't logged stats in a processed game.
+          </div>
+        ) : (
+          <div style={{padding:'12px 16px'}}>
+            <div className="ss-stat-row"><span>FW Score</span><span className="ss-stat-val" style={{color:gradeColor(p.fwScore)}}>{p.fwScore}</span></div>
+            <div className="ss-stat-row"><span>Projected</span><span className="ss-stat-val">{p.projPts}</span></div>
+            <div className="ss-stat-row"><span>Last Game</span><span className="ss-stat-val">{p.last1}</span></div>
+            <div className="ss-stat-row"><span>L3 Avg</span><span className="ss-stat-val">{p.last3avg}</span></div>
+            <div className="ss-stat-row"><span>Trend</span><span className="ss-stat-val">{p.trend}</span></div>
+          </div>
+        )}
+      </div>
+    )
   }
 
   return (
@@ -2418,22 +2412,17 @@ function StartSitView({ mode }) {
               onChange={e => { setSearchA(e.target.value); setPlayerA(null); setShowA(true) }}
               onFocus={() => setShowA(true)}
             />
-            {showA && filteredA.length > 0 && !playerA && (
+            {showA && filteredA.length > 0 && (
               <div className="ss-dropdown">
-                {filteredA.map((p, i) => (
-                  <div key={i} className="ss-option"
-                    onMouseDown={() => { setPlayerA(p); setSearchA(''); setShowA(false) }}>
-                    <span className="ss-opt-pos">{p.pos}</span>
-                    <span>{p.name}</span>
-                    <span className="ss-opt-team">{p.team}</span>
-                  </div>
+                {filteredA.map((p,i) => (
+                  <button key={i} onClick={() => { setPlayerA(p); setSearchA(''); setShowA(false) }}>
+                    {p.name} <span style={{color:'var(--muted-lt)'}}>{p.pos || '—'} · {p.team || '—'}</span>
+                  </button>
                 ))}
               </div>
             )}
           </div>
-
-          <div className="ss-vs">vs</div>
-
+          <span className="ss-vs">VS</span>
           {/* Player B */}
           <div className="ss-input-wrap">
             <input className="ss-input" placeholder="Search Player 2…"
@@ -2441,118 +2430,62 @@ function StartSitView({ mode }) {
               onChange={e => { setSearchB(e.target.value); setPlayerB(null); setShowB(true) }}
               onFocus={() => setShowB(true)}
             />
-            {showB && filteredB.length > 0 && !playerB && (
+            {showB && filteredB.length > 0 && (
               <div className="ss-dropdown">
-                {filteredB.map((p, i) => (
-                  <div key={i} className="ss-option"
-                    onMouseDown={() => { setPlayerB(p); setSearchB(''); setShowB(false) }}>
-                    <span className="ss-opt-pos">{p.pos}</span>
-                    <span>{p.name}</span>
-                    <span className="ss-opt-team">{p.team}</span>
-                  </div>
+                {filteredB.map((p,i) => (
+                  <button key={i} onClick={() => { setPlayerB(p); setSearchB(''); setShowB(false) }}>
+                    {p.name} <span style={{color:'var(--muted-lt)'}}>{p.pos || '—'} · {p.team || '—'}</span>
+                  </button>
                 ))}
               </div>
             )}
           </div>
         </div>
 
-        {/* Comparison */}
-        {(!playerA || !playerB) && (
-          <div className="ss-placeholder">
-            Search two players above to compare
+        {loading && (
+          <div className="leaders-coming-soon">
+            <div className="cs-icon">⚡</div>
+            <div className="cs-title">Loading live FW Formula data…</div>
           </div>
         )}
 
-        {playerA && playerB && recommendation && (
-          <div className="ss-comparison">
-            {/* Player A card */}
-            <div className={`ss-player-card ${recommendation.start === playerA ? 'winner' : 'loser'}`}>
-              <div className="ss-card-header">
-                <div className="ss-card-name">{playerA.name}</div>
-                <div className="ss-card-meta">{playerA.team} · {playerA.pos} · {playerA.matchup}</div>
-              </div>
-              <div className="ss-card-body">
-                <div className="ss-stat">
-                  <span className="ss-stat-label">Projected Pts</span>
-                  <span className="ss-stat-val">{mode === 'ppr' && playerA.pos !== 'QB' ? (playerA.proj + 2).toFixed(1) : playerA.proj}</span>
-                </div>
-                <div className="ss-stat">
-                  <span className="ss-stat-label">Matchup</span>
-                  <span className="ss-stat-val" style={{color: gradeColor(playerA.matchupRating), fontSize:10}}>
-                    {MATCHUP_RATINGS[playerA.matchupRating]}
-                  </span>
-                </div>
-                <div className="ss-stat">
-                  <span className="ss-stat-label">Last Week</span>
-                  <span className="ss-stat-val">{playerA.lastWk || 'Rookie'}</span>
-                </div>
-                <div className="ss-stat">
-                  <span className="ss-stat-label">Season Avg</span>
-                  <span className="ss-stat-val">{playerA.avgPts || 'Rookie'}</span>
-                </div>
-                <div style={{textAlign:'center', paddingTop:8}}>
-                  <span className={`ss-rec-badge ${recommendation.start === playerA ? 'start' : 'sit'}`}>
-                    {recommendation.start === playerA ? '✓ START' : '✗ SIT'}
-                  </span>
-                </div>
-              </div>
-            </div>
+        {!loading && (!playerA || !playerB) && (
+          <div className="leaders-coming-soon">
+            <div className="cs-icon">⚖️</div>
+            <div className="cs-title">Search two players above to compare</div>
+          </div>
+        )}
 
-            {/* Verdict */}
+        {!loading && playerA && playerB && (
+          <div className="ss-comparison">
+            {renderCard(playerA, recommendation ? recommendation.start === playerA : null)}
             <div className="ss-verdict">
               <div className="ss-verdict-label">Recommendation</div>
-              <div className={`ss-verdict-val ${recommendation.start === playerA ? 'start' : 'sit'}`}>
-                {recommendation.start.name.split(' ').pop()}
-              </div>
-              <div style={{fontSize:9, fontFamily:'var(--font-mono)', color:'var(--muted-lt)', marginTop:8, lineHeight:1.4}}>
-                Based on projections, matchup rating, and recent form
-              </div>
+              {recommendation ? (
+                <>
+                  <div className={`ss-verdict-val ${recommendation.start === playerA ? 'start' : 'sit'}`}>
+                    {recommendation.start.name}
+                  </div>
+                  <div className="ss-rec-badge start">Start</div>
+                </>
+              ) : (
+                <div style={{fontFamily:'var(--font-mono)', fontSize:11, color:'var(--muted-lt)', padding:'12px'}}>
+                  Need FW scores for both players to compare — one or both haven't logged stats yet.
+                </div>
+              )}
             </div>
-
-            {/* Player B card */}
-            <div className={`ss-player-card ${recommendation.start === playerB ? 'winner' : 'loser'}`}>
-              <div className="ss-card-header">
-                <div className="ss-card-name">{playerB.name}</div>
-                <div className="ss-card-meta">{playerB.team} · {playerB.pos} · {playerB.matchup}</div>
-              </div>
-              <div className="ss-card-body">
-                <div className="ss-stat">
-                  <span className="ss-stat-label">Projected Pts</span>
-                  <span className="ss-stat-val">{mode === 'ppr' && playerB.pos !== 'QB' ? (playerB.proj + 2).toFixed(1) : playerB.proj}</span>
-                </div>
-                <div className="ss-stat">
-                  <span className="ss-stat-label">Matchup</span>
-                  <span className="ss-stat-val" style={{color: gradeColor(playerB.matchupRating), fontSize:10}}>
-                    {MATCHUP_RATINGS[playerB.matchupRating]}
-                  </span>
-                </div>
-                <div className="ss-stat">
-                  <span className="ss-stat-label">Last Week</span>
-                  <span className="ss-stat-val">{playerB.lastWk || 'Rookie'}</span>
-                </div>
-                <div className="ss-stat">
-                  <span className="ss-stat-label">Season Avg</span>
-                  <span className="ss-stat-val">{playerB.avgPts || 'Rookie'}</span>
-                </div>
-                <div style={{textAlign:'center', paddingTop:8}}>
-                  <span className={`ss-rec-badge ${recommendation.start === playerB ? 'start' : 'sit'}`}>
-                    {recommendation.start === playerB ? '✓ START' : '✗ SIT'}
-                  </span>
-                </div>
-              </div>
-            </div>
+            {renderCard(playerB, recommendation ? recommendation.start === playerB : null)}
           </div>
         )}
 
-        {/* Off-season note */}
         <div className="atl-note">
-          Projections and matchup ratings update weekly during the season based on live ESPN data.
-          Pre-season figures are estimates based on 2025 averages. {mode === 'ppr' ? 'PPR' : 'Standard'} scoring.
+          FW Score blends trend, matchup, usage, weather, and momentum from live ESPN box scores — same engine as the FW Formula tab. {mode === 'ppr' ? 'PPR' : 'Standard'} scoring.
         </div>
       </div>
     </div>
   )
 }
+
 
 // ── FANTASY NEWS ──────────────────────────────────────────────────────────────
 function FantasyNewsView({ mode }) {
@@ -3140,7 +3073,7 @@ function FantasyView({ mode, setMode, currentWeek, squad, watchlist, toggleWatch
       </div>
       {tab === 'leaders'  && <TabErrorBoundary><FantasyLeadersView mode={mode} squad={squad} /></TabErrorBoundary>}
       {tab === 'fw'       && <TabErrorBoundary><FWFormulaView currentWeek={currentWeek} mode={mode} squad={squad} watchlist={watchlist} toggleWatch={toggleWatch} /></TabErrorBoundary>}
-      {tab === 'startsit' && <TabErrorBoundary><StartSitView mode={mode} /></TabErrorBoundary>}
+      {tab === 'startsit' && <TabErrorBoundary><StartSitView mode={mode} currentWeek={currentWeek} /></TabErrorBoundary>}
       {tab === 'matchups' && <TabErrorBoundary><MatchupRaterView /></TabErrorBoundary>}
       {tab === 'waiver'   && <TabErrorBoundary><WaiverWireView /></TabErrorBoundary>}
       {tab === 'trends'   && (
