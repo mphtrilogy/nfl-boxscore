@@ -3198,6 +3198,16 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   color: rgba(245,240,232,.4);
   border-color: rgba(255,255,255,.1);
 }
+
+/* Dark card — Game Info drawer values (Network, Rosters, Spread, O/U, Weather).
+   Row labels already read fine (muted-lt is light enough), but values used
+   --ink (near-black) which vanishes against a dark card background. */
+.games-grid .gi-row { border-bottom-color: rgba(255,255,255,.08); }
+.games-grid .gi-row span:last-child { color: var(--paper); }
+.games-grid .gi-odds-val { color: var(--paper); }
+.games-grid .gi-weather-val { color: var(--paper); }
+.games-grid .gi-row a.sb-google-link { color: var(--gold); }
+.games-grid .gi-note { color: rgba(245,240,232,.6); }
 .games-grid .player-ref-btn:hover {
   background: var(--gold);
   color: var(--ink);
