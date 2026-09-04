@@ -1291,6 +1291,11 @@ function GameInfoDrawer({ game: g }) {
           <span style={{color:'var(--muted-lt)', fontStyle:'italic'}}>Lines not posted yet</span>
         </div>
       )}
+      {oddsDebug && (
+        <div style={{fontFamily:'monospace',fontSize:'8px',color:'#888',padding:'6px 8px',background:'rgba(0,0,0,.3)',borderRadius:'4px',wordBreak:'break-all',marginTop:'6px'}}>
+          {oddsDebug}
+        </div>
+      )}
       {/* Weather widget for outdoor games */}
       {isOutdoor && (
         <div className="gi-row gi-weather">
