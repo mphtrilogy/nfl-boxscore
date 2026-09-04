@@ -1212,7 +1212,6 @@ function GameInfoDrawer({ game: g }) {
 
   // Fetch live odds directly — separate spread + over/under, not just g.odds string
   const [odds, setOdds] = useState(null)
-  const [announcerDebug, setAnnouncerDebug] = useState('')
   useEffect(() => {
     if (!g.home || !g.away) return
     // GameInfoDrawer only ever shows games from SCHEDULE_2026 (the regular
@@ -1239,22 +1238,6 @@ function GameInfoDrawer({ game: g }) {
             spread: o.details || o.spread || null,
             overUnder: o.overUnder || o.total || null,
           })
-        }
-
-        // Diagnostic: check if summary endpoint exposes announcer names.
-        // Broadcast crew data (play-by-play, color commentator) is a much
-        // heavier payload than the lightweight scoreboard's broadcasts field
-        // (which is just network names, already used above) — if it exists
-        // anywhere in ESPN's public API it's most likely in summary.gameInfo.
-        if (ev?.id) {
-          fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${ev.id}`)
-            .then(r => r.json())
-            .then(sum => {
-              const gi = sum?.gameInfo
-              const bc = sum?.header?.competitions?.[0]?.broadcasts || sum?.competitions?.[0]?.broadcasts
-              setAnnouncerDebug(`gameInfoKeys:${gi ? Object.keys(gi).join(',') : 'none'} | broadcasts:${JSON.stringify(bc)?.slice(0,300)}`)
-            })
-            .catch(e => setAnnouncerDebug(`error: ${e.message}`))
         }
       })
       .catch(() => {})
@@ -1308,11 +1291,6 @@ function GameInfoDrawer({ game: g }) {
         <div className="gi-row">
           <span>Spread</span>
           <span style={{color:'var(--muted-lt)', fontStyle:'italic'}}>Lines not posted yet</span>
-        </div>
-      )}
-      {announcerDebug && (
-        <div style={{fontFamily:'monospace',fontSize:'8px',color:'#888',padding:'6px 8px',background:'rgba(0,0,0,.3)',borderRadius:'4px',wordBreak:'break-all',marginTop:'6px'}}>
-          {announcerDebug}
         </div>
       )}
       {/* Weather widget for outdoor games */}
