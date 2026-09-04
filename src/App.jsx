@@ -4442,7 +4442,10 @@ function TVGuideView({ currentWeek }) {
   const seasonStarted = isGameSeason()
 
   // Get games for selected week with network info
-  const weekGames = SCHEDULE_2026.filter(g => g.week === weekFilter)
+  // SCHEDULE_2026 stores the broadcaster as `tv`, not `network` — same field
+  // name mismatch fixed elsewhere in mergedGames; TV Guide reads the raw
+  // schedule directly so it needs the same normalization here.
+  const weekGames = SCHEDULE_2026.filter(g => g.week === weekFilter).map(g => ({ ...g, network: g.network || g.tv }))
   const byNetwork = {}
   weekGames.forEach(g => {
     const net = g.network || 'TBD'
