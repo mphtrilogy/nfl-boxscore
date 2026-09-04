@@ -1223,10 +1223,14 @@ function GameInfoDrawer({ game: g }) {
     fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${g.week}&seasontype=${seasonType}&limit=20`)
       .then(r => r.json())
       .then(data => {
+        // ESPN uses different abbreviations than our schedule for a few teams
+        // (LAR vs LA, WSH vs WAS, JAX vs JAC) — normalize before matching,
+        // same mapping already used elsewhere in this file.
+        const norm = (a) => a?.replace('LAR','LA').replace('WSH','WAS').replace('JAX','JAC') || ''
         const ev = (data.events || []).find(e => {
           const comp = e.competitions?.[0]
-          const teams = (comp?.competitors || []).map(c => c.team?.abbreviation)
-          return teams.includes(g.home) && teams.includes(g.away)
+          const teams = (comp?.competitors || []).map(c => norm(c.team?.abbreviation))
+          return teams.includes(norm(g.home)) && teams.includes(norm(g.away))
         })
         const oddsArr = ev?.competitions?.[0]?.odds
         const o = oddsArr?.[0]
