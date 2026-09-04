@@ -1214,8 +1214,12 @@ function GameInfoDrawer({ game: g }) {
   const [odds, setOdds] = useState(null)
   const [oddsDebug, setOddsDebug] = useState('')
   useEffect(() => {
-    if (!seasonStarted || !g.home || !g.away) return
-    const seasonType = isPreseason() ? 1 : 2
+    if (!g.home || !g.away) return
+    // GameInfoDrawer only ever shows games from SCHEDULE_2026 (the regular
+    // season schedule), so always query seasontype=2 — regardless of whether
+    // the site is currently in "preseason mode." ESPN publishes regular season
+    // odds/schedule data well before kickoff, so this should work any time.
+    const seasonType = 2
     fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${g.week}&seasontype=${seasonType}&limit=20`)
       .then(r => r.json())
       .then(data => {
@@ -1285,11 +1289,6 @@ function GameInfoDrawer({ game: g }) {
         <div className="gi-row">
           <span>Spread</span>
           <span style={{color:'var(--muted-lt)', fontStyle:'italic'}}>Lines not posted yet</span>
-        </div>
-      )}
-      {oddsDebug && (
-        <div style={{fontFamily:'monospace',fontSize:'8px',color:'#888',padding:'6px 8px',background:'#f5f0e8',borderRadius:'4px',wordBreak:'break-all',marginTop:'6px'}}>
-          {oddsDebug}
         </div>
       )}
       {/* Weather widget for outdoor games */}
