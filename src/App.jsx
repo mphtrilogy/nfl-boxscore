@@ -1212,6 +1212,7 @@ function GameInfoDrawer({ game: g }) {
 
   // Fetch live odds directly — separate spread + over/under, not just g.odds string
   const [odds, setOdds] = useState(null)
+  const [oddsDebug, setOddsDebug] = useState('')
   useEffect(() => {
     if (!seasonStarted || !g.home || !g.away) return
     const seasonType = isPreseason() ? 1 : 2
@@ -1223,15 +1224,17 @@ function GameInfoDrawer({ game: g }) {
           const teams = (comp?.competitors || []).map(c => c.team?.abbreviation)
           return teams.includes(g.home) && teams.includes(g.away)
         })
-        const o = ev?.competitions?.[0]?.odds?.[0]
+        const oddsArr = ev?.competitions?.[0]?.odds
+        const o = oddsArr?.[0]
+        setOddsDebug(`week:${g.week} type:${seasonType} eventsFound:${data.events?.length||0} matchedGame:${!!ev} oddsArrLen:${oddsArr?.length||0} sample:${JSON.stringify(o)?.slice(0,250)}`)
         if (o) {
           setOdds({
-            spread: o.details || null,
-            overUnder: o.overUnder || null,
+            spread: o.details || o.spread || null,
+            overUnder: o.overUnder || o.total || null,
           })
         }
       })
-      .catch(() => {})
+      .catch(e => setOddsDebug(`error: ${e.message}`))
   }, [g.home, g.away, g.week, seasonStarted])
 
   return (
@@ -1282,6 +1285,11 @@ function GameInfoDrawer({ game: g }) {
         <div className="gi-row">
           <span>Spread</span>
           <span style={{color:'var(--muted-lt)', fontStyle:'italic'}}>Lines not posted yet</span>
+        </div>
+      )}
+      {oddsDebug && (
+        <div style={{fontFamily:'monospace',fontSize:'8px',color:'#888',padding:'6px 8px',background:'#f5f0e8',borderRadius:'4px',wordBreak:'break-all',marginTop:'6px'}}>
+          {oddsDebug}
         </div>
       )}
       {/* Weather widget for outdoor games */}
