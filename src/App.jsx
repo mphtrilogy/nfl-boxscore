@@ -1709,10 +1709,12 @@ function LeadersView({ tab, setTab }) {
 // ══════════════════════════════════════════════════════════════════════════════
 
 // Defensive pts-allowed rankings by position (live — computed from ESPN box scores)
-// These update automatically as the season progresses via useLiveDefenseRankings()
+// These update automatically as real games are processed via useFWFantasyScores()
 const DEF_BASELINE = { QB:22, RB:24, WR:28, TE:12, K:8 }
 
-// Known 2026 NFL TEs — used to fix ESPN's incorrect WR classification of TEs in boxscore
+// Real live defensive rankings — points allowed per position, computed from
+// actual completed games. Replaces the old hardcoded MATCHUP_DATA map that
+// never changed regardless of what actually happened on the field.
 const KNOWN_TES = new Set([
   // AFC North
   'Mark Andrews','Isaiah Likely','Sam LaPorta','Zach Gentry','Cade Stover',
@@ -1831,6 +1833,7 @@ function useFWFantasyScores(currentWeek, mode) {
   const [players, setPlayers] = useState([])
   const [loading, setLoading] = useState(true)
   const [debug,   setDebug]   = useState('')
+  const [defenseRankings, setDefenseRankings] = useState({})
 
   useEffect(() => {
     if (!isGameSeason()) { setLoading(false); return }
@@ -1879,6 +1882,9 @@ function useFWFantasyScores(currentWeek, mode) {
 
       // Step 3: build player map — mirrors BoxScoreDrawer parsing exactly
       const pmap = {}
+      // Points allowed per position, per defense — built from the exact same
+      // fetch as everything else here, no second parallel request needed
+      const defenseAllowed = {} // { defTeam: { QB:[pts], RB:[pts], WR:[pts], TE:[pts] } }
 
       const addToMap = (name, team, pos, wk, cat, vals, targets=0, carries=0) => {
         if (!name || name === '—') return
@@ -1901,9 +1907,15 @@ function useFWFantasyScores(currentWeek, mode) {
       summaries.filter(Boolean).forEach(summary => {
         const wk = summary._week
         const teamsData = summary.boxscore?.players || []
+        // Opponent lookup for this game — needed to credit points allowed
+        // to the correct defense, computed from data already being fetched
+        // here rather than a second parallel fetch.
+        const teamAbbrs = teamsData.map(td => td.team?.abbreviation || '')
+        const oppOf = (abbr) => teamAbbrs.find(a => a !== abbr) || ''
 
         teamsData.forEach(td => {
           const team = td.team?.abbreviation || ''
+          const opp  = oppOf(team)
 
           // Parse each stat group — same as BoxScoreDrawer PlayerStats
           ;['passing','rushing','receiving','kicking'].forEach(cat => {
@@ -1927,9 +1939,37 @@ function useFWFantasyScores(currentWeek, mode) {
               const targets = cat === 'receiving' ? parseFloat(vals['TGTS']||vals['TGT']||0) : 0
               const carries = cat === 'rushing'   ? parseFloat(vals['CAR']||0) : 0
               addToMap(name, team, pos, wk, cat, vals, targets, carries)
+
+              // Credit these points to the opposing defense for matchup rankings
+              if (opp && ['QB','RB','WR','TE'].includes(pos)) {
+                const pts = calcFpts(vals, cat, mode)
+                if (pts > 0) {
+                  if (!defenseAllowed[opp]) defenseAllowed[opp] = { QB:[], RB:[], WR:[], TE:[] }
+                  defenseAllowed[opp][pos].push(pts)
+                }
+              }
             })
           })
         })
+      })
+
+      // Average points allowed per position, per defense — real matchup data
+      const defAvg = {}
+      Object.entries(defenseAllowed).forEach(([team, byPos]) => {
+        defAvg[team] = {}
+        Object.entries(byPos).forEach(([pos, arr]) => {
+          defAvg[team][pos] = arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : null
+        })
+      })
+      // League-wide range per position, for scaling matchup ratings honestly
+      // against what's actually happened this season rather than a guess
+      const posRange = {}
+      ;['QB','RB','WR','TE'].forEach(pos => {
+        const vals = Object.values(defAvg).map(d => d[pos]).filter(v => v != null)
+        posRange[pos] = {
+          min: vals.length ? Math.min(...vals) : DEF_BASELINE[pos] * 0.7,
+          max: vals.length ? Math.max(...vals) : DEF_BASELINE[pos] * 1.3,
+        }
       })
 
       // Step 4: score each player
@@ -1958,7 +1998,19 @@ function useFWFantasyScores(currentWeek, mode) {
           const usagePerGame  = (p.targets + p.carries) / games
           const usageScore    = Math.min(10, usagePerGame * 0.5)
           const momentumScore = last1 > last3avg ? 8 : last1 > last3avg * 0.7 ? 5 : 3
-          const matchupScore  = 5 // neutral default (no upcoming matchup data in preseason)
+
+          // Real matchup score — find this player's NEXT scheduled opponent,
+          // then rate how many points that defense has actually allowed to
+          // this position so far. Higher points allowed = softer matchup.
+          const nextGame = SCHEDULE_2026.find(g =>
+            g.week === currentWeek + 1 && (g.home === p.team || g.away === p.team)
+          )
+          const nextOpp = nextGame ? (nextGame.home === p.team ? nextGame.away : nextGame.home) : null
+          const oppAllowed = nextOpp ? defAvg[nextOpp]?.[p.pos] : null
+          const { min, max } = posRange[p.pos] || { min: DEF_BASELINE[p.pos]*0.7, max: DEF_BASELINE[p.pos]*1.3 }
+          const matchupScore = oppAllowed != null
+            ? Math.min(10, Math.max(0, 2 + ((oppAllowed - min) / Math.max(max - min, 1)) * 7))
+            : 5 // no upcoming game scheduled yet or opponent has no data — neutral
 
           const fwScore = (
             trendScore    * 0.35 +
@@ -1978,7 +2030,7 @@ function useFWFantasyScores(currentWeek, mode) {
             seasonAvg: Math.round(seasonAvg * 10) / 10,
             last1:     Math.round(last1 * 10) / 10,
             last3avg:  Math.round(last3avg * 10) / 10,
-            opp:       '',
+            opp:       nextOpp || '',
             fwScore:   Math.round(fwScore * 10) / 10,
             projPts,
             trendScore:    Math.round(trendScore    * 10) / 10,
@@ -1996,6 +2048,7 @@ function useFWFantasyScores(currentWeek, mode) {
       const posStr = Object.entries(posCounts).map(([p,n]) => `${p}:${n}`).join(' ')
       setDebug(`${gameIds.length} games processed · ${scored.length} players scored | ${posStr || 'no players found'}`)
       setPlayers(scored)
+      setDefenseRankings(defAvg)
       setLoading(false)
     })
     .catch(e => {
@@ -2004,7 +2057,7 @@ function useFWFantasyScores(currentWeek, mode) {
     })
   }, [currentWeek, mode])
 
-  return { players, loading, debug }
+  return { players, loading, debug, defenseRankings }
 }
 
 // ── FW FORMULA VIEW ────────────────────────────────────────────────────────────
@@ -2596,30 +2649,22 @@ function FantasyNewsView({ mode }) {
 }
 
 // ── WAIVER WIRE VIEW ──────────────────────────────────────────────────────────
-const WAIVER_TARGETS = [
-  { player:'Malik Washington',   team:'DEN', pos:'WR', owned:'18%', reason:'Courtland Sutton dealing with knee — Washington steps into WR1 role vs soft secondary', priority:'HIGH' },
-  { player:'Tyjae Spears',       team:'TEN', pos:'RB', owned:'31%', reason:'Tony Pollard listed questionable — Spears has workhorse upside if Pollard misses Week 5', priority:'HIGH' },
-  { player:'Cole Kmet',          team:'CHI', pos:'TE', owned:'42%', reason:'With Caleb Williams hot, Kmet is his favorite red zone target — 4 TDs in last 3 weeks', priority:'MED' },
-  { player:'Demarcus Robinson',  team:'LAR', pos:'WR', owned:'8%',  reason:'Cooper Kupp on IR — Robinson becomes LA\'s WR2 immediately', priority:'HIGH' },
-  { player:'Jordan Mason',       team:'SF',  pos:'RB', owned:'55%', reason:'Christian McCaffrey limited in practice — Mason is the handcuff every 49ers manager needs', priority:'MED' },
-  { player:'Chosen Anderson',    team:'ARI', pos:'WR', owned:'12%', reason:'Kyler Murray has been targeting him in the slot — 8 catches last week', priority:'MED' },
-  { player:'Dalton Kincaid',     team:'BUF', pos:'TE', owned:'38%', reason:'Emerging as Josh Allen\'s safety valve — 6+ targets in 3 straight games', priority:'MED' },
-  { player:'Antonio Gibson',     team:'WAS', pos:'RB', owned:'22%', reason:'Brian Robinson dealing with ankle — Gibson poised for lead back role', priority:'HIGH' },
-  { player:'Rashid Shaheed',     team:'NO',  pos:'WR', owned:'29%', reason:'Big play ability in Saints offense — Chris Olave questionable Week 5', priority:'LOW' },
-  { player:'Hunter Henry',       team:'NE',  pos:'TE', owned:'15%', reason:'Drake Maye loves targeting TEs — Henry averaging 6 targets/game', priority:'LOW' },
-]
-
-function WaiverWireView() {
+function WaiverWireView({ currentWeek, mode }) {
   const [posFilter, setPosFilter] = useState('All')
-  const [priFilter, setPriFilter] = useState('All')
+  const { players, loading } = useFWFantasyScores(currentWeek, mode)
 
-  const filtered = WAIVER_TARGETS.filter(p => {
-    if (posFilter !== 'All' && p.pos !== posFilter) return false
-    if (priFilter !== 'All' && p.priority !== priFilter) return false
-    return true
-  })
-
-  const priColor = { HIGH:'#c00', MED:'#c8a84b', LOW:'#555' }
+  // Real waiver logic: surface players who are (a) performing well right now
+  // (FW Score) and (b) likely available on most rosters — we don't have real
+  // ownership % data, so we use a defensible proxy: recent breakout production
+  // (last game notably above their own season average) rather than fabricated
+  // scenarios. This can't fake injury context, so it reports what's real —
+  // performance trend — and nothing it can't back up.
+  const candidates = players
+    .filter(p => p.games >= 1 && p.last1 != null && p.seasonAvg != null)
+    .filter(p => p.last1 >= p.seasonAvg * 1.3 && p.last1 >= 8) // notable spike, meaningful floor
+    .filter(p => posFilter === 'All' || p.pos === posFilter)
+    .sort((a, b) => (b.last1 - b.seasonAvg) - (a.last1 - a.seasonAvg))
+    .slice(0, 15)
 
   return (
     <div>
@@ -2632,69 +2677,79 @@ function WaiverWireView() {
             ))}
           </div>
         </div>
-        <div className="tc-group">
-          <span className="tc-label">Priority</span>
-          <div className="tc-btns">
-            {['All','HIGH','MED','LOW'].map(p => (
-              <button key={p} className={`tc-btn ${priFilter === p ? 'on' : ''}`} onClick={() => setPriFilter(p)}>{p}</button>
-            ))}
-          </div>
-        </div>
       </div>
       <div className="ww-intro">
         <span style={{fontFamily:'var(--font-body)', fontStyle:'italic', fontSize:12, color:'var(--muted)'}}>
-          Waiver wire targets based on injuries, usage trends, and matchup analysis. Updates weekly during the season.
+          Players trending up based on real recent performance vs. their own season average — computed live from box scores, same FW Formula data as everywhere else on the site. We don't have real roster ownership % data, so treat this as "who's heating up," not a guaranteed available add — check your own league first.
         </span>
       </div>
-      {filtered.map((p, i) => (
-        <a key={i} href={`https://www.google.com/search?q=${encodeURIComponent(p.player+' fantasy football 2026')}`}
+      {loading && (
+        <div className="leaders-coming-soon">
+          <div className="cs-icon">⚡</div>
+          <div className="cs-title">Loading live performance data…</div>
+        </div>
+      )}
+      {!loading && candidates.length === 0 && (
+        <div className="leaders-coming-soon">
+          <div className="cs-icon">📈</div>
+          <div className="cs-title">No standout risers yet</div>
+          <div className="cs-text">Check back once more games are completed — this needs at least one real game of data per player.</div>
+        </div>
+      )}
+      {!loading && candidates.map((p, i) => (
+        <a key={i} href={`https://www.google.com/search?q=${encodeURIComponent(p.name+' fantasy football waiver wire 2026')}`}
            target="_blank" rel="noopener" className="ww-card">
-          <div className="ww-priority" style={{background: priColor[p.priority]}}>{p.priority}</div>
+          <div className="ww-priority" style={{background: p.last1 >= p.seasonAvg * 1.6 ? '#c00' : '#c8a84b'}}>
+            {p.last1 >= p.seasonAvg * 1.6 ? 'HOT' : 'RISING'}
+          </div>
           <div className="ww-info">
-            <div className="ww-player">{p.player}</div>
+            <div className="ww-player">{p.name}</div>
             <div className="ww-meta">
               <span className="ww-team">{p.team}</span>
               <span className="ww-pos">{p.pos}</span>
-              <span className="ww-owned">{p.owned} owned</span>
+              <span className="ww-owned">FW {p.fwScore}</span>
             </div>
-            <div className="ww-reason">{p.reason}</div>
+            <div className="ww-reason">Last game: {p.last1} pts vs. {p.seasonAvg} season avg — {p.trend}</div>
           </div>
           <div className="ww-arrow">↗</div>
         </a>
       ))}
-      <div className="atl-note">Ownership percentages are estimates. Adds should be made before your league\'s waiver deadline.</div>
+      <div className="atl-note">Based on live FW Formula scoring, not fabricated ownership data. Always check your own league\'s free agent pool before making a claim.</div>
     </div>
   )
 }
 
-// ── MATCHUP RATER VIEW ────────────────────────────────────────────────────────
-const MATCHUP_DATA = {
-  QB: { best:['DET','NO','WAS','LAV','TB'], worst:['SF','BAL','DEN','NYJ','PHI'] },
-  RB: { best:['DET','NO','LAC','MIA','LV'], worst:['SF','BAL','CLE','NYJ','CHI'] },
-  WR: { best:['DET','NO','WAS','TB','LV'],  worst:['SF','DEN','BAL','NYJ','PHI'] },
-  TE: { best:['DET','NO','MIA','TB','LV'],  worst:['SF','BAL','KC','NYJ','CHI'] },
-}
-
-function MatchupRaterView() {
+function MatchupRaterView({ currentWeek: propWeek }) {
   const [pos, setPos] = useState('WR')
-  const currentWeek = getAutoWeek()
+  const currentWeek = propWeek || getAutoWeek()
+  // Reuse FW Formula's engine — it already computes real defense-allowed
+  // stats from the same box scores, no need for a second parallel fetch.
+  const { defenseRankings: rankings, loading } = useFWFantasyScores(currentWeek, 'ppr')
 
   const weekGames = SCHEDULE_2026.filter(g => g.week === currentWeek)
+  const hasData = Object.keys(rankings).length > 0
 
-  const getRating = (team, pos) => {
-    const data = MATCHUP_DATA[pos]
-    if (!data) return 5
-    if (data.best.includes(team))  return data.best.indexOf(team)  <= 1 ? 9 : 7
-    if (data.worst.includes(team)) return data.worst.indexOf(team) <= 1 ? 2 : 3
-    return 5
+  // Higher points allowed = softer matchup = better for offense = higher rating
+  const allPosValues = hasData
+    ? Object.values(rankings).map(r => r[pos]).filter(v => v != null)
+    : []
+  const maxAllowed = allPosValues.length ? Math.max(...allPosValues) : DEF_BASELINE[pos]
+  const minAllowed = allPosValues.length ? Math.min(...allPosValues) : DEF_BASELINE[pos]
+  const range = Math.max(maxAllowed - minAllowed, 1)
+
+  const getRating = (defTeam) => {
+    const allowed = rankings[defTeam]?.[pos]
+    if (allowed == null) return 5 // no data yet — neutral
+    // Scale within this week's actual observed range, 2 (toughest) to 9 (softest)
+    return Math.round(2 + ((allowed - minAllowed) / range) * 7)
   }
 
   const getLabel = (r) => r >= 8 ? '🟢 Excellent' : r >= 6 ? '🟢 Good' : r >= 4 ? '🟡 Average' : r >= 3 ? '🟠 Tough' : '🔴 Avoid'
 
   const gamesWithRatings = weekGames.map(g => ({
     ...g,
-    homeRating: getRating(g.away, pos), // home team faces away defense
-    awayRating: getRating(g.home, pos), // away team faces home defense
+    homeRating: getRating(g.away), // home team's offense faces away defense
+    awayRating: getRating(g.home), // away team's offense faces home defense
   })).sort((a, b) => Math.max(b.homeRating, b.awayRating) - Math.max(a.homeRating, a.awayRating))
 
   return (
@@ -2709,10 +2764,19 @@ function MatchupRaterView() {
       </div>
       <div className="matchup-intro">
         <span style={{fontFamily:'var(--font-body)', fontStyle:'italic', fontSize:12, color:'var(--muted)'}}>
-          Defensive matchup ratings for Week {currentWeek} — ranked best to worst for {pos}s.
-          Green = start with confidence. Red = consider sitting.
+          {hasData
+            ? `Real defensive matchup ratings for Week ${currentWeek} — computed from actual points allowed to ${pos}s this season. Green = start with confidence. Red = consider sitting.`
+            : `Matchup data builds as real games are played — showing neutral ratings until enough games are completed.`
+          }
         </span>
       </div>
+      {loading && (
+        <div className="leaders-coming-soon">
+          <div className="cs-icon">⚡</div>
+          <div className="cs-title">Computing live defensive rankings…</div>
+        </div>
+      )}
+      {!loading && (
       <table className="matchup-table">
         <thead>
           <tr>
@@ -2743,12 +2807,11 @@ function MatchupRaterView() {
           ))}
         </tbody>
       </table>
-      <div className="atl-note">Matchup ratings based on 2025 defensive statistics. Updates before Week 1 with 2026 preseason data.</div>
+      )}
     </div>
   )
 }
 
-// ── FANTASY LEADERS VIEW ─────────────────────────────────────────────────────
 // ESPN athlete stats endpoint — live during season, pre-season shows estimates
 const FANTASY_LEADERS_2025 = {
   QB: [
@@ -3074,8 +3137,8 @@ function FantasyView({ mode, setMode, currentWeek, squad, watchlist, toggleWatch
       {tab === 'leaders'  && <TabErrorBoundary><FantasyLeadersView mode={mode} squad={squad} /></TabErrorBoundary>}
       {tab === 'fw'       && <TabErrorBoundary><FWFormulaView currentWeek={currentWeek} mode={mode} squad={squad} watchlist={watchlist} toggleWatch={toggleWatch} /></TabErrorBoundary>}
       {tab === 'startsit' && <TabErrorBoundary><StartSitView mode={mode} currentWeek={currentWeek} /></TabErrorBoundary>}
-      {tab === 'matchups' && <TabErrorBoundary><MatchupRaterView /></TabErrorBoundary>}
-      {tab === 'waiver'   && <TabErrorBoundary><WaiverWireView /></TabErrorBoundary>}
+      {tab === 'matchups' && <TabErrorBoundary><MatchupRaterView currentWeek={currentWeek} /></TabErrorBoundary>}
+      {tab === 'waiver'   && <TabErrorBoundary><WaiverWireView currentWeek={currentWeek} mode={mode} /></TabErrorBoundary>}
       {tab === 'trends'   && (
         <TabErrorBoundary>
           <TrendsView currentWeek={currentWeek}
@@ -3214,7 +3277,7 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos }
       const capped = gameIds.slice(0, 20)
       const boxScores = await Promise.all(
         capped.map(g =>
-          fetch(`/api/espn/summary?event=${g.id}`)
+          fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${g.id}`)
             .then(r => r.json())
             .then(data => ({ ...data, week: g.week }))
             .catch(() => null)
@@ -3230,16 +3293,27 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos }
           const tm = teamData.team?.abbreviation || ''
           teamData.statistics?.forEach(statGroup => {
             const cat = statGroup.name
-            const detectedPos = CAT_TO_POS[cat] || 'SKILL'
             statGroup.athletes?.forEach(a => {
               const name = a.athlete?.displayName || ''
               if (!name) return
+              // Use real athlete position when ESPN provides it, with the
+              // same TE correction FW Formula uses — ESPN's receiving stat
+              // group lumps WRs and TEs together with no position field of
+              // its own, so a blunt category map mislabels every TE as WR.
+              const rawPos = a.athlete?.position?.abbreviation || ''
+              const catPos = CAT_TO_POS[cat] || 'SKILL'
+              let detectedPos = normPos(rawPos) || catPos
+              if (detectedPos === 'WR' && KNOWN_TES.has(name)) detectedPos = 'TE'
               const key = `${name}|${tm}`
               const vals = {}
               statGroup.labels?.forEach((lbl, i) => {
                 vals[lbl] = a.stats?.[i] || '0'
               })
-              const weekPts = calcFantasyPts(vals, mode, detectedPos)
+              // calcFpts takes raw ESPN labels (YDS/TD/REC) directly with the
+              // stat category name — calcFantasyPts expects pre-prefixed keys
+              // (passYds/rushYds/recYds) that were never built here, so every
+              // score was silently computing as 0 before this fix.
+              const weekPts = calcFpts(vals, cat, mode)
               if (!playerMap[key]) {
                 playerMap[key] = {
                   name, team: tm, pos: detectedPos,
