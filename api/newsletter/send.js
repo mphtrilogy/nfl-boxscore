@@ -836,6 +836,79 @@ function renderCondensedGame(g) {
 </div>`
 }
 
+// Compact one-line schedule row for an UPCOMING (not yet played) game —
+// time, network, spread/O-U, weather flag — each hyperlinked to the site.
+// This is the "cull the site into the newsletter" row: same data as the
+// Game Info drawer, condensed to a scannable line.
+function renderScheduleLine(ev, oddsMap, weatherMap, favTeam) {
+  const comp     = ev.competitions?.[0]
+  const home     = comp?.competitors?.find(c => c.homeAway === 'home')
+  const away     = comp?.competitors?.find(c => c.homeAway === 'away')
+  const homeAbbr = home?.team?.abbreviation || '?'
+  const awayAbbr = away?.team?.abbreviation || '?'
+  const tv       = comp?.broadcasts?.[0]?.names?.[0] || ''
+  const kickoff  = ev.date
+    ? new Date(ev.date).toLocaleString('en-US',
+        { weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit' })
+    : 'TBD'
+  const isFav    = favTeam && favTeam !== 'All' && [homeAbbr, awayAbbr].includes(favTeam)
+  const key      = `${awayAbbr}@${homeAbbr}`
+  const odds     = oddsMap?.[key]
+  const oddsStr  = odds ? formatOdds(odds) : ''
+  const wx       = weatherMap?.[homeAbbr]
+  const wxStr    = wx?.flags?.length ? `⚠️ ${wx.flags.map(f=>f.text).join(', ')}` : (wx ? `${wx.tMax}°F` : '')
+  const deepLink = `${SITE_URL}?game=${awayAbbr}-${homeAbbr}`
+  const hl       = isFav ? 'background:rgba(200,168,75,.08);border-left:3px solid rgba(200,168,75,.5);' : 'border-left:3px solid transparent;'
+
+  return `
+<a href="${deepLink}" style="text-decoration:none;display:block">
+<div style="display:table;width:100%;padding:8px 18px;border-bottom:1px solid rgba(42,31,14,.08);box-sizing:border-box;${hl}">
+  <span style="display:table-cell;vertical-align:top;color:#1a1209">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700">${awayAbbr} @ ${homeAbbr}${isFav ? ' ⚡' : ''}</span>
+    ${oddsStr ? `<br><span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6b5f4e">${oddsStr}</span>` : ''}
+  </span>
+  <span style="display:table-cell;text-align:right;vertical-align:top;font-family:'IBM Plex Mono',monospace;font-size:9px;color:#9e9080;white-space:nowrap">
+    ${kickoff}${tv ? `<br><span style="color:#c8a84b">${tv}</span>` : ''}${wxStr ? `<br>${wxStr}` : ''}
+  </span>
+</div>
+</a>`
+}
+
+// Full compact schedule section — fetches odds + weather for all upcoming
+// games in one pass, renders each as a one-line hyperlinked row. This is
+// the "site data culled into the newsletter" section requested for
+// Monday/Tuesday (next week preview) and Thursday/Friday (this weekend).
+async function renderCompactSchedule(events, week, seasonType, favTeam, label, preOddsMap = null) {
+  if (!events?.length) return ''
+  const oddsMap = preOddsMap || await fetchOdds(week, seasonType)
+
+  // Weather only for outdoor stadiums, fetched once per unique home team
+  const outdoorHomeTeams = [...new Set(
+    events
+      .map(ev => ev.competitions?.[0]?.competitors?.find(c => c.homeAway === 'home')?.team?.abbreviation)
+      .filter(t => t && OUTDOOR_STADIUMS.has(t))
+  )]
+  const weatherEntries = await Promise.all(
+    outdoorHomeTeams.map(async t => {
+      const ev = events.find(e => e.competitions?.[0]?.competitors?.find(c => c.homeAway === 'home')?.team?.abbreviation === t)
+      const wx = await fetchGameWeather(t, ev?.date)
+      return [t, wx]
+    })
+  )
+  const weatherMap = Object.fromEntries(weatherEntries.filter(([,wx]) => wx))
+
+  const rows = events.map(ev => renderScheduleLine(ev, oddsMap, weatherMap, favTeam)).join('')
+
+  return `
+<span class="sec-label">🏈 ${label}</span>
+<div style="padding:2px 0">
+  ${rows}
+</div>
+<div class="cta-wrap">
+  <a class="cta" href="${SITE_URL}">Full Schedule &amp; Box Scores &rarr;</a>
+</div>`
+}
+
 // WAIVER WIRE — auto-generated from real box score data
 function renderWaiverSection(parsedGames, nextWeek, squad, mode = 'ppr') {
   const seen       = new Set()
@@ -1002,65 +1075,179 @@ async function renderWeatherSection(events) {
 // Called at build time inside buildEmail — runs server-side in the edge function
 // ── ODDS — ESPN odds API (free, no key) ──────────────────────────────────────
 // Returns spread + over/under for upcoming games
+// Uses site.api.espn.com scoreboard (same proven endpoint as the rest of the
+// site) instead of sports.core.api's $ref-chasing pattern, which returns
+// unresolved reference objects rather than full data and needs 2x the
+// requests per game.
 async function fetchOdds(week, seasonType) {
   const oddsMap = {}
   try {
     const r    = await fetch(
-      `https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/seasons/2026/types/${seasonType}/weeks/${week}/events?limit=20`
+      `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${week}&seasontype=${seasonType}&limit=20`
     )
     const data = await r.json()
-    const eventRefs = data.items || []
-
-    await Promise.all(eventRefs.slice(0, 16).map(async ref => {
-      try {
-        const evR  = await fetch(ref.$ref)
-        const ev   = await evR.json()
-        const compId = ev.competitions?.[0]?.id
-        if (!compId) return
-
-        const oddsR = await fetch(
-          `https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/events/${ev.id}/competitions/${compId}/odds?limit=5`
-        )
-        const oddsData = await oddsR.json()
-        const consensus = (oddsData.items || []).find(o =>
-          o.provider?.name?.toLowerCase().includes('consensus') ||
-          o.provider?.id === '2'
-        ) || oddsData.items?.[0]
-
-        if (consensus) {
-          const homeTeam = ev.competitions?.[0]?.competitors
-            ?.find(c => c.homeAway === 'home')?.team?.abbreviation || ''
-          const awayTeam = ev.competitions?.[0]?.competitors
-            ?.find(c => c.homeAway === 'away')?.team?.abbreviation || ''
-          const key = `${awayTeam}@${homeTeam}`
-          oddsMap[key] = {
-            spread:    consensus.spread   != null ? consensus.spread   : null,
-            overUnder: consensus.overUnder != null ? consensus.overUnder : null,
-            favored:   consensus.homeTeamOdds?.favorite ? homeTeam : awayTeam,
-          }
-        }
-      } catch { /* silent per game */ }
-    }))
+    ;(data.events || []).forEach(ev => {
+      const comp = ev.competitions?.[0]
+      const o    = comp?.odds?.[0]
+      if (!o) return
+      const homeTeam = comp.competitors?.find(c => c.homeAway === 'home')?.team?.abbreviation || ''
+      const awayTeam = comp.competitors?.find(c => c.homeAway === 'away')?.team?.abbreviation || ''
+      const key = `${awayTeam}@${homeTeam}`
+      oddsMap[key] = {
+        spread:    o.details    || null,
+        overUnder: o.overUnder  != null ? o.overUnder : null,
+      }
+    })
   } catch { /* silent */ }
   return oddsMap
 }
 
-function formatOdds(odds, awayAbbr, homeAbbr) {
+function formatOdds(odds) {
   if (!odds) return ''
   const parts = []
-  if (odds.spread != null) {
-    const favSign = odds.spread > 0 ? '+' : ''
-    const dogTeam = odds.favored === homeAbbr ? awayAbbr : homeAbbr
-    const favTeam = odds.favored
-    parts.push(`${favTeam} -${Math.abs(odds.spread)}`)
-  }
-  if (odds.overUnder != null) {
-    parts.push(`O/U ${odds.overUnder}`)
-  }
+  if (odds.spread) parts.push(odds.spread) // already formatted, e.g. "SEA -3.5"
+  if (odds.overUnder != null) parts.push(`O/U ${odds.overUnder}`)
   return parts.join(' · ')
 }
 
 // ── INJURIES — notable OUT/Doubtful from ESPN ─────────────────────────────────
+// ── STANDINGS — fav team's current record, division rank, playoff seed ─────
+// Uses site.api.espn.com (same proven-reliable domain as scoreboard/summary)
+// rather than sports.core.api's $ref-chasing pattern used elsewhere for
+// standings in some docs — this endpoint returns fully resolved team +
+// stats objects directly, no second request needed per team.
+async function fetchStandings() {
+  try {
+    const r = await fetch('https://site.api.espn.com/apis/site/v2/sports/football/nfl/standings?season=2026')
+    const data = await r.json()
+    const teams = []
+    // Response nests conference -> division -> entries, but exact depth
+    // can vary by ESPN's grouping that season, so walk defensively rather
+    // than assume a fixed number of levels.
+    const walk = (node) => {
+      if (!node) return
+      if (Array.isArray(node.standings?.entries)) {
+        node.standings.entries.forEach(e => {
+          const abbr = e.team?.abbreviation
+          if (!abbr) return
+          const stats = {}
+          ;(e.stats || []).forEach(s => { stats[s.name] = s.value ?? s.displayValue })
+          teams.push({
+            abbr,
+            wins: stats.wins ?? 0,
+            losses: stats.losses ?? 0,
+            ties: stats.ties ?? 0,
+            divisionRank: stats.divisionRank ?? null,
+            playoffSeed: stats.playoffSeed ?? null,
+            gamesBehind: stats.gamesBehind ?? null,
+            streak: stats.streak ?? null,
+            division: node.name || node.abbreviation || '',
+          })
+        })
+      }
+      ;(node.children || []).forEach(walk)
+    }
+    ;(data.children || []).forEach(walk)
+    return teams
+  } catch { return [] }
+}
+
+function ordinal(n) {
+  if (n == null) return ''
+  const s = ['th','st','nd','rd']
+  const v = n % 100
+  return n + (s[(v-20)%10] || s[v] || s[0])
+}
+
+function renderStandingsLine(favTeam, standings) {
+  if (!favTeam || favTeam === 'All' || !standings.length) return ''
+  const team = standings.find(t => t.abbr === favTeam)
+  if (!team) return ''
+
+  const record = `${team.wins}-${team.losses}${team.ties ? `-${team.ties}` : ''}`
+  const divLine = team.divisionRank ? `${ordinal(team.divisionRank)} in ${team.division}` : ''
+  const seedLine = team.playoffSeed ? `#${team.playoffSeed} seed` : (team.divisionRank && team.divisionRank > 1 ? `${ordinal(team.gamesBehind ? Math.ceil(team.gamesBehind) : '')} games back`.replace('th games back','') : '')
+
+  return `
+<div style="background:rgba(200,168,75,.06);border-left:3px solid #c8a84b;padding:10px 18px;font-family:monospace;font-size:11px;color:#1a1209;margin-bottom:2px">
+  <strong style="font-size:15px">${favTeam}</strong> &nbsp; ${record}
+  ${divLine ? `&nbsp;·&nbsp;<span style="color:#6b5f4e">${divLine}</span>` : ''}
+  ${seedLine ? `&nbsp;·&nbsp;<span style="color:#c8a84b">${seedLine}</span>` : ''}
+  ${team.streak ? `<div style="margin-top:3px;font-size:9px;color:#9e9080">${team.streak}</div>` : ''}
+</div>`
+}
+
+// ── PLAYOFF PICTURE — top 7 seeds per conference from the fav team's side ──
+// Same standings data already fetched for the record line above, just
+// grouped and sorted by seed instead of shown as a single team's line.
+function renderPlayoffPicture(favTeam, standings) {
+  if (!standings.length) return ''
+
+  // Infer conference from the division label built during the standings
+  // walk (e.g. "AFC East" -> "AFC") rather than a separate lookup table.
+  const withConf = standings.map(t => ({
+    ...t,
+    conf: t.division?.startsWith('AFC') ? 'AFC' : t.division?.startsWith('NFC') ? 'NFC' : null,
+  })).filter(t => t.conf)
+
+  if (!withConf.length) return ''
+
+  // Which conference to lead with — fav team's, if we have one
+  const favConf = favTeam && favTeam !== 'All'
+    ? withConf.find(t => t.abbr === favTeam)?.conf
+    : null
+  const confOrder = favConf ? [favConf, favConf === 'AFC' ? 'NFC' : 'AFC'] : ['AFC', 'NFC']
+
+  const renderConf = (conf) => {
+    const teams = withConf
+      .filter(t => t.conf === conf && t.playoffSeed)
+      .sort((a, b) => a.playoffSeed - b.playoffSeed)
+      .slice(0, 7)
+    if (!teams.length) return ''
+
+    const rows = teams.map(t => {
+      const isFav = t.abbr === favTeam
+      const isBubble = t.playoffSeed === 7
+      const label = t.playoffSeed <= 4 ? `#${t.playoffSeed} (Div)` : `#${t.playoffSeed} (WC)`
+      return `
+<div style="display:flex;justify-content:space-between;padding:4px 0;${isBubble ? 'border-top:1px dashed rgba(42,31,14,.25);margin-top:2px;padding-top:6px' : ''}">
+  <span style="font-family:monospace;font-size:10.5px;${isFav ? 'font-weight:700;color:#c8a84b' : 'color:#1a1209'}">${label} ${t.abbr}${isFav ? ' ⚡' : ''}</span>
+  <span style="font-family:monospace;font-size:9.5px;color:#9e9080">${t.wins}-${t.losses}${t.ties ? `-${t.ties}` : ''}</span>
+</div>`
+    }).join('')
+
+    return `
+<div style="margin-bottom:10px">
+  <div style="font-family:monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#c8a84b;margin-bottom:4px">${conf} Playoff Picture</div>
+  ${rows}
+</div>`
+  }
+
+  const body = confOrder.map(renderConf).filter(Boolean).join('')
+  if (!body) return ''
+
+  return `
+<span class="sec-label">🏆 If The Season Ended Today</span>
+<div style="padding:8px 18px 4px">
+  ${body}
+  <div style="font-family:monospace;font-size:8px;color:#9e9080;font-style:italic;margin-top:2px">Seeds 1-4 are division winners · 5-7 are wild cards · dashed line = playoff bubble</div>
+</div>`
+}
+
+// ── BYE WEEK — quiet note when the fav team has no game this week ──────────
+function renderByeWeekNote(favTeam, week, weekEvents) {
+  if (!favTeam || favTeam === 'All') return ''
+  const playing = weekEvents.some(ev => {
+    const teams = ev.competitions?.[0]?.competitors?.map(c => c.team?.abbreviation) || []
+    return teams.includes(favTeam)
+  })
+  if (playing) return ''
+  return `
+<div style="background:rgba(107,95,78,.08);border-left:3px solid #9e9080;padding:10px 18px;font-family:monospace;font-size:10px;color:#6b5f4e;margin-bottom:2px">
+  🛋️ ${favTeam} is on bye this week — back in action next week.
+</div>`
+}
+
 async function fetchInjuries(favTeam) {
   const injuries = []
   try {
@@ -1192,6 +1379,127 @@ async function fetchTeamNews(favTeam) {
   } catch { /* silent */ }
 
   return articles.slice(0, 4)
+}
+
+// ── FW FORMULA TAKE — top risers/fallers, real data, hyperlinked to site ────
+// A lighter version of the site's FW Formula engine: same calcFpts-style
+// scoring on real box scores, scoped to "biggest jump vs. own recent average"
+// rather than the full trend/matchup/usage/weather/momentum blend (that
+// stays a client-side, per-visitor computation on the site itself). This is
+// the same honest signal the Waiver Wire section uses.
+const KNOWN_TES_NL = new Set([
+  'Mark Andrews','Isaiah Likely','Sam LaPorta','Zach Gentry','Cade Stover',
+  'Jonnu Smith','Erick All','Gerald Everett','Luke Farrell','Dalton Schultz',
+  'Brevin Jordan','Will Dissly','Mo Alie-Cox','Chig Okonkwo','Josh Whyle',
+  'Hunter Henry','Austin Hooper','Tyler Higbee','Cole Kmet','Tommy Tremble',
+  'Travis Kelce','Noah Gray','Evan Engram','Brenton Strange','Brock Bowers',
+  'T.J. Hockenson','Luke Musgrave','Jake Ferguson','Juwan Johnson','Cade Otton',
+  'Dallas Goedert','Grant Calcaterra','George Kittle','Trey McBride','Colby Parkinson',
+  'Dalton Kincaid','Theo Johnson','Will Mallory','Elijah Higgins','Zach Ertz',
+])
+
+function nlCalcFpts(vals, cat) {
+  const v = (k) => parseFloat(vals[k] || 0)
+  if (cat === 'passing')   return (v('YDS')/25) + (v('TD')*6) - (v('INT')*2)
+  if (cat === 'rushing')   return (v('YDS')/10) + (v('TD')*6)
+  if (cat === 'receiving') return (v('YDS')/10) + (v('TD')*6) + v('REC') // PPR
+  return 0
+}
+
+async function fetchFWTake(currentWeek, seasonType) {
+  try {
+    const weeks = []
+    for (let w = Math.max(1, currentWeek - 3); w <= currentWeek; w++) weeks.push(w)
+
+    const boards = await Promise.all(
+      weeks.map(w =>
+        fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${w}&seasontype=${seasonType}&limit=20`)
+          .then(r => r.json()).catch(() => ({ events: [] }))
+      )
+    )
+    const gameIds = []
+    boards.forEach((board, i) => {
+      ;(board.events || []).forEach(ev => {
+        if (ev.status?.type?.state === 'post') gameIds.push({ id: ev.id, week: weeks[i] })
+      })
+    })
+    if (!gameIds.length) return null
+
+    const summaries = await Promise.all(
+      gameIds.slice(0, 30).map(g =>
+        fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${g.id}`)
+          .then(r => r.json()).then(d => ({ ...d, _week: g.week })).catch(() => null)
+      )
+    )
+
+    const pmap = {}
+    summaries.filter(Boolean).forEach(summary => {
+      const wk = summary._week
+      ;(summary.boxscore?.players || []).forEach(td => {
+        const team = td.team?.abbreviation || ''
+        ;['passing','rushing','receiving'].forEach(cat => {
+          const sg = td.statistics?.find(s => s.name === cat)
+          if (!sg) return
+          sg.athletes?.forEach(a => {
+            const name = a.athlete?.displayName || ''
+            if (!name) return
+            const rawPos = a.athlete?.position?.abbreviation || ''
+            let pos = rawPos || (cat === 'passing' ? 'QB' : cat === 'rushing' ? 'RB' : 'WR')
+            if (pos === 'WR' && KNOWN_TES_NL.has(name)) pos = 'TE'
+            if (!['QB','RB','WR','TE'].includes(pos)) return
+            const vals = {}
+            sg.labels?.forEach((lbl, i) => { vals[lbl] = a.stats?.[i] || '0' })
+            if (!sg.labels?.some(lbl => parseFloat(vals[lbl]) !== 0)) return
+            const pts = nlCalcFpts(vals, cat)
+            const key = `${name}|${team}`
+            if (!pmap[key]) pmap[key] = { name, team, pos, weekPts: {} }
+            if (pos === 'TE') pmap[key].pos = 'TE'
+            pmap[key].weekPts[wk] = (pmap[key].weekPts[wk] || 0) + pts
+          })
+        })
+      })
+    })
+
+    const scored = Object.values(pmap)
+      .map(p => {
+        const pts = Object.values(p.weekPts)
+        if (pts.length < 1) return null
+        const last1     = pts[pts.length - 1] || 0
+        const seasonAvg = pts.reduce((a,b)=>a+b,0) / pts.length
+        if (last1 < 8) return null // meaningful floor, not noise
+        return { ...p, last1, seasonAvg, delta: last1 - seasonAvg }
+      })
+      .filter(Boolean)
+
+    const risers  = scored.filter(p => p.delta > 0).sort((a,b) => b.delta - a.delta).slice(0, 3)
+    const fallers = scored.filter(p => p.seasonAvg >= 8 && p.delta < 0).sort((a,b) => a.delta - b.delta).slice(0, 3)
+
+    return { risers, fallers }
+  } catch { return null }
+}
+
+function renderFWTakeSection(take) {
+  if (!take || (!take.risers.length && !take.fallers.length)) return ''
+
+  const rowHtml = (p, isRiser) => `
+<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(42,31,14,.06)">
+  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#1a1209">
+    ${isRiser ? '🔥' : '❄️'} <strong>${p.name}</strong> <span style="color:#9e9080">${p.pos} · ${p.team}</span>
+  </span>
+  <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:${isRiser ? '#1a5c1a' : '#8b1a1a'}">
+    ${p.last1.toFixed(1)} last gm ${isRiser?'▲':'▼'} vs ${p.seasonAvg.toFixed(1)} avg
+  </span>
+</div>`
+
+  return `
+<span class="sec-label">⚡ FW Formula — Risers &amp; Fallers</span>
+<div style="padding:6px 18px 4px">
+  ${take.risers.length ? `<div style="font-family:'IBM Plex Mono',monospace;font-size:8px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#c8a84b;margin:6px 0 2px">Trending Up</div>${take.risers.map(p=>rowHtml(p,true)).join('')}` : ''}
+  ${take.fallers.length ? `<div style="font-family:'IBM Plex Mono',monospace;font-size:8px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#8b1a1a;margin:10px 0 2px">Trending Down</div>${take.fallers.map(p=>rowHtml(p,false)).join('')}` : ''}
+</div>
+<div class="cta-wrap">
+  <a class="cta" href="${SITE_URL}?tab=fantasy&view=fw">See Full FW Formula Rankings &rarr;</a>
+</div>`
 }
 
 // ── LEAGUE NEWS — Top 5 NFL stories circulating right now ─────────────────
@@ -1468,15 +1776,19 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
 
   let html = shell(SUBJECTS[sendType], dateStr, dispWeek, LABELS[sendType], mode)
 
-  // Fetch team news, league news, and injuries in parallel
-  const [teamNews, leagueNews, injuries] = await Promise.all([
+  // Fetch team news, league news, injuries, FW Take, and standings in parallel
+  const [teamNews, leagueNews, injuries, fwTake, standings] = await Promise.all([
     fetchTeamNews(favTeam),
     fetchLeagueNews(),
     fetchInjuries(favTeam),
+    fetchFWTake(currentWeek, getSeasonType()),
+    fetchStandings(),
   ])
-  const teamNewsHTML   = renderTeamNewsSection(teamNews, favTeam)
-  const leagueNewsHTML = renderLeagueNewsSection(leagueNews)
-  const injuryHTML     = renderInjurySection(injuries, favTeam)
+  const teamNewsHTML    = renderTeamNewsSection(teamNews, favTeam)
+  const leagueNewsHTML  = renderLeagueNewsSection(leagueNews)
+  const injuryHTML      = renderInjurySection(injuries, favTeam)
+  const fwTakeHTML      = renderFWTakeSection(fwTake)
+  const standingsHTML   = renderStandingsLine(favTeam, standings)
 
   // ── MONDAY: All Sunday games ──────────────────────────────────────────────
   if (sendType === 'monday') {
@@ -1491,6 +1803,10 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
         const won = favGame.winner === favTeam
         html += `<span class="sec-label">⚡ ${favTeam} — ${won ? '✅ WIN' : '❌ LOSS'}</span>`
         html += renderFullGame(favGame, squad, mode)
+        html += standingsHTML
+      } else {
+        html += renderByeWeekNote(favTeam, recapWeek, recapEvents)
+        html += standingsHTML
       }
 
       // SNF featured game (if different from fav team game)
@@ -1521,6 +1837,15 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
 
     html += teamNewsHTML
     html += leagueNewsHTML
+    html += fwTakeHTML
+
+    // Week ahead — compact schedule preview with odds/weather as they post
+    const nextWeekEvents = await getWeekEvents(currentWeek + 1)
+    if (nextWeekEvents.length) {
+      html += await renderCompactSchedule(nextWeekEvents, currentWeek + 1, getSeasonType(), favTeam, `Week ${currentWeek + 1} — Coming Up`)
+    }
+
+    html += renderPlayoffPicture(favTeam, standings)
     html += injuryHTML
     html += renderWaiverSection(parsedGames, currentWeek, squad, mode)
   }
@@ -1543,13 +1868,22 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
     html += renderSquadSummary(parsedGames, squad, mode)
     html += teamNewsHTML
     html += leagueNewsHTML
+    html += fwTakeHTML
+
+    // Rest of the week ahead — compact schedule
+    const restOfWeekEvents = await getWeekEvents(currentWeek)
+    const upcomingEvents = restOfWeekEvents.filter(ev => !ev.status?.type?.completed)
+    if (upcomingEvents.length) {
+      html += await renderCompactSchedule(upcomingEvents, currentWeek, getSeasonType(), favTeam, `Rest of Week ${currentWeek}`)
+    }
+
     html += injuryHTML
     html += renderWaiverSection(parsedGames, currentWeek, squad, mode)
   }
 
   // ── THURSDAY: No recap — preview + HOF ───────────────────────────────────
   else if (sendType === 'thursday') {
-    // TNF game preview
+    // TNF game preview — now with network, odds, and weather
     const tnf = allEvents.find(ev => new Date(ev.date).getDay() === 4)
     if (tnf) {
       const comps    = tnf.competitions?.[0]
@@ -1560,12 +1894,20 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
       const kickoff  = new Date(tnf.date).toLocaleTimeString('en-US',
         {hour:'numeric', minute:'2-digit', timeZoneName:'short'})
       const venue    = comps?.venue?.fullName || ''
+      const tv       = comps?.broadcasts?.[0]?.names?.[0] || ''
       const isFavTNF = hasFav && [homeAbbr, awayAbbr].includes(favTeam)
+
+      const tnfOddsMap = await fetchOdds(currentWeek, getSeasonType())
+      const tnfOdds    = tnfOddsMap[`${awayAbbr}@${homeAbbr}`]
+      const oddsLine   = tnfOdds ? formatOdds(tnfOdds) : ''
+      const tnfWx      = OUTDOOR_STADIUMS.has(homeAbbr) ? await fetchGameWeather(homeAbbr, tnf.date) : null
 
       html += `<span class="sec-label">📺 Tonight — Thursday Night Football</span>
 <div class="hof" style="padding:16px 18px">
   <div style="font-family:Georgia,serif;font-size:24px;font-weight:700;color:#c8a84b">${awayAbbr} @ ${homeAbbr}${isFavTNF?' ⚡':''}</div>
-  <div style="font-family:monospace;font-size:9px;color:rgba(255,255,255,.4);margin-top:5px;letter-spacing:.08em">${kickoff}${venue?` &nbsp;&middot;&nbsp; ${venue}`:''}</div>
+  <div style="font-family:monospace;font-size:9px;color:rgba(255,255,255,.4);margin-top:5px;letter-spacing:.08em">${kickoff}${tv?` &nbsp;&middot;&nbsp; ${tv}`:''}${venue?` &nbsp;&middot;&nbsp; ${venue}`:''}</div>
+  ${oddsLine ? `<div style="font-family:monospace;font-size:9px;color:#c8a84b;margin-top:6px;letter-spacing:.06em">${oddsLine}</div>` : ''}
+  ${tnfWx ? `<div style="font-family:monospace;font-size:9px;color:rgba(255,255,255,.5);margin-top:4px">${tnfWx.summary}</div>` : ''}
   <div style="margin-top:10px;font-family:monospace;font-size:9px;color:rgba(255,255,255,.55);line-height:1.6">Start your players before kickoff. Check nflboxscore.com for FW Formula scores &amp; injury updates.</div>
   <div style="text-align:center;margin-top:12px">
     <a class="cta" href="${SITE_URL}" style="font-size:8px">Live Scores Tonight &rarr;</a>
@@ -1587,6 +1929,7 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
     html += renderHOFTidbit(currentWeek, sendType)
     html += teamNewsHTML
     html += leagueNewsHTML
+    html += fwTakeHTML
     html += injuryHTML
   }
 
@@ -1603,7 +1946,9 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
         : renderCondensedGame(tnfGame)
     }
 
-    // 2. Fetch odds for the weekend
+    // 2. Fetch odds once for the weekend — reused by both the fav-team
+    // highlight card below and the compact schedule, avoiding a duplicate
+    // fetch of the same data.
     const oddsMap = await fetchOdds(currentWeek, getSeasonType())
 
     // 3. Weekend schedule with odds inline
@@ -1629,7 +1974,7 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
             : ''
           const key  = `${awayAbbr}@${homeAbbr}`
           const odds = oddsMap[key]
-          const oddsStr = odds ? formatOdds(odds, awayAbbr, homeAbbr) : ''
+          const oddsStr = odds ? formatOdds(odds) : ''
           html += `
 <span class="sec-label">⚡ ${favTeam} — This Sunday</span>
 <div style="background:rgba(200,168,75,.06);border-left:3px solid #c8a84b;padding:10px 18px;font-family:monospace;font-size:11px;color:#1a1209">
@@ -1638,49 +1983,22 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
   ${tv ? `&nbsp;·&nbsp;<span style="color:#c8a84b">${tv}</span>` : ''}
   ${oddsStr ? `<div style="margin-top:5px;font-size:9px;color:#6b5f4e;letter-spacing:.06em">${oddsStr}</div>` : ''}
 </div>`
+          html += standingsHTML
+        } else {
+          html += renderByeWeekNote(favTeam, currentWeek, upcoming)
+          html += standingsHTML
         }
       }
 
-      // Full weekend slate with odds
-      html += `<span class="sec-label">🏈 Week ${currentWeek} — Full Schedule &amp; Lines</span>`
-      html += `<div style="padding:4px 0 6px">`
-      upcoming.forEach(ev => {
-        const comps    = ev.competitions?.[0]
-        const home     = comps?.competitors?.find(c => c.homeAway === 'home')
-        const away     = comps?.competitors?.find(c => c.homeAway === 'away')
-        const homeAbbr = home?.team?.abbreviation || '?'
-        const awayAbbr = away?.team?.abbreviation || '?'
-        const tv       = comps?.broadcasts?.[0]?.names?.[0] || ''
-        const kickoff  = ev.date
-          ? new Date(ev.date).toLocaleString('en-US',
-              { weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit' })
-          : ''
-        const isFavGame = hasFav && [homeAbbr, awayAbbr].includes(favTeam)
-        const hl    = isFavGame ? 'background:rgba(200,168,75,.05);border-left:2px solid rgba(200,168,75,.4);' : ''
-        const key   = `${awayAbbr}@${homeAbbr}`
-        const odds  = oddsMap[key]
-        const oddsStr = odds ? formatOdds(odds, awayAbbr, homeAbbr) : ''
-        html += `
-<div style="display:table;width:100%;padding:6px 18px;border-bottom:1px solid rgba(42,31,14,.08);box-sizing:border-box;${hl}">
-  <span style="display:table-cell;vertical-align:top">
-    <span style="font-family:monospace;font-size:10.5px;font-weight:700;color:#1a1209">${awayAbbr} @ ${homeAbbr}${isFavGame ? ' ⚡' : ''}</span>
-    ${oddsStr ? `<br><span style="font-family:monospace;font-size:8px;color:#6b5f4e;letter-spacing:.04em">${oddsStr}</span>` : ''}
-  </span>
-  <span style="display:table-cell;text-align:right;vertical-align:top;font-family:monospace;font-size:8.5px;color:#9e9080;white-space:nowrap">
-    ${kickoff}${tv ? `<br><span style="color:#c8a84b">${tv}</span>` : ''}
-  </span>
-</div>`
-      })
-      html += `</div>
-<div class="cta-wrap">
-  <a class="cta" href="${SITE_URL}">Full TV Guide &amp; Box Scores &rarr;</a>
-</div>`
+      // Full weekend slate — reusable compact schedule. Pass the already-
+      // fetched oddsMap in via a pre-fetched-odds variant so it doesn't
+      // re-request the same data internally.
+      html += await renderCompactSchedule(upcoming, currentWeek, getSeasonType(), favTeam, `Week ${currentWeek} — Full Schedule & Lines`, oddsMap)
     }
 
-    // 4. Weather section — all outdoor games
-    html += await renderWeatherSection(upcoming)
+    html += renderPlayoffPicture(favTeam, standings)
 
-    // 5. Start/Sit
+    // 4. Start/Sit
     html += `
 <span class="sec-label">⚖️ Start / Sit — Week ${currentWeek}</span>
 <div class="callout">Lineups lock Sunday morning. The FW Formula scores every rostered player 0–10 using recent trend, matchup difficulty, usage data, and weather — auto-updated every page load.</div>
@@ -1691,10 +2009,8 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
     html += renderHOFTidbit(currentWeek, sendType)
     html += teamNewsHTML
     html += leagueNewsHTML
-
-    // 6. Injury report — bottom of email
-    const injuries    = await fetchInjuries(favTeam)
-    html += renderInjurySection(injuries, favTeam)
+    html += fwTakeHTML
+    html += injuryHTML
   }
 
   html += foot(email)
