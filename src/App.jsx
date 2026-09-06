@@ -1829,7 +1829,7 @@ function useESPNPlayerSearch(query) {
   return { results, loading, debug }
 }
 
-function useFWFantasyScores(currentWeek, mode) {
+function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
   const [players, setPlayers] = useState([])
   const [loading, setLoading] = useState(true)
   const [debug,   setDebug]   = useState('')
@@ -1837,9 +1837,15 @@ function useFWFantasyScores(currentWeek, mode) {
 
   useEffect(() => {
     if (!isGameSeason()) { setLoading(false); return }
+    // forceRegularSeason lets a caller (like MatchupRaterView, which only
+    // ever rates games from the regular-season SCHEDULE_2026) request real
+    // regular-season defensive data even while the site's calendar is still
+    // in "preseason mode" — otherwise it would silently mix preseason
+    // defensive stats into ratings for unrelated regular-season matchups.
+    const useRegular = forceRegularSeason || isRegularSeason()
 
     const weeks = []
-    if (isPreseason()) {
+    if (!useRegular) {
       for (let w = 1; w <= Math.min(currentWeek, 4); w++) weeks.push(w)
     } else {
       for (let w = Math.max(1, currentWeek - 4); w <= currentWeek; w++) weeks.push(w)
@@ -1848,8 +1854,9 @@ function useFWFantasyScores(currentWeek, mode) {
     setLoading(true)
 
     // Step 1: get all game IDs for these weeks
+    const seasonTypeToFetch = useRegular ? 2 : 1
     Promise.all(weeks.map(w =>
-      fetch(`${ESPN_NFL}/scoreboard?week=${w}&seasontype=${espnSeasonType()}&limit=20`)
+      fetch(`${ESPN_NFL}/scoreboard?week=${w}&seasontype=${seasonTypeToFetch}&limit=20`)
         .then(r => r.json())
         .catch(() => ({ events: [] }))
     ))
@@ -2055,7 +2062,7 @@ function useFWFantasyScores(currentWeek, mode) {
       setDebug(`✗ ${e.message}`)
       setLoading(false)
     })
-  }, [currentWeek, mode])
+  }, [currentWeek, mode, forceRegularSeason])
 
   return { players, loading, debug, defenseRankings }
 }
@@ -2724,7 +2731,7 @@ function MatchupRaterView({ currentWeek: propWeek }) {
   const currentWeek = propWeek || getAutoWeek()
   // Reuse FW Formula's engine — it already computes real defense-allowed
   // stats from the same box scores, no need for a second parallel fetch.
-  const { defenseRankings: rankings, loading } = useFWFantasyScores(currentWeek, 'ppr')
+  const { defenseRankings: rankings, loading } = useFWFantasyScores(currentWeek, 'ppr', true)
 
   const weekGames = SCHEDULE_2026.filter(g => g.week === currentWeek)
   const hasData = Object.keys(rankings).length > 0
