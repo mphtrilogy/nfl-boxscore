@@ -3654,8 +3654,15 @@ function useMultiSourceNews(sourceId, sources, teamFilter = 'All', isFantasy = f
         .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text() })
         .then(xml => {
           if (!xml || xml.trim().startsWith('{') || xml.trim().startsWith('<html')) throw new Error('Bad response')
-          const parsed = parseRSS(xml)
+          let parsed = parseRSS(xml)
           if (!parsed.length) throw new Error('No articles')
+          // Same fantasy keyword filter as ESPN — needed here now that
+          // cbs_fant points at the general CBS NFL feed rather than a
+          // dedicated (but no-longer-live) fantasy-only feed.
+          if (isFantasy && src.id === 'cbs' && teamFilter === 'All') {
+            const kws = ['fantasy','injury','questionable','doubtful',' out ','snap','target','waiver','start','sit','projection','handcuff','red zone','practice','limited','ir ','placed on']
+            parsed = parsed.filter(a => kws.some(k => (a.headline+a.desc).toLowerCase().includes(k)))
+          }
           setArticles(parsed)
           setLoading(false)
         })
