@@ -1629,11 +1629,6 @@ function StandingsView() {
         <span className="sb-ct">{loading ? 'Loading…' : seasonLabel()}</span>
       </div>
       {error && <div style={{fontFamily:'monospace',fontSize:10,color:'#8b1a1a',padding:'8px 16px'}}>Standings fetch error: {error}</div>}
-      {!loading && data && (
-        <div style={{fontFamily:'monospace',fontSize:9,color:'#888',padding:'6px 16px',background:'#f5f0e8',wordBreak:'break-all'}}>
-          debug: topKeys={Object.keys(data).join(',')} | children={data.children?.length||0} | sample={JSON.stringify(data.children?.[0]?.standings?.entries?.[0])?.slice(0,300)}
-        </div>
-      )}
       <div className="standings-grid">
         {DIVISIONS.map(([divName, teams]) => (
           <div key={divName} className="div-block">
