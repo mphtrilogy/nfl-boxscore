@@ -399,7 +399,7 @@ function useNFLNews() {
   const [headlines, setHeadlines] = useState([])
 
   useEffect(() => {
-    fetch('/api/espn/news?limit=20')
+    fetch('https://site.api.espn.com/apis/site/v2/sports/football/nfl/news?limit=20')
       .then(r => r.json())
       .then(data => {
         const items = (data.articles || []).map(a => ({
@@ -3546,9 +3546,13 @@ function buildNewsUrl(src, teamFilter, isFantasy) {
       MIN:16,NE:17,NO:18,NYG:19,NYJ:20,PHI:21,PIT:23,SEA:26,SF:25,TB:27,
       TEN:10,WAS:28,
     }
+    // Direct browser fetch — /api/espn/news (server-side proxy) gets
+    // blocked by ESPN with 403, same issue fixed everywhere else on the
+    // site. site.api.espn.com works fine called directly from the browser.
+    const ESPN_NEWS = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/news'
     if (teamFilter !== 'All' && ESPN_IDS[teamFilter])
-      return `/api/espn/news?team=${ESPN_IDS[teamFilter]}&limit=30`
-    return src.type === 'espn-fantasy' ? '/api/espn/news?limit=50' : '/api/espn/news?limit=40'
+      return `${ESPN_NEWS}?team=${ESPN_IDS[teamFilter]}&limit=30`
+    return src.type === 'espn-fantasy' ? `${ESPN_NEWS}?limit=50` : `${ESPN_NEWS}?limit=40`
   }
   if (src.type === 'gnews') {
     if (teamFilter !== 'All') {
@@ -3656,7 +3660,12 @@ function useMultiSourceNews(sourceId, sources, teamFilter = 'All', isFantasy = f
           setLoading(false)
         })
         .catch(() => {
-          setError(`${src.label} unavailable`)
+          const isProxied = src.url?.startsWith('/api/')
+          setError(
+            isProxied
+              ? `${src.label} unavailable — the /api/rss proxy isn't responding. Try ESPN or Google News instead.`
+              : `${src.label} unavailable`
+          )
           setLoading(false)
         })
     }
