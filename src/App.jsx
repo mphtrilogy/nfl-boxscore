@@ -1595,7 +1595,11 @@ function StandingsView() {
       // blocked by ESPN with 403, same issue fixed everywhere else on the
       // site. This endpoint was silently failing and falling back to the
       // hardcoded 0-0-0 defaults below rather than showing real records.
-      fetch('https://site.api.espn.com/apis/site/v2/sports/football/nfl/standings?season=2026')
+      // /apis/site/v2/.../standings returns an empty stub ({fullViewLink})
+      // for some ESPN sports/leagues — confirmed via research this is a
+      // known issue, and NHL specifically documents needing /apis/v2/
+      // instead. Trying that path here since NFL hit the identical stub.
+      fetch('https://site.api.espn.com/apis/v2/sports/football/nfl/standings?season=2026')
         .then(r => {
           if (!r.ok) throw new Error(`ESPN ${r.status}`)
           return r.json()
@@ -5010,7 +5014,7 @@ function useTeamStats(season) {
     // entirely in preseason rather than show broken/empty data.
     if (!isRegularSeason()) { setData([]); setLoading(false); return }
     setLoading(true)
-    fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/standings?season=${season}&seasontype=2`)
+    fetch(`https://site.api.espn.com/apis/v2/sports/football/nfl/standings?season=${season}&seasontype=2`)
       .then(r => r.json())
       .then(d => {
         const teams = []
