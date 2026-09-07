@@ -12,7 +12,13 @@ const FEEDS = {
   // Fantasy
   rotoworld: 'https://www.rotowire.com/football/rss-news.php',
   fp:        'https://www.fantasypros.com/nfl/news/feed.xml',
-  cbs_fant:  'https://www.cbssports.com/rss/headlines/fantasy/football',
+  // No currently-live dedicated CBS fantasy RSS URL could be confirmed —
+  // the old fantasynews.cbssports.com feed references found are from
+  // 2008-2013 era CBS site structure, long since restructured. Point at
+  // the confirmed-working main NFL feed instead, which already carries
+  // plenty of fantasy-relevant content (betting, waiver-style stories);
+  // the app's existing keyword filter narrows it down client-side.
+  cbs_fant:  'https://www.cbssports.com/rss/headlines/nfl',
   espn_fant: 'https://www.espn.com/espn/rss/fantasy/football/news',
 }
 export default async function handler(req) {
