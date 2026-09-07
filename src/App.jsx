@@ -3660,10 +3660,10 @@ function useMultiSourceNews(sourceId, sources, teamFilter = 'All', isFantasy = f
           setLoading(false)
         })
         .catch(() => {
-          const isProxied = src.url?.startsWith('/api/')
+          const isProxied = src.type === 'gnews' || src.url?.startsWith('/api/')
           setError(
             isProxied
-              ? `${src.label} unavailable — the /api/rss proxy isn't responding. Try ESPN or Google News instead.`
+              ? `${src.label} unavailable — its /api proxy isn't responding. Try ESPN News instead.`
               : `${src.label} unavailable`
           )
           setLoading(false)
