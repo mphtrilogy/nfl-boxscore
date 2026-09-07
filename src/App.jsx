@@ -1586,16 +1586,24 @@ function ScheduleGame({ game: g, onTeamClick }) {
 // ── STANDINGS ─────────────────────────────────────────────────────────────────
 // Placeholder — will be replaced with ESPN live standings data
 function StandingsView() {
-  const { data, loading } = (() => {
+  const { data, loading, error } = (() => {
     const [data, setData] = useState(null)
     const [loading, setLoading] = useState(true)
+    const [error, setError] = useState(null)
     useEffect(() => {
-      fetch('/api/espn/standings')
-        .then(r => r.json())
+      // Direct browser fetch — /api/espn/standings (server-side proxy) gets
+      // blocked by ESPN with 403, same issue fixed everywhere else on the
+      // site. This endpoint was silently failing and falling back to the
+      // hardcoded 0-0-0 defaults below rather than showing real records.
+      fetch('https://site.api.espn.com/apis/site/v2/sports/football/nfl/standings?season=2026')
+        .then(r => {
+          if (!r.ok) throw new Error(`ESPN ${r.status}`)
+          return r.json()
+        })
         .then(d => { setData(d); setLoading(false) })
-        .catch(() => setLoading(false))
+        .catch(e => { setError(e.message); setLoading(false) })
     }, [])
-    return { data, loading }
+    return { data, loading, error }
   })()
 
   const DIVISIONS = [
@@ -1616,6 +1624,12 @@ function StandingsView() {
         <div className="sb-rule" />
         <span className="sb-ct">{loading ? 'Loading…' : seasonLabel()}</span>
       </div>
+      {error && <div style={{fontFamily:'monospace',fontSize:10,color:'#8b1a1a',padding:'8px 16px'}}>Standings fetch error: {error}</div>}
+      {!loading && data && (
+        <div style={{fontFamily:'monospace',fontSize:9,color:'#888',padding:'6px 16px',background:'#f5f0e8',wordBreak:'break-all'}}>
+          debug: topKeys={Object.keys(data).join(',')} | children={data.children?.length||0} | sample={JSON.stringify(data.children?.[0]?.standings?.entries?.[0])?.slice(0,300)}
+        </div>
+      )}
       <div className="standings-grid">
         {DIVISIONS.map(([divName, teams]) => (
           <div key={divName} className="div-block">
