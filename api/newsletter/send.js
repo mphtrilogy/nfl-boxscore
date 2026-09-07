@@ -1118,7 +1118,10 @@ function formatOdds(odds) {
 // stats objects directly, no second request needed per team.
 async function fetchStandings() {
   try {
-    const r = await fetch('https://site.api.espn.com/apis/site/v2/sports/football/nfl/standings?season=2026')
+    // /apis/site/v2/.../standings returns an empty stub ({fullViewLink})
+    // for NFL — confirmed live on the site itself. /apis/v2/ (no "site/")
+    // returns the real, fully-resolved standings data instead.
+    const r = await fetch('https://site.api.espn.com/apis/v2/sports/football/nfl/standings?season=2026')
     const data = await r.json()
     const teams = []
     // Response nests conference -> division -> entries, but exact depth
