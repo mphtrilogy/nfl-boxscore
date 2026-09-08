@@ -272,7 +272,16 @@ export default function App() {
             squad={squad}
           />
         )}
-        {activeView === 'Preseason' && <PreseasonView squad={squad} />}
+        {activeView === 'Preseason' && (
+          <div className="leaders-coming-soon">
+            <div className="cs-icon">🏈</div>
+            <div className="cs-title">Preseason wrapped — Week 1 starts Sep 9</div>
+            <div className="cs-text">Regular season box scores, stats, and FW Formula are all live on the Scores tab now.</div>
+            <div className="cta-wrap" style={{textAlign:'center', marginTop:16}}>
+              <button className="tc-btn on" onClick={() => setActiveView('Scores')}>Go to Scores →</button>
+            </div>
+          </div>
+        )}
         {activeView === 'Schedule'  && (
           <ScheduleView
             teamFilter={teamFilter}
