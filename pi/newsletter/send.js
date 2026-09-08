@@ -82,42 +82,132 @@ const STADIUM_COORDS = {
 
 // ── Fantasy HOF data (rotating tidbit for Thu/Fri) ───────────────────────────
 const FANTASY_HOF = [
-  { player:'Alvin Kamara',        pos:'RB', team:'NO',  year:2020, week:16, pts:61.8,
+  // ── All-time single game explosion performances ──
+  { player:'Alvin Kamara',        team:'NO',  pos:'RB', year:2020, week:16, pts:61.8,
     line:'22 rush yds, 6 rush TD · 6 rec, 46 yds',
-    note:'Six rushing TDs on Christmas Day — all-time single-game TD record.' },
-  { player:'Patrick Mahomes',     pos:'QB', team:'KC',  year:2018, week:6,  pts:56.7,
-    line:'6 TD, 478 yds, 0 INT',
-    note:'50 TD season. Youngest QB ever to win MVP at 23.' },
-  { player:'LaDainian Tomlinson', pos:'RB', team:'SD',  year:2006, week:16, pts:55.4,
-    line:'28 car, 193 yds, 3 TD · 4 rec, 57 yds, 1 TD',
-    note:'Greatest fantasy RB season ever — 28 TDs, 1,815 rush yards.' },
-  { player:'Marshall Faulk',      pos:'RB', team:'STL', year:2000, week:15, pts:54.6,
+    note:'Six rushing TDs on Christmas Day — tied the all-time NFL single-game TD record. The greatest fantasy game ever played.' },
+  { player:'Patrick Mahomes',     team:'KC',  pos:'QB', year:2018, week:6,  pts:56.7,
+    line:'478 yds, 6 TD, 0 INT',
+    note:'Part of a historic 50-TD season at age 23. Youngest QB MVP ever. Redefined what a fantasy QB could be.' },
+  { player:'Jamaal Charles',      team:'KC',  pos:'RB', year:2013, week:14, pts:55.2,
+    line:'6 rush TD, 1 rec TD · 195 scrimmage yds',
+    note:'Seven touchdowns in a single game — tied the NFL single-game TD record. The most electric fantasy performance of the 2010s.' },
+  { player:'Marshall Faulk',      team:'STL', pos:'RB', year:2000, week:15, pts:54.6,
     line:'5 TD, 220 scrimmage yds',
-    note:'26 TDs, 2,189 scrimmage yards. The greatest fantasy season ever played.' },
-  { player:'Jamaal Charles',      pos:'RB', team:'KC',  year:2013, week:14, pts:55.2,
-    line:'6 rush TD, 1 rec TD, 195 scrimmage yds',
-    note:'7 touchdowns in a single game — tied the NFL single-game record.' },
-  { player:'Tyreek Hill',         pos:'WR', team:'KC',  year:2020, week:12, pts:50.2,
+    note:'Greatest fantasy season ever — 26 TDs, 2,189 scrimmage yards. The Greatest Show on Turf at its peak.' },
+  { player:'LaDainian Tomlinson', team:'SD',  pos:'RB', year:2006, week:16, pts:55.4,
+    line:'28 car, 193 yds, 3 TD · 4 rec, 57 yds, 1 TD',
+    note:'The greatest fantasy RB season ever — 28 TDs, 1,815 rush yards. The record still stands.' },
+  { player:'Josh Allen',          team:'BUF', pos:'QB', year:2020, week:15, pts:54.1,
+    line:'4 pass TD, 1 rush TD · 375 pass yds',
+    note:'Redefined what a dual-threat fantasy QB could deliver. The ceiling no one had seen before.' },
+  { player:'Tyreek Hill',         team:'KC',  pos:'WR', year:2020, week:12, pts:50.2,
     line:'13 rec, 269 yds, 3 TD',
     note:'269 receiving yards — one of the greatest single-game WR performances in NFL history.' },
-  { player:'Adrian Peterson',     pos:'RB', team:'MIN', year:2012, week:16, pts:50.1,
-    line:'34 car, 212 yds, 2 TD',
-    note:'2,097 rush yards — came within 9 yards of Dickerson\'s all-time record.' },
-  { player:'Josh Allen',          pos:'QB', team:'BUF', year:2020, week:15, pts:54.1,
-    line:'4 pass TD, 1 rush TD, 375 yds',
-    note:'Redefined what a fantasy QB could be. Dual-threat ceiling no one had seen.' },
-  { player:'Calvin Johnson',      pos:'WR', team:'DET', year:2012, week:16, pts:49.3,
-    line:'11 rec, 225 yds, 1 TD',
-    note:'Record 1,964 receiving yards in a season. Megatron at his absolute peak.' },
-  { player:'Jerry Rice',          pos:'WR', team:'SF',  year:1987, week:11, pts:52.0,
-    line:'3 rec TD, 12 rec, 204 yds',
-    note:'22 TD season in a strike-shortened year. The greatest receiver of all time.' },
-  { player:'Randy Moss',          pos:'WR', team:'MIN', year:1998, week:8,  pts:48.7,
-    line:'5 TD, 190 yds, 8 rec',
-    note:'Rookie record 17 TD season. Vikings went 15-1. Nobody saw it coming.' },
-  { player:'Priest Holmes',       pos:'RB', team:'KC',  year:2003, week:8,  pts:53.2,
+  { player:'Priest Holmes',       team:'KC',  pos:'RB', year:2003, week:8,  pts:53.2,
     line:'6 TD, 148 yds',
-    note:'27 TD season — dominated fantasy for three straight years.' },
+    note:'27 TD season — dominated fantasy football for three straight years before injuries derailed him.' },
+  { player:'Adrian Peterson',     team:'MIN', pos:'RB', year:2012, week:16, pts:50.1,
+    line:'34 car, 212 yds, 2 TD',
+    note:'2,097 rush yards — came within 9 yards of Eric Dickerson\'s all-time single-season record.' },
+  { player:'Calvin Johnson',      team:'DET', pos:'WR', year:2012, week:16, pts:49.3,
+    line:'11 rec, 225 yds, 1 TD',
+    note:'Single-season record 1,964 receiving yards. Megatron at his absolute peak, on a team that won 4 games.' },
+  { player:'Jerry Rice',          team:'SF',  pos:'WR', year:1987, week:11, pts:52.0,
+    line:'3 rec TD · 12 rec, 204 yds',
+    note:'22 TD season in a strike-shortened year. The greatest receiver of all time at age 25.' },
+  { player:'Randy Moss',          team:'MIN', pos:'WR', year:1998, week:8,  pts:48.7,
+    line:'5 TD, 190 yds, 8 rec',
+    note:'Rookie record 17 TD season. The Vikings went 15-1 and nobody saw Randy coming.' },
+  // ── Season-long dominance ──
+  { player:'Barry Sanders',       team:'DET', pos:'RB', year:1997, week:14, pts:48.2,
+    line:'23 car, 167 yds, 2 TD',
+    note:'2,358 total yards in 1997. The most elusive runner in NFL history — retired at 30 with 15,269 career rush yards.' },
+  { player:'Emmitt Smith',        team:'DAL', pos:'RB', year:1995, week:12, pts:46.8,
+    line:'25 car, 147 yds, 3 TD',
+    note:'25 TD season — part of a dynasty. All-time NFL rushing record holder at 18,355 yards.' },
+  { player:'Steve Young',         team:'SF',  pos:'QB', year:1994, week:9,  pts:52.4,
+    line:'6 TD, 325 yds, 0 INT',
+    note:'36 TD season, 112.8 passer rating. The year he finally stepped out of Montana\'s shadow.' },
+  { player:'Dan Marino',          team:'MIA', pos:'QB', year:1984, week:12, pts:49.6,
+    line:'5 TD, 422 yds, 0 INT',
+    note:'48 TD passes and 5,084 yards in 1984 — records that stood for 27 years. The greatest arm of his era.' },
+  { player:'Kurt Warner',         team:'STL', pos:'QB', year:1999, week:10, pts:51.3,
+    line:'5 TD, 441 yds, 1 INT',
+    note:'Bagged groceries the year before. Then threw for 4,353 yards and 41 TDs and won the Super Bowl MVP.' },
+  { player:'Peyton Manning',      team:'IND', pos:'QB', year:2004, week:13, pts:53.8,
+    line:'6 TD, 383 yds, 0 INT',
+    note:'49 TD passes in 2004 — a record that stood until Brady broke it. Fantasy QBs didn\'t get this good until Mahomes.' },
+  { player:'Tom Brady',           team:'NE',  pos:'QB', year:2007, week:14, pts:55.1,
+    line:'5 TD, 399 yds, 0 INT',
+    note:'50 TD passes in 2007 — a record at the time. The Patriots went 16-0. The greatest offensive season in NFL history.' },
+  { player:'Aaron Rodgers',       team:'GB',  pos:'QB', year:2011, week:6,  pts:51.4,
+    line:'4 TD, 396 yds, 0 INT',
+    note:'45 TDs, 6 INTs, 122.5 passer rating in 2011. The highest single-season QB rating in NFL history.' },
+  // ── Unforgettable single weeks ──
+  { player:'Shaun Alexander',     team:'SEA', pos:'RB', year:2005, week:10, pts:49.6,
+    line:'27 car, 173 yds, 3 TD',
+    note:'27 TDs and 1,880 rush yards in 2005. The last old-school workhorse RB to win MVP.' },
+  { player:'Clinton Portis',      team:'DEN', pos:'RB', year:2003, week:9,  pts:50.4,
+    line:'22 car, 218 yds, 5 TD',
+    note:'5 rushing TDs in a game. Traded to Washington after the season for Champ Bailey — one of the most shocking deals ever.' },
+  { player:'Chris Johnson',       team:'TEN', pos:'RB', year:2009, week:15, pts:47.8,
+    line:'34 car, 204 yds, 1 TD',
+    note:'2,006 rush yards in 2009 — only the 6th player in NFL history to reach 2,000 in a season.' },
+  { player:'DeMarco Murray',      team:'DAL', pos:'RB', year:2014, week:14, pts:46.3,
+    line:'24 car, 149 yds, 2 TD + 3 rec, 22 yds',
+    note:'1,845 rush yards on the greatest offensive line in the NFL. Every week felt like a lock.' },
+  { player:'Arian Foster',        team:'HOU', pos:'RB', year:2010, week:1,  pts:54.2,
+    line:'33 car, 231 yds, 3 TD · 4 rec, 55 yds, 1 TD',
+    note:'Burst onto the scene with 4 TDs in Week 1 on an undrafted contract. Owned fantasy football for 3 seasons.' },
+  { player:'Terrell Owens',       team:'SF',  pos:'WR', year:2000, week:14, pts:47.1,
+    line:'20 rec, 283 yds, 3 TD',
+    note:'20 receptions for 283 yards in a single game — the famous "Monday Night Miracle" against the Giants.' },
+  { player:'Antonio Brown',       team:'PIT', pos:'WR', year:2014, week:10, pts:48.3,
+    line:'16 rec, 189 yds, 3 TD',
+    note:'The most dominant WR of his era. Three straight seasons of 1,400+ yards during his Pittsburgh prime.' },
+  { player:'Marvin Harrison',     team:'IND', pos:'WR', year:2002, week:13, pts:46.4,
+    line:'11 rec, 172 yds, 2 TD',
+    note:'143 receptions in 2002 — a record that stood for 10 years. The quietest Hall of Famer ever.' },
+  { player:'Rob Gronkowski',      team:'NE',  pos:'TE', year:2011, week:7,  pts:47.6,
+    line:'8 rec, 143 yds, 3 TD',
+    note:'17 TD season in 2011 — the all-time TE record. Changed the position forever. The best TE in NFL history.' },
+  { player:'Tony Gonzalez',       team:'KC',  pos:'TE', year:2004, week:12, pts:43.8,
+    line:'10 rec, 133 yds, 3 TD',
+    note:'1,258 yards and 7 TDs in 2004. The greatest TE of his era — owned the position for a decade before Gronk arrived.' },
+  { player:'Jimmy Graham',        team:'NO',  pos:'TE', year:2011, week:13, pts:45.2,
+    line:'9 rec, 145 yds, 4 TD',
+    note:'The year Jimmy Graham made every team wish they had a receiving TE. 99 catches, 1,310 yards, 11 TDs.' },
+  { player:'Travis Kelce',        team:'KC',  pos:'TE', year:2020, week:12, pts:46.1,
+    line:'10 rec, 159 yds, 3 TD',
+    note:'5 straight 1,000-yard seasons and counting. The most reliable TE in fantasy history.' },
+  { player:'Michael Vick',        team:'ATL', pos:'QB', year:2002, week:11, pts:48.9,
+    line:'2 pass TD, 3 rush TD · 173 rush yds',
+    note:'The original dual-threat fantasy QB. Nobody had seen a QB run like this. Changed the position forever.' },
+  { player:'Cam Newton',          team:'CAR', pos:'QB', year:2015, week:9,  pts:51.2,
+    line:'3 pass TD, 2 rush TD · 271 pass yds, 48 rush yds',
+    note:'35 TD passes plus 10 rushing TDs in 2015 MVP season. Every week was a fantasy bonanza.' },
+  { player:'Lamar Jackson',       team:'BAL', pos:'QB', year:2019, week:12, pts:57.3,
+    line:'5 pass TD, 1 rush TD · 442 total yds',
+    note:'Unanimous MVP with 36 pass TDs and 7 rush TDs. Shattered every QB rushing record ever set.' },
+  { player:'Davante Adams',       team:'GB',  pos:'WR', year:2020, week:14, pts:47.2,
+    line:'10 rec, 173 yds, 3 TD',
+    note:'18 TD season — the most by a WR in a decade. The cleanest route runner in the league.' },
+  { player:'Justin Jefferson',    team:'MIN', pos:'WR', year:2022, week:15, pts:48.9,
+    line:'12 rec, 223 yds, 2 TD',
+    note:'Broke Calvin Johnson\'s receiving yards record in 2022. The new measuring stick for elite WRs.' },
+  { player:'Cooper Kupp',         team:'LA',  pos:'WR', year:2021, week:15, pts:49.4,
+    line:'9 rec, 108 yds, 3 TD',
+    note:'Triple Crown season — most receptions (145), most yards (1,947), most TDs (16). The greatest PPR season ever.' },
+  { player:'Christian McCaffrey', team:'CAR', pos:'RB', year:2019, week:12, pts:52.6,
+    line:'16 car, 108 rush yds, 2 rush TD · 8 rec, 81 yds, 1 TD',
+    note:'2,392 scrimmage yards in 2019 — the first player since Marshall Faulk to top 2,000 in a season.' },
+  { player:'Derrick Henry',       team:'TEN', pos:'RB', year:2020, week:8,  pts:51.8,
+    line:'28 car, 178 yds, 2 TD · 3 rec, 17 yds, 1 TD',
+    note:'2,027 rush yards in 2020 — the 5th player ever to top 2,000. Built like a fullback, runs like a tailback.' },
+  { player:'Frank Gore',          team:'SF',  pos:'RB', year:2006, week:14, pts:44.1,
+    line:'24 car, 212 yds, 2 TD',
+    note:'16,000 career rush yards — the third most in NFL history. Quietly one of the most consistent fantasy RBs of any era.' },
 ]
 
 // ── ESPN API helpers ──────────────────────────────────────────────────────────
@@ -133,10 +223,22 @@ async function espnFetch(path) {
 // Determine week context per send type
 // Monday  → recapWeek = last completed week (all Sunday games)
 // Tuesday → recapWeek = current week (for MNF which just finished)
-// Thu/Fri → currentWeek = this week's games
+// Thu/Fri → currentWeek = this week\'s games
 async function getWeekContext(sendType) {
-  const sb   = await espnFetch('/scoreboard')
-  const week = sb?.week?.number || 1
+  // Compute week from real calendar dates rather than trusting an unscoped
+  // ESPN scoreboard call — sb.week.number with no seasontype/week param is
+  // ambiguous right at the preseason->regular-season boundary (e.g. the day
+  // before kickoff), and was confirmed to return a stale/wrong value there.
+  const now           = new Date()
+  const regularStart  = new Date('2026-09-09T00:00:00-04:00')
+  let week
+  if (now >= regularStart) {
+    week = Math.floor((now - regularStart) / (7*24*60*60*1000)) + 1
+    week = Math.min(Math.max(week, 1), 18)
+  } else {
+    week = 1 // before kickoff — nothing has been played yet
+  }
+
   if (sendType === 'monday') {
     // Sunday games belong to the week that just completed
     return { currentWeek: week, recapWeek: Math.max(1, week - 1) }
@@ -149,8 +251,20 @@ async function getWeekContext(sendType) {
   return { currentWeek: week, recapWeek: null }
 }
 
-async function getWeekEvents(week) {
-  const sb = await espnFetch(`/scoreboard?week=${week}&seasontype=2&limit=20`)
+// Season type helper — mirrors the app\'s espnSeasonType()
+// ESPN: seasontype=1 (preseason Aug 7–Sep 8), seasontype=2 (regular Sep 9+)
+function getSeasonType() {
+  const now            = new Date()
+  const preseasonStart = new Date('2026-08-07T00:00:00-04:00')
+  const regularStart   = new Date('2026-09-09T00:00:00-04:00')
+  if (now >= regularStart)   return 2
+  if (now >= preseasonStart) return 1
+  return 1  // default to preseason during off-season for testing
+}
+
+async function getWeekEvents(week, forceSeasonType = null) {
+  const st = forceSeasonType || getSeasonType()
+  const sb = await espnFetch(`/scoreboard?week=${week}&seasontype=${st}&limit=20`)
   return sb?.events || []
 }
 
@@ -213,16 +327,16 @@ async function fetchGameWeather(homeTeam, gameDate) {
     const tMax  = Math.round(days.temperature_2m_max[i] || 70)
     const code  = days.weather_code[i] || 0
 
-    const condIcon = code <= 1 ? '☀️' : code <= 3 ? '⛅' : code <= 48 ? '🌫️' :
-                     code <= 67 ? '🌧️' : code <= 77 ? '❄️' : '⛈️'
+    const condIcon = code <= 1 ? 'sunny' : code <= 3 ? 'cloudy' : code <= 48 ? 'foggy' :
+                     code <= 67 ? 'rainy' : code <= 77 ? 'snowy' : 'stormy'
 
     // Fantasy impact flags — what actually matters
     const flags = []
-    if (wind >= 25)  flags.push({ icon:'💨', text:`${wind} mph wind — fade pass catchers, WRs/TEs at risk` })
-    if (wind >= 20 && wind < 25) flags.push({ icon:'💨', text:`${wind} mph wind — monitor kickers and deep threats` })
-    if (rain > 0.2)  flags.push({ icon:'🌧️', text:`Rain expected (${rain.toFixed(1)}"`) + ` — favor RBs, fade kickers` })
-    if (tMin < 25)   flags.push({ icon:'🥶', text:`Extreme cold (low ${tMin}°F) — expect run-heavy game plan` })
-    if (tMin < 35 && tMin >= 25) flags.push({ icon:'🌨️', text:`Cold game (low ${tMin}°F) — slight RB boost` })
+    if (wind >= 25)  flags.push({ icon:'wind', text:`${wind} mph wind — fade pass catchers, WRs/TEs at risk` })
+    if (wind >= 20 && wind < 25) flags.push({ icon:'wind', text:`${wind} mph wind — monitor kickers and deep threats` })
+    if (rain > 0.2)  flags.push({ icon:"rain", text:`Rain expected (${rain.toFixed(1)} in) — favor RBs, fade kickers` })
+    if (tMin < 25)   flags.push({ icon:'cold', text:`Extreme cold (low ${tMin}°F) — expect run-heavy game plan` })
+    if (tMin < 35 && tMin >= 25) flags.push({ icon:'snow', text:`Cold game (low ${tMin}°F) — slight RB boost` })
 
     return {
       wind, rain: rain.toFixed(2), tMin, tMax, condIcon,
@@ -499,7 +613,7 @@ body{margin:0;padding:0;background:#f0ebe0;font-family:Georgia,serif}
 `
 
 // ── Scoring mode helper ───────────────────────────────────────────────────────
-// Always use this to get a player's fantasy points — never access .fpts directly
+// Always use this to get a player\'s fantasy points — never access .fpts directly
 // in render functions. mode = 'ppr' | 'std'
 function fp(player, mode) {
   return mode === 'std' ? (player.fpts_std ?? player.fpts) : (player.fpts_ppr ?? player.fpts)
@@ -734,6 +848,79 @@ function renderCondensedGame(g) {
 </div>`
 }
 
+// Compact one-line schedule row for an UPCOMING (not yet played) game —
+// time, network, spread/O-U, weather flag — each hyperlinked to the site.
+// This is the "cull the site into the newsletter" row: same data as the
+// Game Info drawer, condensed to a scannable line.
+function renderScheduleLine(ev, oddsMap, weatherMap, favTeam) {
+  const comp     = ev.competitions?.[0]
+  const home     = comp?.competitors?.find(c => c.homeAway === 'home')
+  const away     = comp?.competitors?.find(c => c.homeAway === 'away')
+  const homeAbbr = home?.team?.abbreviation || '?'
+  const awayAbbr = away?.team?.abbreviation || '?'
+  const tv       = comp?.broadcasts?.[0]?.names?.[0] || ''
+  const kickoff  = ev.date
+    ? new Date(ev.date).toLocaleString('en-US',
+        { weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit' })
+    : 'TBD'
+  const isFav    = favTeam && favTeam !== 'All' && [homeAbbr, awayAbbr].includes(favTeam)
+  const key      = `${awayAbbr}@${homeAbbr}`
+  const odds     = oddsMap?.[key]
+  const oddsStr  = odds ? formatOdds(odds) : ''
+  const wx       = weatherMap?.[homeAbbr]
+  const wxStr    = wx?.flags?.length ? `⚠️ ${wx.flags.map(f=>f.text).join(', ')}` : (wx ? `${wx.tMax}°F` : '')
+  const deepLink = `${SITE_URL}?game=${awayAbbr}-${homeAbbr}`
+  const hl       = isFav ? 'background:rgba(200,168,75,.08);border-left:3px solid rgba(200,168,75,.5);' : 'border-left:3px solid transparent;'
+
+  return `
+<a href="${deepLink}" style="text-decoration:none;display:block">
+<div style="display:table;width:100%;padding:8px 18px;border-bottom:1px solid rgba(42,31,14,.08);box-sizing:border-box;${hl}">
+  <span style="display:table-cell;vertical-align:top;color:#1a1209">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700">${awayAbbr} @ ${homeAbbr}${isFav ? ' ⚡' : ''}</span>
+    ${oddsStr ? `<br><span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6b5f4e">${oddsStr}</span>` : ''}
+  </span>
+  <span style="display:table-cell;text-align:right;vertical-align:top;font-family:'IBM Plex Mono',monospace;font-size:9px;color:#9e9080;white-space:nowrap">
+    ${kickoff}${tv ? `<br><span style="color:#c8a84b">${tv}</span>` : ''}${wxStr ? `<br>${wxStr}` : ''}
+  </span>
+</div>
+</a>`
+}
+
+// Full compact schedule section — fetches odds + weather for all upcoming
+// games in one pass, renders each as a one-line hyperlinked row. This is
+// the "site data culled into the newsletter" section requested for
+// Monday/Tuesday (next week preview) and Thursday/Friday (this weekend).
+async function renderCompactSchedule(events, week, seasonType, favTeam, label, preOddsMap = null) {
+  if (!events?.length) return ''
+  const oddsMap = preOddsMap || await fetchOdds(week, seasonType)
+
+  // Weather only for outdoor stadiums, fetched once per unique home team
+  const outdoorHomeTeams = [...new Set(
+    events
+      .map(ev => ev.competitions?.[0]?.competitors?.find(c => c.homeAway === 'home')?.team?.abbreviation)
+      .filter(t => t && OUTDOOR_STADIUMS.has(t))
+  )]
+  const weatherEntries = await Promise.all(
+    outdoorHomeTeams.map(async t => {
+      const ev = events.find(e => e.competitions?.[0]?.competitors?.find(c => c.homeAway === 'home')?.team?.abbreviation === t)
+      const wx = await fetchGameWeather(t, ev?.date)
+      return [t, wx]
+    })
+  )
+  const weatherMap = Object.fromEntries(weatherEntries.filter(([,wx]) => wx))
+
+  const rows = events.map(ev => renderScheduleLine(ev, oddsMap, weatherMap, favTeam)).join('')
+
+  return `
+<span class="sec-label">🏈 ${label}</span>
+<div style="padding:2px 0">
+  ${rows}
+</div>
+<div class="cta-wrap">
+  <a class="cta" href="${SITE_URL}">Full Schedule &amp; Box Scores &rarr;</a>
+</div>`
+}
+
 // WAIVER WIRE — auto-generated from real box score data
 function renderWaiverSection(parsedGames, nextWeek, squad, mode = 'ppr') {
   const seen       = new Set()
@@ -783,13 +970,34 @@ function renderWaiverSection(parsedGames, nextWeek, squad, mode = 'ppr') {
   return `
 <span class="sec-label">📋 Waiver Wire Targets — Week ${nextWeek}</span>
 ${rows}
-<div class="callout">Claims close Wednesday in most leagues. Lead with your top priority — don't split waiver position across multiple speculative adds.</div>
+<div class="callout">Claims close Wednesday in most leagues. Lead with your top priority — don\'t split waiver position across multiple speculative adds.</div>
 <div class="cta-wrap">
   <a class="cta" href="${SITE_URL}">Full Waiver Analysis &rarr;</a>
 </div>`
 }
 
 // SQUAD SUMMARY — "Your fantasy squad this week"
+// Find the Sunday Night Football game from parsed games + raw events
+function findSNFGame(parsedGames, allEvents) {
+  if (!allEvents?.length || !parsedGames?.length) return null
+  // SNF broadcasts 8:20 PM ET Sunday = UTC 00:20 Monday
+  const snfEvent = allEvents.find(ev => {
+    const d   = new Date(ev.date)
+    const day = d.getUTCDay()
+    const hr  = d.getUTCHours()
+    // Sunday night: UTC day 0 hour >=23, or UTC day 1 hour <= 3
+    return (day === 0 && hr >= 23) || (day === 1 && hr <= 3)
+  })
+  if (!snfEvent) return null
+  const comps    = snfEvent.competitions?.[0]
+  const homeTeam = comps?.competitors?.find(c => c.homeAway === 'home')?.team?.abbreviation || ''
+  const awayTeam = comps?.competitors?.find(c => c.homeAway === 'away')?.team?.abbreviation || ''
+  return parsedGames.find(g => g &&
+    ((g.home.abbr === homeTeam && g.away.abbr === awayTeam) ||
+     (g.home.abbr === awayTeam && g.away.abbr === homeTeam))
+  ) || null
+}
+
 function renderSquadSummary(parsedGames, squad, mode = 'ppr') {
   if (!squad.length) return ''
   const seen      = new Set()
@@ -877,6 +1085,260 @@ async function renderWeatherSection(events) {
 
 // TEAM NEWS — fetches 4 headlines for fav team from ESPN + Google News
 // Called at build time inside buildEmail — runs server-side in the edge function
+// ── ODDS — ESPN odds API (free, no key) ──────────────────────────────────────
+// Returns spread + over/under for upcoming games
+// Uses site.api.espn.com scoreboard (same proven endpoint as the rest of the
+// site) instead of sports.core.api's $ref-chasing pattern, which returns
+// unresolved reference objects rather than full data and needs 2x the
+// requests per game.
+async function fetchOdds(week, seasonType) {
+  const oddsMap = {}
+  try {
+    const r    = await fetch(
+      `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${week}&seasontype=${seasonType}&limit=20`
+    )
+    const data = await r.json()
+    ;(data.events || []).forEach(ev => {
+      const comp = ev.competitions?.[0]
+      const o    = comp?.odds?.[0]
+      if (!o) return
+      const homeTeam = comp.competitors?.find(c => c.homeAway === 'home')?.team?.abbreviation || ''
+      const awayTeam = comp.competitors?.find(c => c.homeAway === 'away')?.team?.abbreviation || ''
+      const key = `${awayTeam}@${homeTeam}`
+      oddsMap[key] = {
+        spread:    o.details    || null,
+        overUnder: o.overUnder  != null ? o.overUnder : null,
+      }
+    })
+  } catch { /* silent */ }
+  return oddsMap
+}
+
+function formatOdds(odds) {
+  if (!odds) return ''
+  const parts = []
+  if (odds.spread) parts.push(odds.spread) // already formatted, e.g. "SEA -3.5"
+  if (odds.overUnder != null) parts.push(`O/U ${odds.overUnder}`)
+  return parts.join(' · ')
+}
+
+// ── INJURIES — notable OUT/Doubtful from ESPN ─────────────────────────────────
+// ── STANDINGS — fav team's current record, division rank, playoff seed ─────
+// Uses site.api.espn.com (same proven-reliable domain as scoreboard/summary)
+// rather than sports.core.api's $ref-chasing pattern used elsewhere for
+// standings in some docs — this endpoint returns fully resolved team +
+// stats objects directly, no second request needed per team.
+async function fetchStandings() {
+  try {
+    // /apis/site/v2/.../standings returns an empty stub ({fullViewLink})
+    // for NFL — confirmed live on the site itself. /apis/v2/ (no "site/")
+    // returns the real, fully-resolved standings data instead.
+    const r = await fetch('https://site.api.espn.com/apis/v2/sports/football/nfl/standings?season=2026')
+    const data = await r.json()
+    const teams = []
+    // Response nests conference -> division -> entries, but exact depth
+    // can vary by ESPN's grouping that season, so walk defensively rather
+    // than assume a fixed number of levels.
+    const walk = (node) => {
+      if (!node) return
+      if (Array.isArray(node.standings?.entries)) {
+        node.standings.entries.forEach(e => {
+          const abbr = e.team?.abbreviation
+          if (!abbr) return
+          const stats = {}
+          ;(e.stats || []).forEach(s => { stats[s.name] = s.value ?? s.displayValue })
+          teams.push({
+            abbr,
+            wins: stats.wins ?? 0,
+            losses: stats.losses ?? 0,
+            ties: stats.ties ?? 0,
+            divisionRank: stats.divisionRank ?? null,
+            playoffSeed: stats.playoffSeed ?? null,
+            gamesBehind: stats.gamesBehind ?? null,
+            streak: stats.streak ?? null,
+            division: node.name || node.abbreviation || '',
+          })
+        })
+      }
+      ;(node.children || []).forEach(walk)
+    }
+    ;(data.children || []).forEach(walk)
+    return teams
+  } catch { return [] }
+}
+
+function ordinal(n) {
+  if (n == null) return ''
+  const s = ['th','st','nd','rd']
+  const v = n % 100
+  return n + (s[(v-20)%10] || s[v] || s[0])
+}
+
+function renderStandingsLine(favTeam, standings) {
+  if (!favTeam || favTeam === 'All' || !standings.length) return ''
+  const team = standings.find(t => t.abbr === favTeam)
+  if (!team) return ''
+
+  const record = `${team.wins}-${team.losses}${team.ties ? `-${team.ties}` : ''}`
+  const divLine = team.divisionRank ? `${ordinal(team.divisionRank)} in ${team.division}` : ''
+  const seedLine = team.playoffSeed ? `#${team.playoffSeed} seed` : (team.divisionRank && team.divisionRank > 1 ? `${ordinal(team.gamesBehind ? Math.ceil(team.gamesBehind) : '')} games back`.replace('th games back','') : '')
+
+  return `
+<div style="background:rgba(200,168,75,.06);border-left:3px solid #c8a84b;padding:10px 18px;font-family:monospace;font-size:11px;color:#1a1209;margin-bottom:2px">
+  <strong style="font-size:15px">${favTeam}</strong> &nbsp; ${record}
+  ${divLine ? `&nbsp;·&nbsp;<span style="color:#6b5f4e">${divLine}</span>` : ''}
+  ${seedLine ? `&nbsp;·&nbsp;<span style="color:#c8a84b">${seedLine}</span>` : ''}
+  ${team.streak ? `<div style="margin-top:3px;font-size:9px;color:#9e9080">${team.streak}</div>` : ''}
+</div>`
+}
+
+// ── PLAYOFF PICTURE — top 7 seeds per conference from the fav team's side ──
+// Same standings data already fetched for the record line above, just
+// grouped and sorted by seed instead of shown as a single team's line.
+function renderPlayoffPicture(favTeam, standings) {
+  if (!standings.length) return ''
+
+  // Infer conference from the division label built during the standings
+  // walk (e.g. "AFC East" -> "AFC") rather than a separate lookup table.
+  const withConf = standings.map(t => ({
+    ...t,
+    conf: t.division?.startsWith('AFC') ? 'AFC' : t.division?.startsWith('NFC') ? 'NFC' : null,
+  })).filter(t => t.conf)
+
+  if (!withConf.length) return ''
+
+  // Which conference to lead with — fav team's, if we have one
+  const favConf = favTeam && favTeam !== 'All'
+    ? withConf.find(t => t.abbr === favTeam)?.conf
+    : null
+  const confOrder = favConf ? [favConf, favConf === 'AFC' ? 'NFC' : 'AFC'] : ['AFC', 'NFC']
+
+  const renderConf = (conf) => {
+    const teams = withConf
+      .filter(t => t.conf === conf && t.playoffSeed)
+      .sort((a, b) => a.playoffSeed - b.playoffSeed)
+      .slice(0, 7)
+    if (!teams.length) return ''
+
+    const rows = teams.map(t => {
+      const isFav = t.abbr === favTeam
+      const isBubble = t.playoffSeed === 7
+      const label = t.playoffSeed <= 4 ? `#${t.playoffSeed} (Div)` : `#${t.playoffSeed} (WC)`
+      return `
+<div style="display:flex;justify-content:space-between;padding:4px 0;${isBubble ? 'border-top:1px dashed rgba(42,31,14,.25);margin-top:2px;padding-top:6px' : ''}">
+  <span style="font-family:monospace;font-size:10.5px;${isFav ? 'font-weight:700;color:#c8a84b' : 'color:#1a1209'}">${label} ${t.abbr}${isFav ? ' ⚡' : ''}</span>
+  <span style="font-family:monospace;font-size:9.5px;color:#9e9080">${t.wins}-${t.losses}${t.ties ? `-${t.ties}` : ''}</span>
+</div>`
+    }).join('')
+
+    return `
+<div style="margin-bottom:10px">
+  <div style="font-family:monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#c8a84b;margin-bottom:4px">${conf} Playoff Picture</div>
+  ${rows}
+</div>`
+  }
+
+  const body = confOrder.map(renderConf).filter(Boolean).join('')
+  if (!body) return ''
+
+  return `
+<span class="sec-label">🏆 If The Season Ended Today</span>
+<div style="padding:8px 18px 4px">
+  ${body}
+  <div style="font-family:monospace;font-size:8px;color:#9e9080;font-style:italic;margin-top:2px">Seeds 1-4 are division winners · 5-7 are wild cards · dashed line = playoff bubble</div>
+</div>`
+}
+
+// ── BYE WEEK — quiet note when the fav team has no game this week ──────────
+function renderByeWeekNote(favTeam, week, weekEvents) {
+  if (!favTeam || favTeam === 'All') return ''
+  const playing = weekEvents.some(ev => {
+    const teams = ev.competitions?.[0]?.competitors?.map(c => c.team?.abbreviation) || []
+    return teams.includes(favTeam)
+  })
+  if (playing) return ''
+  return `
+<div style="background:rgba(107,95,78,.08);border-left:3px solid #9e9080;padding:10px 18px;font-family:monospace;font-size:10px;color:#6b5f4e;margin-bottom:2px">
+  🛋️ ${favTeam} is on bye this week — back in action next week.
+</div>`
+}
+
+async function fetchInjuries(favTeam) {
+  const injuries = []
+  try {
+    // Get league-wide injury report
+    const r    = await fetch(
+      'https://site.api.espn.com/apis/site/v2/sports/football/nfl/injuries?limit=50'
+    )
+    const data = await r.json()
+    const items = data.injuries || []
+
+    // Prioritize fav team, then notable fantasy-relevant injuries
+    items.forEach(teamInj => {
+      const abbr = teamInj.team?.abbreviation || ''
+      ;(teamInj.injuries || []).forEach(inj => {
+        const status = inj.status || ''
+        const pos    = inj.athlete?.position?.abbreviation || ''
+        const name   = inj.athlete?.displayName || ''
+        const detail = inj.shortComment || inj.longComment || ''
+        // Only show skill positions and notable statuses
+        const isSkill  = ['QB','RB','WR','TE'].includes(pos)
+        const isOut    = ['Out','Doubtful','IR'].includes(status)
+        if (isSkill && isOut && name) {
+          injuries.push({ team: abbr, name, pos, status, detail, isFav: abbr === favTeam })
+        }
+      })
+    })
+  } catch { /* silent */ }
+
+  // Sort: fav team first, then by severity
+  const order = { 'IR': 0, 'Out': 1, 'Doubtful': 2 }
+  injuries.sort((a, b) => {
+    if (a.isFav !== b.isFav) return a.isFav ? -1 : 1
+    return (order[a.status] ?? 3) - (order[b.status] ?? 3)
+  })
+
+  return injuries.slice(0, 8)
+}
+
+function renderInjurySection(injuries, favTeam) {
+  if (!injuries?.length) return ''
+
+  const badge = s => {
+    const colors = {
+      'IR':       'background:#1a1209;color:rgba(245,240,232,.6)',
+      'Out':      'background:#8b1a1a;color:#fff',
+      'Doubtful': 'background:rgba(139,90,30,.25);color:#7a4a0e;border:1px solid rgba(139,90,30,.4)',
+    }
+    return `<span style="display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:6.5px;font-weight:700;letter-spacing:.1em;padding:2px 7px;border-radius:2px;margin-right:7px;vertical-align:middle;${colors[s] || ''}">${s.toUpperCase()}</span>`
+  }
+
+  const rows = injuries.map(inj => {
+    const isFav = inj.team === favTeam
+    const hl    = isFav ? 'background:rgba(200,168,75,.05);border-left:3px solid rgba(200,168,75,.5);' : 'border-left:3px solid transparent;'
+    return `
+<tr>
+  <td style="padding:8px 16px;border-bottom:1px solid rgba(42,31,14,.08);${hl}">
+    <div style="margin-bottom:3px">
+      ${badge(inj.status)}
+      <span style="font-family:Georgia,serif;font-size:13px;font-weight:700;color:#1a1209">${inj.name}</span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:8.5px;color:#9e9080;margin-left:6px">${inj.pos} · ${inj.team}</span>
+    </div>
+    ${inj.detail ? `<div style="font-family:'IBM Plex Mono',monospace;font-size:8.5px;color:#6b5f4e;line-height:1.5;padding-left:2px">${inj.detail}</div>` : ''}
+  </td>
+</tr>`
+  }).join('')
+
+  return `
+<span class="sec-label">🏥 Injury Report — Notable Outs &amp; Doubtful</span>
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse">
+  ${rows}
+</table>
+<div class="cta-wrap">
+  <a class="cta" href="https://www.nfl.com/injuries/">Full NFL Injury Report &rarr;</a>
+</div>`
+}
+
 async function fetchTeamNews(favTeam) {
   if (!favTeam || favTeam === 'All') return []
 
@@ -905,7 +1367,7 @@ async function fetchTeamNews(favTeam) {
     }
   } catch { /* silent — fall through to Google News */ }
 
-  // Source 2: Google News RSS via the app's /api/gnews proxy
+  // Source 2: Google News RSS via the app\'s /api/gnews proxy
   // Builds same query as buildNewsUrl() in the app
   try {
     if (articles.length < 4 && info) {
@@ -934,6 +1396,203 @@ async function fetchTeamNews(favTeam) {
   return articles.slice(0, 4)
 }
 
+// ── FW FORMULA TAKE — top risers/fallers, real data, hyperlinked to site ────
+// A lighter version of the site's FW Formula engine: same calcFpts-style
+// scoring on real box scores, scoped to "biggest jump vs. own recent average"
+// rather than the full trend/matchup/usage/weather/momentum blend (that
+// stays a client-side, per-visitor computation on the site itself). This is
+// the same honest signal the Waiver Wire section uses.
+const KNOWN_TES_NL = new Set([
+  'Mark Andrews','Isaiah Likely','Sam LaPorta','Zach Gentry','Cade Stover',
+  'Jonnu Smith','Erick All','Gerald Everett','Luke Farrell','Dalton Schultz',
+  'Brevin Jordan','Will Dissly','Mo Alie-Cox','Chig Okonkwo','Josh Whyle',
+  'Hunter Henry','Austin Hooper','Tyler Higbee','Cole Kmet','Tommy Tremble',
+  'Travis Kelce','Noah Gray','Evan Engram','Brenton Strange','Brock Bowers',
+  'T.J. Hockenson','Luke Musgrave','Jake Ferguson','Juwan Johnson','Cade Otton',
+  'Dallas Goedert','Grant Calcaterra','George Kittle','Trey McBride','Colby Parkinson',
+  'Dalton Kincaid','Theo Johnson','Will Mallory','Elijah Higgins','Zach Ertz',
+])
+
+function nlCalcFpts(vals, cat) {
+  const v = (k) => parseFloat(vals[k] || 0)
+  if (cat === 'passing')   return (v('YDS')/25) + (v('TD')*6) - (v('INT')*2)
+  if (cat === 'rushing')   return (v('YDS')/10) + (v('TD')*6)
+  if (cat === 'receiving') return (v('YDS')/10) + (v('TD')*6) + v('REC') // PPR
+  return 0
+}
+
+async function fetchFWTake(currentWeek, seasonType) {
+  try {
+    const weeks = []
+    for (let w = Math.max(1, currentWeek - 3); w <= currentWeek; w++) weeks.push(w)
+
+    const boards = await Promise.all(
+      weeks.map(w =>
+        fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${w}&seasontype=${seasonType}&limit=20`)
+          .then(r => r.json()).catch(() => ({ events: [] }))
+      )
+    )
+    const gameIds = []
+    boards.forEach((board, i) => {
+      ;(board.events || []).forEach(ev => {
+        if (ev.status?.type?.state === 'post') gameIds.push({ id: ev.id, week: weeks[i] })
+      })
+    })
+    if (!gameIds.length) return null
+
+    const summaries = await Promise.all(
+      gameIds.slice(0, 30).map(g =>
+        fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${g.id}`)
+          .then(r => r.json()).then(d => ({ ...d, _week: g.week })).catch(() => null)
+      )
+    )
+
+    const pmap = {}
+    summaries.filter(Boolean).forEach(summary => {
+      const wk = summary._week
+      ;(summary.boxscore?.players || []).forEach(td => {
+        const team = td.team?.abbreviation || ''
+        ;['passing','rushing','receiving'].forEach(cat => {
+          const sg = td.statistics?.find(s => s.name === cat)
+          if (!sg) return
+          sg.athletes?.forEach(a => {
+            const name = a.athlete?.displayName || ''
+            if (!name) return
+            const rawPos = a.athlete?.position?.abbreviation || ''
+            let pos = rawPos || (cat === 'passing' ? 'QB' : cat === 'rushing' ? 'RB' : 'WR')
+            if (pos === 'WR' && KNOWN_TES_NL.has(name)) pos = 'TE'
+            if (!['QB','RB','WR','TE'].includes(pos)) return
+            const vals = {}
+            sg.labels?.forEach((lbl, i) => { vals[lbl] = a.stats?.[i] || '0' })
+            if (!sg.labels?.some(lbl => parseFloat(vals[lbl]) !== 0)) return
+            const pts = nlCalcFpts(vals, cat)
+            const key = `${name}|${team}`
+            if (!pmap[key]) pmap[key] = { name, team, pos, weekPts: {} }
+            if (pos === 'TE') pmap[key].pos = 'TE'
+            pmap[key].weekPts[wk] = (pmap[key].weekPts[wk] || 0) + pts
+          })
+        })
+      })
+    })
+
+    const scored = Object.values(pmap)
+      .map(p => {
+        const pts = Object.values(p.weekPts)
+        if (pts.length < 1) return null
+        const last1     = pts[pts.length - 1] || 0
+        const seasonAvg = pts.reduce((a,b)=>a+b,0) / pts.length
+        if (last1 < 8) return null // meaningful floor, not noise
+        return { ...p, last1, seasonAvg, delta: last1 - seasonAvg }
+      })
+      .filter(Boolean)
+
+    const risers  = scored.filter(p => p.delta > 0).sort((a,b) => b.delta - a.delta).slice(0, 3)
+    const fallers = scored.filter(p => p.seasonAvg >= 8 && p.delta < 0).sort((a,b) => a.delta - b.delta).slice(0, 3)
+
+    return { risers, fallers }
+  } catch { return null }
+}
+
+function renderFWTakeSection(take) {
+  if (!take || (!take.risers.length && !take.fallers.length)) return ''
+
+  const rowHtml = (p, isRiser) => `
+<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(42,31,14,.06)">
+  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#1a1209">
+    ${isRiser ? '🔥' : '❄️'} <strong>${p.name}</strong> <span style="color:#9e9080">${p.pos} · ${p.team}</span>
+  </span>
+  <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:${isRiser ? '#1a5c1a' : '#8b1a1a'}">
+    ${p.last1.toFixed(1)} last gm ${isRiser?'▲':'▼'} vs ${p.seasonAvg.toFixed(1)} avg
+  </span>
+</div>`
+
+  return `
+<span class="sec-label">⚡ FW Formula — Risers &amp; Fallers</span>
+<div style="padding:6px 18px 4px">
+  ${take.risers.length ? `<div style="font-family:'IBM Plex Mono',monospace;font-size:8px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#c8a84b;margin:6px 0 2px">Trending Up</div>${take.risers.map(p=>rowHtml(p,true)).join('')}` : ''}
+  ${take.fallers.length ? `<div style="font-family:'IBM Plex Mono',monospace;font-size:8px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#8b1a1a;margin:10px 0 2px">Trending Down</div>${take.fallers.map(p=>rowHtml(p,false)).join('')}` : ''}
+</div>
+<div class="cta-wrap">
+  <a class="cta" href="${SITE_URL}?tab=fantasy&view=fw">See Full FW Formula Rankings &rarr;</a>
+</div>`
+}
+
+// ── LEAGUE NEWS — Top 5 NFL stories circulating right now ─────────────────
+async function fetchLeagueNews() {
+  const articles = []
+  try {
+    // ESPN general NFL news — most viewed/recent
+    const r    = await fetch('https://site.api.espn.com/apis/site/v2/sports/football/nfl/news?limit=8')
+    const data = await r.json()
+    ;(data.articles || []).forEach(a => {
+      if (articles.length >= 5) return
+      const title = a.headline || ''
+      if (!title) return
+      articles.push({
+        title,
+        source:    a.byline || 'ESPN',
+        url:       a.links?.web?.href || 'https://www.espn.com/nfl/',
+        time:      a.published
+          ? new Date(a.published).toLocaleDateString('en-US',
+              { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' })
+          : '',
+        category:  a.categories?.find(c => c.type === 'topic')?.description || '',
+      })
+    })
+  } catch { /* silent */ }
+
+  // Fallback: Google News RSS for general NFL
+  if (articles.length < 3) {
+    try {
+      const r   = await fetch(`${SITE_URL}/api/gnews?q=NFL+football+2026`)
+      const xml = await r.text()
+      const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)]
+      items.forEach(match => {
+        if (articles.length >= 5) return
+        const item   = match[1]
+        const title  = (item.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/) ||
+                        item.match(/<title>(.*?)<\/title>/))?.[1]?.trim() || ''
+        const link   = item.match(/<link>(.*?)<\/link>/)?.[1]?.trim() || ''
+        const source = item.match(/<source[^>]*>(.*?)<\/source>/)?.[1]?.trim() || 'Google News'
+        const pub    = item.match(/<pubDate>(.*?)<\/pubDate>/)?.[1]?.trim() || ''
+        if (title && link && !title.toLowerCase().includes('advertisement')) {
+          articles.push({ title, source, url: link, time: pub, category: '' })
+        }
+      })
+    } catch { /* silent */ }
+  }
+
+  return articles.slice(0, 5)
+}
+
+function renderLeagueNewsSection(articles) {
+  if (!articles?.length) return ''
+  const rows = articles.map((a, i) => `
+<div style="padding:8px 0;border-bottom:1px solid rgba(42,31,14,.08)">
+  <div style="font-family:monospace;font-size:7.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#8b1a1a;margin-bottom:3px">
+    ${String(i + 1).padStart(2,'0')} ${a.category ? `· ${a.category}` : ''}
+  </div>
+  <a href="${a.url}" target="_blank" rel="noopener"
+     style="font-family:Georgia,serif;font-size:13px;font-weight:600;color:#1a1209;text-decoration:none;line-height:1.4;display:block">
+    ${a.title}
+  </a>
+  <div style="font-family:monospace;font-size:8px;color:#9e9080;margin-top:3px;letter-spacing:.04em">
+    ${a.source}${a.time ? ` &nbsp;&middot;&nbsp; ${a.time}` : ''}
+  </div>
+</div>`).join('')
+
+  return `
+<span class="sec-label">📰 Around the NFL — Top Stories</span>
+<div style="padding:4px 18px 12px">
+  ${rows}
+</div>
+<div style="text-align:center;padding:6px 0 12px">
+  <a href="https://nflboxscore.com" style="font-family:monospace;font-size:8px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#c8a84b;text-decoration:none">
+    More NFL News at nflboxscore.com →
+  </a>
+</div>`
+}
+
 function renderTeamNewsSection(articles, favTeam) {
   if (!articles?.length || !favTeam || favTeam === 'All') return ''
   const info = TEAM_INFO[favTeam]
@@ -960,11 +1619,134 @@ function renderTeamNewsSection(articles, favTeam) {
 </div>`
 }
 
-// HOF TIDBIT — rotating by week number so it changes each week
-function renderHOFTidbit(weekNum) {
-  const idx  = (weekNum - 1) % FANTASY_HOF.length
-  const legend = FANTASY_HOF[idx]
+// HOF TIDBIT — varies by week AND day so Thu/Fri sends show different legends
 
+// ── What If? Fantasy HOF — pre-fantasy era legends ───────────────────────────
+const FANTASY_WHATIF = [
+  {
+    player:'Gale Sayers', team:'CHI', pos:'RB', year:1965,
+    game:'Week 10 vs SF · Dec 12, 1965', pts_ppr:56.0, pts_std:44.0,
+    line:'9 rush TD, 113 rush yds · 1 rec TD, 89 yds, 2 rec · 1 punt return TD',
+    note:'Six touchdowns in a single game — Papa Bear Halas called it the greatest performance he\'d ever seen. On a muddy Wrigley Field.',
+    whatif:true,
+  },
+  {
+    player:'Jim Brown', team:'CLE', pos:'RB', year:1963,
+    game:'Season Average · 1963', pts_ppr:38.4, pts_std:36.4,
+    line:'1,863 rush yds, 12 TD in 14 games — 133 rush yds/game',
+    note:'5.2 yards per carry for his entire career. Retired at 29 at his absolute peak. Nine seasons, nine Pro Bowls, never missed a game.',
+    whatif:true,
+  },
+  {
+    player:'Joe Namath', team:'NYJ', pos:'QB', year:1967,
+    game:'Best Week · 1967', pts_ppr:44.8, pts_std:44.8,
+    line:'496 yds, 3 TD, 0 INT',
+    note:'First QB ever to throw for 4,000 yards in a season. In 1967 alone he had 4 games with 400+ yards — 40 years before anyone was keeping score.',
+    whatif:true,
+  },
+  {
+    player:'Frank Gifford', team:'NYG', pos:'RB/WR', year:1956,
+    game:'1956 NFL MVP Season · Best Game', pts_ppr:41.2, pts_std:36.2,
+    line:'19 car, 123 yds, 2 rush TD · 5 rec, 76 yds, 1 rec TD',
+    note:'The original flex player — ran, caught, even threw passes. In today\'s PPR world he\'d be the most valuable hybrid back in the game.',
+    whatif:true,
+  },
+  {
+    player:'Johnny Unitas', team:'BAL', pos:'QB', year:1959,
+    game:'Consecutive TD streak · Best Week', pts_ppr:51.2, pts_std:51.2,
+    line:'6 TD, 374 yds, 0 INT',
+    note:'TD pass in 47 consecutive games — a record that stood 52 years. Cut by the Steelers before becoming the greatest QB of his era.',
+    whatif:true,
+  },
+  {
+    player:'Walter Payton', team:'CHI', pos:'RB', year:1977,
+    game:'Week 7 vs MIN · Nov 20, 1977', pts_ppr:49.4, pts_std:46.4,
+    line:'40 car, 275 yds, 1 TD · 3 rec, 26 yds',
+    note:'275 yards on 40 carries — the single-game rushing record at the time. On frozen ground. Against a playoff defense. Sweetness at his peak.',
+    whatif:true,
+  },
+  {
+    player:'O.J. Simpson', team:'BUF', pos:'RB', year:1973,
+    game:'Season Finale vs NYJ · Dec 16, 1973', pts_ppr:47.6, pts_std:44.6,
+    line:'34 car, 200 yds, 1 TD · 3 rec, 18 yds',
+    note:'First player ever to break 2,000 rush yards in a season. Did it entirely on his own, on the Bills, with no supporting weapons.',
+    whatif:true,
+  },
+  {
+    player:'Don Hutson', team:'GB', pos:'WR', year:1942,
+    game:'1942 Season · Best Game', pts_ppr:44.8, pts_std:36.8,
+    line:'9 rec, 88 yds, 4 TD',
+    note:'Scored 17 TDs in 1942 — more than his closest competitor scored in their entire career. The original dominant WR, 30 years before PPR existed.',
+    whatif:true,
+  },
+  {
+    player:'Lance Alworth', team:'SD', pos:'WR', year:1965,
+    game:'1965 Season · Best Game', pts_ppr:46.3, pts_std:38.3,
+    line:'9 rec, 123 yds, 3 TD',
+    note:'Caught a pass in 96 consecutive games. Seven straight 1,000-yard seasons when 1,000 yards was nearly impossible. Bambi would have been a first-rounder every year.',
+    whatif:true,
+  },
+  {
+    player:'Bronko Nagurski', team:'CHI', pos:'RB', year:1934,
+    game:'1934 NFL Championship Game', pts_ppr:38.0, pts_std:36.0,
+    line:'25 car, 124 yds, 2 TD · 2 rec, 16 yds',
+    note:'Once scored a TD by running through the end zone wall into the stands — reportedly told the ref "that last guy hit pretty hard." The original physical specimen.',
+    whatif:true,
+  },
+  {
+    player:'Paul Hornung', team:'GB', pos:'RB/K', year:1960,
+    game:'1960 Season · 176 pts scored', pts_ppr:43.6, pts_std:40.6,
+    line:'2 rush TD, 88 yds · 3 rec, 34 yds, 1 rec TD · 2 FG, 4 XP',
+    note:'176 points in the 1960 season — a record that stood 46 years. Scored as a RB AND kicker. The original dual-position fantasy nightmare.',
+    whatif:true,
+  },
+  {
+    player:'Dick "Night Train" Lane', team:'LA', pos:'CB', year:1952,
+    game:'Rookie Season 1952', pts_ppr:0, pts_std:0,
+    line:'14 interceptions — the all-time single-season NFL record',
+    note:'Set the all-time INT record as a ROOKIE in a 12-game season. Walked in off the street with his Army discharge papers. The record still stands 70+ years later.',
+    whatif:true,
+  },
+]
+
+// Merged pool: modern HOF + What If legends, tagged for rendering
+const ALL_HOF = [
+  ...FANTASY_HOF.map(l => ({ ...l, whatif:false })),
+  ...FANTASY_WHATIF,
+]
+
+function renderHOFTidbit(weekNum, sendType) {
+  const dayOffset = { thursday:0, friday:7, monday:14, tuesday:21 }[sendType] || 0
+  // During off-season (week 1 stuck), use day-of-year for variety
+  // Once season starts week numbers increment naturally
+  const now = new Date()
+  const start = new Date(now.getFullYear(), 0, 0)
+  const dayOfYear = Math.floor((now - start) / (1000 * 60 * 60 * 24))
+  const rotator = weekNum > 1 ? (weekNum - 1) * 7 : dayOfYear
+  const idx = (rotator + dayOffset) % ALL_HOF.length
+  const legend = ALL_HOF[idx]
+
+  if (legend.whatif) {
+    // What If? card — pre-fantasy era legend
+    return `
+<span class="sec-label">⏰ What If? Fantasy Football — Pre-Fantasy Era Legend</span>
+<div class="hof">
+  <div class="hof-label" style="color:rgba(200,168,75,.6);font-size:9px;letter-spacing:.18em">PRE-FANTASY ERA · ${legend.year}</div>
+  <div class="hof-player">${legend.player}</div>
+  <div class="hof-meta">${legend.pos} &nbsp;&middot;&nbsp; ${legend.team} &nbsp;&middot;&nbsp; ${legend.game}</div>
+  <div style="margin-top:10px">
+    <span class="hof-pts">${legend.pts_ppr}</span>
+    <div class="hof-pts-lbl">pts PPR &nbsp;/&nbsp; ${legend.pts_std} STD &nbsp;&middot;&nbsp; <em>estimated if played today</em></div>
+  </div>
+  <div class="hof-line">${legend.line}</div>
+  <div class="hof-note">${legend.note}</div>
+  <div style="margin-top:8px;font-family:'IBM Plex Mono',monospace;font-size:8px;color:rgba(200,168,75,.4);letter-spacing:.08em">
+    What would this performance have scored in a modern PPR league?
+  </div>
+</div>`
+  }
+
+  // Standard modern HOF card
   return `
 <span class="sec-label">⚡ Fantasy Hall of Fame — This Week in History</span>
 <div class="hof">
@@ -1009,9 +1791,19 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
 
   let html = shell(SUBJECTS[sendType], dateStr, dispWeek, LABELS[sendType], mode)
 
-  // Fetch team news once — used in all four send types
-  const teamNews     = await fetchTeamNews(favTeam)
-  const teamNewsHTML = renderTeamNewsSection(teamNews, favTeam)
+  // Fetch team news, league news, injuries, FW Take, and standings in parallel
+  const [teamNews, leagueNews, injuries, fwTake, standings] = await Promise.all([
+    fetchTeamNews(favTeam),
+    fetchLeagueNews(),
+    fetchInjuries(favTeam),
+    fetchFWTake(currentWeek, getSeasonType()),
+    fetchStandings(),
+  ])
+  const teamNewsHTML    = renderTeamNewsSection(teamNews, favTeam)
+  const leagueNewsHTML  = renderLeagueNewsSection(leagueNews)
+  const injuryHTML      = renderInjurySection(injuries, favTeam)
+  const fwTakeHTML      = renderFWTakeSection(fwTake)
+  const standingsHTML   = renderStandingsLine(favTeam, standings)
 
   // ── MONDAY: All Sunday games ──────────────────────────────────────────────
   if (sendType === 'monday') {
@@ -1026,22 +1818,50 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
         const won = favGame.winner === favTeam
         html += `<span class="sec-label">⚡ ${favTeam} — ${won ? '✅ WIN' : '❌ LOSS'}</span>`
         html += renderFullGame(favGame, squad, mode)
+        html += standingsHTML
+      } else {
+        html += renderByeWeekNote(favTeam, recapWeek, recapEvents)
+        html += standingsHTML
+      }
+
+      // SNF featured game (if different from fav team game)
+      const snfGame = findSNFGame(parsedGames, recapEvents)
+      if (snfGame && snfGame !== favGame) {
+        html += `<span class="sec-label">🌙 Sunday Night Football — Featured Game</span>`
+        html += renderFullGame(snfGame, squad, mode)
       }
 
       // All other games condensed
       const others = parsedGames.filter(g =>
-        g && g.home.abbr !== favTeam && g.away.abbr !== favTeam)
+        g && g !== favGame && g !== snfGame)
       if (others.length) {
         html += `<span class="sec-label">🏈 Sunday Results — Week ${recapWeek}</span>`
         others.forEach(g => { html += renderCondensedGame(g) })
       }
     } else {
-      // All Teams: every game condensed
-      html += `<span class="sec-label">🏈 Sunday Results — Week ${recapWeek} — All Games</span>`
-      parsedGames.forEach(g => { html += renderCondensedGame(g) })
+      // All Teams subscriber — show SNF featured, rest condensed
+      const snfGame = findSNFGame(parsedGames, recapEvents)
+      if (snfGame) {
+        html += `<span class="sec-label">🌙 Sunday Night Football — Featured Game</span>`
+        html += renderFullGame(snfGame, squad, mode)
+      }
+      const others = parsedGames.filter(g => g && g !== snfGame)
+      html += `<span class="sec-label">🏈 Sunday Results — Week ${recapWeek}</span>`
+      others.forEach(g => { html += renderCondensedGame(g) })
     }
 
     html += teamNewsHTML
+    html += leagueNewsHTML
+    html += fwTakeHTML
+
+    // Week ahead — compact schedule preview with odds/weather as they post
+    const nextWeekEvents = await getWeekEvents(currentWeek + 1, 2)
+    if (nextWeekEvents.length) {
+      html += await renderCompactSchedule(nextWeekEvents, currentWeek + 1, 2, favTeam, `Week ${currentWeek + 1} — Coming Up`)
+    }
+
+    html += renderPlayoffPicture(favTeam, standings)
+    html += injuryHTML
     html += renderWaiverSection(parsedGames, currentWeek, squad, mode)
   }
 
@@ -1062,12 +1882,26 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
 
     html += renderSquadSummary(parsedGames, squad, mode)
     html += teamNewsHTML
+    html += leagueNewsHTML
+    html += fwTakeHTML
+
+    // Rest of the week ahead — compact schedule. Always regular season here:
+    // the newsletter's Tue/Thu/Fri sends are inherently about the regular
+    // season week, even on a send date that technically falls just before
+    // kickoff (getSeasonType() would otherwise still say "preseason").
+    const restOfWeekEvents = await getWeekEvents(currentWeek, 2)
+    const upcomingEvents = restOfWeekEvents.filter(ev => !ev.status?.type?.completed)
+    if (upcomingEvents.length) {
+      html += await renderCompactSchedule(upcomingEvents, currentWeek, 2, favTeam, `Rest of Week ${currentWeek}`)
+    }
+
+    html += injuryHTML
     html += renderWaiverSection(parsedGames, currentWeek, squad, mode)
   }
 
   // ── THURSDAY: No recap — preview + HOF ───────────────────────────────────
   else if (sendType === 'thursday') {
-    // TNF game preview
+    // TNF game preview — now with network, odds, and weather
     const tnf = allEvents.find(ev => new Date(ev.date).getDay() === 4)
     if (tnf) {
       const comps    = tnf.competitions?.[0]
@@ -1078,12 +1912,20 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
       const kickoff  = new Date(tnf.date).toLocaleTimeString('en-US',
         {hour:'numeric', minute:'2-digit', timeZoneName:'short'})
       const venue    = comps?.venue?.fullName || ''
+      const tv       = comps?.broadcasts?.[0]?.names?.[0] || ''
       const isFavTNF = hasFav && [homeAbbr, awayAbbr].includes(favTeam)
+
+      const tnfOddsMap = await fetchOdds(currentWeek, getSeasonType())
+      const tnfOdds    = tnfOddsMap[`${awayAbbr}@${homeAbbr}`]
+      const oddsLine   = tnfOdds ? formatOdds(tnfOdds) : ''
+      const tnfWx      = OUTDOOR_STADIUMS.has(homeAbbr) ? await fetchGameWeather(homeAbbr, tnf.date) : null
 
       html += `<span class="sec-label">📺 Tonight — Thursday Night Football</span>
 <div class="hof" style="padding:16px 18px">
   <div style="font-family:Georgia,serif;font-size:24px;font-weight:700;color:#c8a84b">${awayAbbr} @ ${homeAbbr}${isFavTNF?' ⚡':''}</div>
-  <div style="font-family:monospace;font-size:9px;color:rgba(255,255,255,.4);margin-top:5px;letter-spacing:.08em">${kickoff}${venue?` &nbsp;&middot;&nbsp; ${venue}`:''}</div>
+  <div style="font-family:monospace;font-size:9px;color:rgba(255,255,255,.4);margin-top:5px;letter-spacing:.08em">${kickoff}${tv?` &nbsp;&middot;&nbsp; ${tv}`:''}${venue?` &nbsp;&middot;&nbsp; ${venue}`:''}</div>
+  ${oddsLine ? `<div style="font-family:monospace;font-size:9px;color:#c8a84b;margin-top:6px;letter-spacing:.06em">${oddsLine}</div>` : ''}
+  ${tnfWx ? `<div style="font-family:monospace;font-size:9px;color:rgba(255,255,255,.5);margin-top:4px">${tnfWx.summary}</div>` : ''}
   <div style="margin-top:10px;font-family:monospace;font-size:9px;color:rgba(255,255,255,.55);line-height:1.6">Start your players before kickoff. Check nflboxscore.com for FW Formula scores &amp; injury updates.</div>
   <div style="text-align:center;margin-top:12px">
     <a class="cta" href="${SITE_URL}" style="font-size:8px">Live Scores Tonight &rarr;</a>
@@ -1102,67 +1944,91 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
   <a class="cta" href="${SITE_URL}">FW Formula Scores &rarr;</a>
 </div>`
 
-    html += renderHOFTidbit(currentWeek)
+    html += renderHOFTidbit(currentWeek, sendType)
     html += teamNewsHTML
+    html += leagueNewsHTML
+    html += fwTakeHTML
+    html += injuryHTML
   }
 
-  // ── FRIDAY: TNF box score + schedule + weather + HOF ─────────────────────
+  // ── FRIDAY: TNF recap + fav team preview + odds + weather + injuries ───────
   else if (sendType === 'friday') {
-    // TNF box score from last night
+    // 1. TNF box score from last night (always full treatment)
     if (parsedGames.length) {
       const tnfGame  = parsedGames[0]
       const isFavTNF = hasFav &&
         (tnfGame?.home.abbr === favTeam || tnfGame?.away.abbr === favTeam)
-
       html += `<span class="sec-label">📺 Thursday Night Football — Final</span>`
       html += isFavTNF
         ? renderFullGame(tnfGame, squad, mode)
         : renderCondensedGame(tnfGame)
     }
 
-    // Weekend schedule
-    const upcoming = allEvents.filter(ev => !ev.status?.type?.completed)
+    // 2. Fetch odds once for the weekend — reused by both the fav-team
+    // highlight card below and the compact schedule, avoiding a duplicate
+    // fetch of the same data.
+    const oddsMap = await fetchOdds(currentWeek, getSeasonType())
+
+    // 3. Weekend schedule with odds inline
+    const upcoming = currentEvents.filter(ev => !ev.status?.type?.completed)
     if (upcoming.length) {
-      html += `<span class="sec-label">🏈 This Weekend — Week ${currentWeek} Schedule</span>`
-      html += `<div style="padding:4px 0 6px">`
-      upcoming.slice(0, 14).forEach(ev => {
-        const comps    = ev.competitions?.[0]
-        const home     = comps?.competitors?.find(c => c.homeAway === 'home')
-        const away     = comps?.competitors?.find(c => c.homeAway === 'away')
-        const homeAbbr = home?.team?.abbreviation || '?'
-        const awayAbbr = away?.team?.abbreviation || '?'
-        const tv       = comps?.broadcasts?.[0]?.names?.[0] || ''
-        const kickoff  = ev.date
-          ? new Date(ev.date).toLocaleString('en-US',
-              {weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit'})
-          : ''
-        const isFavGame = hasFav && [homeAbbr, awayAbbr].includes(favTeam)
-        const hl = isFavGame ? 'background:rgba(200,168,75,.05);' : ''
-        html += `
-<div style="display:table;width:100%;padding:6px 18px;border-bottom:1px solid rgba(42,31,14,.08);box-sizing:border-box;${hl}">
-  <span style="display:table-cell;font-family:monospace;font-size:10px;font-weight:700;color:#1a1209">${awayAbbr} @ ${homeAbbr}${isFavGame?' ⚡':''}</span>
-  <span style="display:table-cell;text-align:right;font-family:monospace;font-size:9px;color:#9e9080">${kickoff}${tv?` &nbsp;&middot;&nbsp; <span style="color:#c8a84b">${tv}</span>`:''}</span>
+      // Fav team's game — highlighted separately if they play Sunday
+      if (hasFav) {
+        const favWeekend = upcoming.find(ev => {
+          const comps = ev.competitions?.[0]
+          const teams = comps?.competitors?.map(c => c.team?.abbreviation) || []
+          return teams.includes(favTeam)
+        })
+        if (favWeekend) {
+          const comps    = favWeekend.competitions?.[0]
+          const home     = comps?.competitors?.find(c => c.homeAway === 'home')
+          const away     = comps?.competitors?.find(c => c.homeAway === 'away')
+          const homeAbbr = home?.team?.abbreviation || '?'
+          const awayAbbr = away?.team?.abbreviation || '?'
+          const tv       = comps?.broadcasts?.[0]?.names?.[0] || ''
+          const kickoff  = favWeekend.date
+            ? new Date(favWeekend.date).toLocaleString('en-US',
+                { weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit' })
+            : ''
+          const key  = `${awayAbbr}@${homeAbbr}`
+          const odds = oddsMap[key]
+          const oddsStr = odds ? formatOdds(odds) : ''
+          html += `
+<span class="sec-label">⚡ ${favTeam} — This Sunday</span>
+<div style="background:rgba(200,168,75,.06);border-left:3px solid #c8a84b;padding:10px 18px;font-family:monospace;font-size:11px;color:#1a1209">
+  <strong style="font-size:14px">${awayAbbr} @ ${homeAbbr}</strong>
+  &nbsp;&nbsp;<span style="color:#9e9080">${kickoff}</span>
+  ${tv ? `&nbsp;·&nbsp;<span style="color:#c8a84b">${tv}</span>` : ''}
+  ${oddsStr ? `<div style="margin-top:5px;font-size:9px;color:#6b5f4e;letter-spacing:.06em">${oddsStr}</div>` : ''}
 </div>`
-      })
-      html += `</div>
-<div class="cta-wrap">
-  <a class="cta" href="${SITE_URL}">Full TV Guide &rarr;</a>
-</div>`
+          html += standingsHTML
+        } else {
+          html += renderByeWeekNote(favTeam, currentWeek, upcoming)
+          html += standingsHTML
+        }
+      }
+
+      // Full weekend slate — reusable compact schedule. Pass the already-
+      // fetched oddsMap in via a pre-fetched-odds variant so it doesn't
+      // re-request the same data internally.
+      html += await renderCompactSchedule(upcoming, currentWeek, getSeasonType(), favTeam, `Week ${currentWeek} — Full Schedule & Lines`, oddsMap)
     }
 
-    // Weather flags
-    html += await renderWeatherSection(upcoming)
+    html += renderPlayoffPicture(favTeam, standings)
 
-    // Start/Sit tease
+    // 4. Start/Sit
     html += `
 <span class="sec-label">⚖️ Start / Sit — Week ${currentWeek}</span>
-<div class="callout">Lineups lock Sunday morning. Check the FW Formula for updated Start/Sit scores — injury news and weather are baked in automatically.</div>
+<div class="callout">Lineups lock Sunday morning. The FW Formula scores every rostered player 0–10 using recent trend, matchup difficulty, usage data, and weather — auto-updated every page load.</div>
 <div class="cta-wrap">
   <a class="cta" href="${SITE_URL}">FW Formula Scores &rarr;</a>
 </div>`
 
-    html += renderHOFTidbit(currentWeek)
+    html += renderHOFTidbit(currentWeek, sendType)
     html += teamNewsHTML
+    html += leagueNewsHTML
+    html += fwTakeHTML
+    html += injuryHTML
   }
 
   html += foot(email)
@@ -1231,7 +2097,7 @@ export default async function handler(req) {
 
     // 3. Identify which games to deep-fetch (completed since last night)
     const targetEvents  = getTargetEvents(
-      sendType === 'tuesday' ? recapEvents :  // MNF = current week's final game
+      sendType === 'tuesday' ? recapEvents :  // MNF = current week\'s final game
       sendType === 'friday'  ? currentEvents : // TNF = current week Thursday game
       recapEvents,
       sendType
