@@ -183,7 +183,7 @@ export default function App() {
         <div className="mob-drawer-section-label">MAIN</div>
         {[
           { view:'Scores',    icon:'🏈', label:'Scores'    },
-          { view:'Preseason', icon:'🏟️', label:'Preseason' },
+          { view:'Preseason', icon:'🏟️', label:'Preseason Archive' },
           { view:'Schedule',  icon:'📅', label:'Schedule'  },
           { view:'Standings', icon:'🏆', label:'Standings' },
           { view:'TV Guide',  icon:'📺', label:'TV Guide'  },
@@ -272,16 +272,7 @@ export default function App() {
             squad={squad}
           />
         )}
-        {activeView === 'Preseason' && (
-          <div className="leaders-coming-soon">
-            <div className="cs-icon">🏈</div>
-            <div className="cs-title">Preseason wrapped — Week 1 starts Sep 9</div>
-            <div className="cs-text">Regular season box scores, stats, and FW Formula are all live on the Scores tab now.</div>
-            <div className="cta-wrap" style={{textAlign:'center', marginTop:16}}>
-              <button className="tc-btn on" onClick={() => setActiveView('Scores')}>Go to Scores →</button>
-            </div>
-          </div>
-        )}
+        {activeView === 'Preseason' && <PreseasonArchiveView />}
         {activeView === 'Schedule'  && (
           <ScheduleView
             teamFilter={teamFilter}
@@ -794,6 +785,213 @@ function PlayerLink({ name, espnId, onScout }) {
         <a href={pfrUrl}  target="_blank" rel="noopener noreferrer" className="player-ref-btn">PFR</a>
       </span>
     </span>
+  )
+}
+
+// ── PRESEASON ARCHIVE ─────────────────────────────────────────────────────
+// 2026 preseason box scores, browsable after the fact. Rebuilt from the
+// original live PreseasonView — same direct-browser ESPN fetch pattern,
+// same box score drawer (kicking/TE/position fixes all still apply since
+// this reuses BoxScoreDrawer/PlayerStats/etc. unchanged). Framed as an
+// archive, not a current-week view, since preseason is over once the
+// regular season starts — but the data stays reachable for trend research.
+function PreseasonArchiveView() {
+  const [week,     setWeek]     = useState(1)
+  const [games,    setGames]    = useState([])
+  const [loading,  setLoading]  = useState(false)
+  const [openId,   setOpenId]   = useState(null)
+  const [boxData,  setBoxData]  = useState({})
+  const [boxLoad,  setBoxLoad]  = useState({})
+
+  const WEEKS = [1, 2, 3, 4]
+  const WEEK_DATES = {
+    1: 'Hall of Fame + Aug 7–11, 2026',
+    2: 'Aug 13–15, 2026',
+    3: 'Aug 20–23, 2026',
+    4: 'Aug 27–29, 2026',
+  }
+
+  useEffect(() => {
+    setLoading(true)
+    setGames([])
+    setOpenId(null)
+
+    const parseGames = (data) => (data.events || []).map(ev => {
+      const comp = ev.competitions?.[0]
+      const home = comp?.competitors?.find(c => c.homeAway === 'home')
+      const away = comp?.competitors?.find(c => c.homeAway === 'away')
+      if (!home || !away) return null
+      const status = ev.status?.type?.state
+      const isFinal = status === 'post'
+      const isLive  = status === 'in'
+      const d = new Date(ev.date)
+      return {
+        id:        ev.id,
+        home:      home.team?.abbreviation || '',
+        away:      away.team?.abbreviation || '',
+        homeName:  home.team?.displayName || '',
+        awayName:  away.team?.displayName || '',
+        homeScore: isFinal || isLive ? parseInt(home.score) || 0 : null,
+        awayScore: isFinal || isLive ? parseInt(away.score) || 0 : null,
+        status:    isFinal ? 'final' : isLive ? 'live' : 'upcoming',
+        statusDetail: ev.status?.type?.detail || '',
+        time:      d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' }),
+        day:       d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }),
+        network:   comp?.broadcasts?.[0]?.names?.[0] || '',
+        note:      comp?.notes?.[0]?.headline || '',
+      }
+    }).filter(Boolean)
+
+    // Direct browser fetch — ESPN blocks the server-side proxy with 403,
+    // confirmed working pattern for every live-data feature on the site.
+    fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${week}&seasontype=1&limit=20`)
+      .then(r => r.json())
+      .then(data => { setGames(parseGames(data)); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [week])
+
+  const toggleGame = (id) => {
+    if (openId === id) { setOpenId(null); return }
+    setOpenId(id)
+    if (boxData[id]) return
+    setBoxLoad(b => ({ ...b, [id]: true }))
+    fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${id}`)
+      .then(r => r.json())
+      .then(d => {
+        setBoxData(b => ({ ...b, [id]: d }))
+        setBoxLoad(b => ({ ...b, [id]: false }))
+      })
+      .catch(() => setBoxLoad(b => ({ ...b, [id]: false })))
+  }
+
+  return (
+    <div>
+      <div className="section-bar">
+        <h2>2026 Preseason Archive</h2>
+        <div className="sb-rule" />
+        <span className="sb-ct">Real box scores · Hall of Fame + Weeks 1–4 · For trend research</span>
+      </div>
+
+      <div className="fw-data-banner" style={{borderLeftColor:'#6b5f4e'}}>
+        <span className="fw-data-banner-icon">📼</span>
+        <span className="fw-data-banner-text">
+          Archived — the 2026 preseason has concluded. These are the real, final box scores from August, kept browsable for depth-chart and trend research all season.
+        </span>
+      </div>
+
+      {/* Week selector */}
+      <div className="week-selector">
+        <div className="week-label-row">
+          <span className="ws-label">Week</span>
+          <div className="ws-pills">
+            {WEEKS.map(w => (
+              <button key={w} className={`ws-btn ${week === w ? 'on' : ''}`}
+                onClick={() => setWeek(w)}>PS{w}</button>
+            ))}
+          </div>
+        </div>
+        <div className="week-meta-bar">
+          <span className="wm-label">Preseason Week {week}</span>
+          <span className="wm-dates">{WEEK_DATES[week]}</span>
+        </div>
+      </div>
+
+      {/* Games */}
+      {loading && (
+        <div className="leaders-coming-soon">
+          <div className="cs-icon">🏈</div>
+          <div className="cs-title">Loading archived box scores…</div>
+        </div>
+      )}
+
+      {!loading && games.length === 0 && (
+        <div className="leaders-coming-soon">
+          <div className="cs-icon">📅</div>
+          <div className="cs-title">No games found for Preseason Week {week}</div>
+          <div className="cs-text">Try another week — the Hall of Fame Game and Weeks 1–4 are all archived.</div>
+        </div>
+      )}
+
+      <div className="games-grid">
+        {games.map(g => {
+          const isOpen   = openId === g.id
+          const isFinal  = g.status === 'final'
+          const homeWin  = isFinal && g.homeScore > g.awayScore
+          const awayWin  = isFinal && g.awayScore > g.homeScore
+          const box      = boxData[g.id]
+          const boxLoading = boxLoad[g.id]
+          const periods  = box ? (box.header?.competitions?.[0]?.competitors || []) : []
+          const awayPeriods = periods.find(c => c.homeAway === 'away')?.linescores || []
+          const homePeriods = periods.find(c => c.homeAway === 'home')?.linescores || []
+          const qLabels  = awayPeriods.map((_, i) => i < 4 ? `Q${i+1}` : 'OT')
+
+          return (
+            <div key={g.id} className="game-card featured">
+              <div className="card-head">
+                {g.note && <div className="card-note">{g.note}</div>}
+
+                {isFinal && qLabels.length > 0 ? (
+                  <table className="ls-table">
+                    <thead>
+                      <tr>
+                        <th className="lt-team"></th>
+                        {qLabels.map((q,i) => <th key={i}>{q}</th>)}
+                        <th className="lt-total">T</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className={awayWin ? 'lwin' : ''}>
+                        <td className="lt-team">{g.away}</td>
+                        {awayPeriods.map((p,i) => <td key={i}>{p.value ?? 0}</td>)}
+                        <td className="lt-total">{g.awayScore}</td>
+                      </tr>
+                      <tr className={homeWin ? 'lwin' : ''}>
+                        <td className="lt-team">{g.home}</td>
+                        {homePeriods.map((p,i) => <td key={i}>{p.value ?? 0}</td>)}
+                        <td className="lt-total">{g.homeScore}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="matchup">
+                    <div className={`team-row ${awayWin ? 'winner' : isFinal ? 'loser' : ''}`}>
+                      <span className="team-abv">{g.away}</span>
+                      <span className="team-score">{g.awayScore ?? '–'}</span>
+                    </div>
+                    <div className={`team-row ${homeWin ? 'winner' : isFinal ? 'loser' : ''}`}>
+                      <span className="team-abv">{g.home}</span>
+                      <span className="team-score">{g.homeScore ?? '–'}</span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="card-status-row">
+                  <span className={`card-status ${isFinal ? 'final' : ''}`}>
+                    {isFinal ? 'FINAL' : `${g.day} · ${g.time}`}
+                  </span>
+                  {g.network && <span className="card-network">{g.network}</span>}
+                </div>
+
+                {isFinal && (
+                  <button className="card-toggle-hint" onClick={() => toggleGame(g.id)}>
+                    {isOpen ? '▲ Hide Box Score' : '▼ Full Box Score'}
+                  </button>
+                )}
+              </div>
+
+              {isOpen && (
+                <div className="drawer">
+                  {boxLoading && <div className="drawer-loading">Loading box score…</div>}
+                  {!boxLoading && box && (
+                    <BoxScoreDrawer espnData={box} loading={false} game={{ home: g.home, away: g.away }} />
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
