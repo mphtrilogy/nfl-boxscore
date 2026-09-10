@@ -193,6 +193,11 @@ body::before {
   animation: fadeUp .35s ease both;
 }
 .game-card:hover, .game-card.open { background: var(--paper-mid); }
+/* An open card's box score drawer needs full width for its data tables —
+   auto-fill can create 2+ columns at various viewport widths (not just the
+   tablet breakpoint), squeezing an expanded drawer into a narrow column
+   and cutting off tabs/columns like Receiving, Defense, Kicking. */
+.games-grid .game-card.open { grid-column: 1 / -1; }
 @keyframes fadeUp { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } }
 
 .card-head { padding: 12px 14px 6px; cursor: pointer; }
@@ -246,7 +251,7 @@ body::before {
 .drawer-loading { padding: 20px; text-align: center; font-family: var(--font-mono); font-size: 10px; color: var(--muted-lt); }
 
 /* Box score drawer */
-.drawer-tabs { display: flex; overflow-x: auto; border-bottom: 1px solid var(--rule); background: var(--paper-dark); scrollbar-width: none; }
+.drawer-tabs { display: flex; overflow-x: auto; -webkit-overflow-scrolling: touch; border-bottom: 1px solid var(--rule); background: var(--paper-dark); scrollbar-width: none; }
 .drawer-tabs::-webkit-scrollbar { display: none; }
 .dtab {
   font-family: var(--font-mono); font-size: 9px; letter-spacing:.1em; text-transform: uppercase;
