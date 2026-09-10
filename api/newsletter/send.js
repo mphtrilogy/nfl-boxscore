@@ -225,8 +225,20 @@ async function espnFetch(path) {
 // Tuesday → recapWeek = current week (for MNF which just finished)
 // Thu/Fri → currentWeek = this week\'s games
 async function getWeekContext(sendType) {
-  const sb   = await espnFetch('/scoreboard')
-  const week = sb?.week?.number || 1
+  // Compute week from real calendar dates rather than trusting an unscoped
+  // ESPN scoreboard call — sb.week.number with no seasontype/week param is
+  // ambiguous right at the preseason->regular-season boundary (e.g. the day
+  // before kickoff), and was confirmed to return a stale/wrong value there.
+  const now           = new Date()
+  const regularStart  = new Date('2026-09-09T00:00:00-04:00')
+  let week
+  if (now >= regularStart) {
+    week = Math.floor((now - regularStart) / (7*24*60*60*1000)) + 1
+    week = Math.min(Math.max(week, 1), 18)
+  } else {
+    week = 1 // before kickoff — nothing has been played yet
+  }
+
   if (sendType === 'monday') {
     // Sunday games belong to the week that just completed
     return { currentWeek: week, recapWeek: Math.max(1, week - 1) }
@@ -250,8 +262,8 @@ function getSeasonType() {
   return 1  // default to preseason during off-season for testing
 }
 
-async function getWeekEvents(week) {
-  const st = getSeasonType()
+async function getWeekEvents(week, forceSeasonType = null) {
+  const st = forceSeasonType || getSeasonType()
   const sb = await espnFetch(`/scoreboard?week=${week}&seasontype=${st}&limit=20`)
   return sb?.events || []
 }
@@ -1843,9 +1855,9 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
     html += fwTakeHTML
 
     // Week ahead — compact schedule preview with odds/weather as they post
-    const nextWeekEvents = await getWeekEvents(currentWeek + 1)
+    const nextWeekEvents = await getWeekEvents(currentWeek + 1, 2)
     if (nextWeekEvents.length) {
-      html += await renderCompactSchedule(nextWeekEvents, currentWeek + 1, getSeasonType(), favTeam, `Week ${currentWeek + 1} — Coming Up`)
+      html += await renderCompactSchedule(nextWeekEvents, currentWeek + 1, 2, favTeam, `Week ${currentWeek + 1} — Coming Up`)
     }
 
     html += renderPlayoffPicture(favTeam, standings)
@@ -1868,26 +1880,61 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
         : renderCondensedGame(mnfGame)
     }
 
-    html += renderSquadSummary(parsedGames, squad, mode)
     html += teamNewsHTML
     html += leagueNewsHTML
-    html += fwTakeHTML
 
-    // Rest of the week ahead — compact schedule
-    const restOfWeekEvents = await getWeekEvents(currentWeek)
+    // Rest of the week ahead — compact schedule. Always regular season here:
+    // the newsletter's Tue/Thu/Fri sends are inherently about the regular
+    // season week, even on a send date that technically falls just before
+    // kickoff (getSeasonType() would otherwise still say "preseason").
+    const restOfWeekEvents = await getWeekEvents(currentWeek, 2)
     const upcomingEvents = restOfWeekEvents.filter(ev => !ev.status?.type?.completed)
     if (upcomingEvents.length) {
-      html += await renderCompactSchedule(upcomingEvents, currentWeek, getSeasonType(), favTeam, `Rest of Week ${currentWeek}`)
+      html += await renderCompactSchedule(upcomingEvents, currentWeek, 2, favTeam, `Rest of Week ${currentWeek}`)
     }
 
+    // Fantasy content — pushed toward the bottom, games and news lead
+    html += renderSquadSummary(parsedGames, squad, mode)
+    html += fwTakeHTML
     html += injuryHTML
     html += renderWaiverSection(parsedGames, currentWeek, squad, mode)
   }
 
   // ── THURSDAY: No recap — preview + HOF ───────────────────────────────────
   else if (sendType === 'thursday') {
-    // TNF game preview — now with network, odds, and weather
-    const tnf = allEvents.find(ev => new Date(ev.date).getDay() === 4)
+    // Scan for ANY completed game already played this week before tonight —
+    // not just a hardcoded assumption of "only Thursday exists mid-week".
+    // Catches things like a Wednesday season-opener/kickoff game, which the
+    // schedule can genuinely include (e.g. Week 1's NFL Kickoff Game).
+    const alreadyPlayed = allEvents.filter(ev => ev.status?.type?.completed)
+    if (alreadyPlayed.length) {
+      for (const ev of alreadyPlayed) {
+        const comps    = ev.competitions?.[0]
+        const home     = comps?.competitors?.find(c => c.homeAway === 'home')
+        const away     = comps?.competitors?.find(c => c.homeAway === 'away')
+        const homeAbbr = home?.team?.abbreviation || '?'
+        const awayAbbr = away?.team?.abbreviation || '?'
+        const homeScore = home?.score ?? '-'
+        const awayScore = away?.score ?? '-'
+        const dayLabel  = new Date(ev.date).toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long' })
+        const isFavGame = hasFav && [homeAbbr, awayAbbr].includes(favTeam)
+
+        html += `<span class="sec-label">🏈 ${dayLabel} Night — Final</span>
+<div style="padding:10px 18px;font-family:monospace;font-size:11px;color:#1a1209;border-bottom:1px solid rgba(42,31,14,.08)">
+  <strong>${awayAbbr} ${awayScore} @ ${homeAbbr} ${homeScore}</strong>${isFavGame ? ' ⚡' : ''}
+</div>`
+      }
+    }
+
+    // TNF game preview — now with network, odds, and weather.
+    // Vercel functions run in UTC (confirmed), so an 8:15 PM ET Thursday
+    // kickoff is past midnight UTC — new Date(ev.date).getDay() would
+    // return Friday (5), not Thursday (4), silently failing this lookup.
+    // Convert to US Eastern before checking the day of week instead.
+    const tnf = allEvents.find(ev => {
+      const etDay = new Date(ev.date).toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'short' })
+      return etDay === 'Thu'
+    })
     if (tnf) {
       const comps    = tnf.competitions?.[0]
       const home     = comps?.competitors?.find(c => c.homeAway === 'home')
@@ -1918,7 +1965,21 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
 </div>`
     }
 
-    // Start/Sit callout
+    // Rest of the weekend — always show the upcoming compact schedule,
+    // same as every other send. This was previously missing from Thursday.
+    const remainingEvents = allEvents.filter(ev => !ev.status?.type?.completed && ev !== tnf)
+    if (remainingEvents.length) {
+      html += await renderCompactSchedule(remainingEvents, currentWeek, 2, favTeam, `Rest of Week ${currentWeek}`)
+    }
+
+    // Real game context first — league news, team news — before any
+    // fantasy content. Games/storylines lead, fantasy trails.
+    html += teamNewsHTML
+    html += leagueNewsHTML
+    html += renderHOFTidbit(currentWeek, sendType)
+
+    // Start/Sit + FW Formula — now positioned after game context, not
+    // immediately following the TNF card.
     html += `
 <span class="sec-label">⚖️ Start / Sit — Week ${currentWeek}</span>
 <div class="callout">
@@ -1928,11 +1989,9 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
 <div class="cta-wrap">
   <a class="cta" href="${SITE_URL}">FW Formula Scores &rarr;</a>
 </div>`
-
-    html += renderHOFTidbit(currentWeek, sendType)
-    html += teamNewsHTML
-    html += leagueNewsHTML
     html += fwTakeHTML
+
+    // Injuries last
     html += injuryHTML
   }
 
