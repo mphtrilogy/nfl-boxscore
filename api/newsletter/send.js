@@ -1867,6 +1867,9 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
 
   // ── TUESDAY: MNF game only ────────────────────────────────────────────────
   else if (sendType === 'tuesday') {
+    // Tuesday's job is purely "what happened Monday night" — the full
+    // Sunday recap (including the fav team, if they played Sunday) is
+    // already owned entirely by Monday's send. No need to repeat it here.
     if (!parsedGames.length) {
       html += `<div style="padding:20px 18px;font-family:monospace;font-size:10px;color:#6b5f4e">No completed Monday Night game found yet — check nflboxscore.com for live scores.</div>`
     } else {
