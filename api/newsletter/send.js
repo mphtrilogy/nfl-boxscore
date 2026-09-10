@@ -1807,9 +1807,6 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
 
   // ── MONDAY: All Sunday games ──────────────────────────────────────────────
   if (sendType === 'monday') {
-    // Squad summary first if applicable
-    html += renderSquadSummary(parsedGames, squad, mode)
-
     if (hasFav) {
       const favGame = parsedGames.find(g =>
         g && (g.home.abbr === favTeam || g.away.abbr === favTeam))
@@ -1852,7 +1849,6 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
 
     html += teamNewsHTML
     html += leagueNewsHTML
-    html += fwTakeHTML
 
     // Week ahead — compact schedule preview with odds/weather as they post
     const nextWeekEvents = await getWeekEvents(currentWeek + 1, 2)
@@ -1862,6 +1858,10 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
 
     html += renderPlayoffPicture(favTeam, standings)
     html += injuryHTML
+
+    // Fantasy content — pushed toward the bottom, games and news lead
+    html += renderSquadSummary(parsedGames, squad, mode)
+    html += fwTakeHTML
     html += renderWaiverSection(parsedGames, currentWeek, squad, mode)
   }
 
