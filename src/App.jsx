@@ -289,7 +289,7 @@ export default function App() {
         {activeView === 'Standings' && <StandingsView />}
         {activeView === 'TV Guide'  && <TVGuideView currentWeek={activeWeek} />}
         {activeView === 'News'      && <NewsView teamFilter={newsTeam} setTeamFilter={setNewsTeam} />}
-        {activeView === 'Injuries'  && <InjuriesView />}
+        {activeView === 'Injuries'  && <InjuriesView onScout={(name) => { setScoutPlayer(name); setActiveView('Scout') }} />}
         {activeView === 'Leaders'   && (
           <LeadersView tab={leadersTab} setTab={setLeadersTab} />
         )}
@@ -4021,7 +4021,7 @@ function NewsView({ teamFilter, setTeamFilter }) {
   )
 }
 
-function InjuriesView() {
+function InjuriesView({ onScout }) {
   const [injuries, setInjuries]   = useState({})
   const [loading,  setLoading]    = useState(false)
   const [teamFilter, setTeamFilter] = useState('All')
@@ -4207,7 +4207,7 @@ function InjuriesView() {
                       const sc = STATUS_COLORS[inj.status] || { bg: '#555', text: '#fff' }
                       return (
                         <tr key={i}>
-                          <td className="it-name">{inj.name}</td>
+                          <td className="it-name"><PlayerLink name={inj.name} onScout={onScout} /></td>
                           <td className="it-pos">{inj.pos}</td>
                           <td className="it-detail">{inj.side ? `${inj.side} ` : ''}{inj.type || inj.detail}</td>
                           <td>
