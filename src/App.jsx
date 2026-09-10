@@ -633,7 +633,21 @@ function ScoresView({ week, games, loading, error, openCardId, setOpenCardId, ac
 
 // ── GAME CARD ─────────────────────────────────────────────────────────────────
 function GameCard({ game: g, isOpen, onToggle, index, squad }) {
-  const { data: boxData, loading: boxLoading } = useBoxScore(isOpen ? g.espnId : null)
+  // Direct browser fetch — bypasses the shared useBoxScore hook from
+  // useESPN.js, which still calls the server-side /api/espn/summary proxy
+  // that ESPN blocks with 403. Same proven pattern used everywhere else
+  // (Preseason Archive, FW Formula, Stats) — confirmed working when
+  // ScoringPlays/TeamStats/etc. show real data instead of "not available".
+  const [boxData, setBoxData] = useState(null)
+  const [boxLoading, setBoxLoading] = useState(false)
+  useEffect(() => {
+    if (!isOpen || !g.espnId) return
+    setBoxLoading(true)
+    fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${g.espnId}`)
+      .then(r => r.json())
+      .then(d => { setBoxData(d); setBoxLoading(false) })
+      .catch(() => setBoxLoading(false))
+  }, [isOpen, g.espnId])
 
   const isFinal    = g.status === 'final'
   const isLive     = g.status === 'live'
