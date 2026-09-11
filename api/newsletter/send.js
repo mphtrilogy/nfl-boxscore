@@ -2017,7 +2017,7 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
     const oddsMap = await fetchOdds(currentWeek, getSeasonType())
 
     // 3. Weekend schedule with odds inline
-    const upcoming = currentEvents.filter(ev => !ev.status?.type?.completed)
+    const upcoming = allEvents.filter(ev => !ev.status?.type?.completed)
     if (upcoming.length) {
       // Fav team's game — highlighted separately if they play Sunday
       if (hasFav) {
