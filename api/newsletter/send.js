@@ -2231,7 +2231,21 @@ export default async function handler(req) {
     return new Response(JSON.stringify({
       ok: true, type: sendType, week: currentWeek,
       gamesProcessed: parsedGames.length, sent, errors,
-      ...(debugMode ? { errorDetails } : {}),
+      ...(debugMode ? {
+        errorDetails,
+        diag: {
+          currentEventsCount: currentEvents.length,
+          recapEventsCount: recapEvents.length,
+          targetEventsCount: targetEvents.length,
+          currentEventsSample: currentEvents.slice(0, 3).map(ev => ({
+            id: ev.id,
+            date: ev.date,
+            completed: ev.status?.type?.completed,
+            state: ev.status?.type?.state,
+            teams: ev.competitions?.[0]?.competitors?.map(c => c.team?.abbreviation),
+          })),
+        },
+      } : {}),
     }), { headers: { 'Content-Type': 'application/json' } })
 
   } catch (err) {
