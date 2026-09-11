@@ -4052,20 +4052,25 @@ function InjuriesView({ onScout }) {
       // season — the actual limitation is that it only has data for teams
       // whose games have been played, which is an ESPN constraint, not a
       // bug. Widened to the full season-to-date so it captures every
-      // completed game, not just the last couple weeks.
+      // Pull from BOTH preseason and regular season games, not just
+      // whichever season type is "current." A week ago (still preseason),
+      // every team had 3-4 preseason games' worth of injury data — that
+      // coverage shouldn't vanish the moment regular season starts. A
+      // player injured in the preseason can still be a relevant Out/
+      // Doubtful designation now.
       const ESPN = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl'
-      const seasonType = isPreseason() ? 1 : 2
       const currentWk  = getAutoWeek()
-      const weeks = []
-      if (isPreseason()) {
-        for (let w = 1; w <= Math.min(currentWk, 4); w++) weeks.push(w)
-      } else {
-        for (let w = 1; w <= currentWk; w++) weeks.push(w)
+      const fetchJobs = []
+      // Preseason weeks 1-4, always included for background injury context
+      for (let w = 1; w <= 4; w++) fetchJobs.push({ week: w, seasonType: 1 })
+      // Regular season weeks played so far, if we're past kickoff
+      if (isRegularSeason()) {
+        for (let w = 1; w <= currentWk; w++) fetchJobs.push({ week: w, seasonType: 2 })
       }
 
       const boards = await Promise.all(
-        weeks.map(w =>
-          fetch(`${ESPN}/scoreboard?week=${w}&seasontype=${seasonType}&limit=20`)
+        fetchJobs.map(({ week, seasonType }) =>
+          fetch(`${ESPN}/scoreboard?week=${week}&seasontype=${seasonType}&limit=20`)
             .then(r => r.json()).catch(() => ({ events: [] }))
         )
       )
@@ -4075,7 +4080,7 @@ function InjuriesView({ onScout }) {
       }))
 
       const summaries = await Promise.all(
-        gameIds.slice(0, 40).map(id =>
+        gameIds.slice(0, 60).map(id =>
           fetch(`${ESPN}/summary?event=${id}`).then(r => r.json()).catch(() => null)
         )
       )
