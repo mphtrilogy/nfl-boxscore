@@ -2169,6 +2169,7 @@ export default async function handler(req) {
 
     // 7. Send emails in batches of 10
     let sent = 0, errors = 0
+    const errorDetails = []
 
     for (let i = 0; i < subscribers.length; i += 10) {
       const batch = subscribers.slice(i, i + 10)
@@ -2203,11 +2204,14 @@ export default async function handler(req) {
             }).catch(() => {})
           } else {
             errors++
-            console.error(`Resend error for ${sub.email}:`, await r.text())
+            const detail = await r.text()
+            console.error(`Resend error for ${sub.email}:`, detail)
+            errorDetails.push({ email: sub.email, stage: 'resend', status: r.status, detail: detail.slice(0, 500) })
           }
         } catch (e) {
           errors++
           console.error(`Exception sending to ${sub.email}:`, e)
+          errorDetails.push({ email: sub.email, stage: 'buildEmail_or_exception', message: e.message, stack: e.stack?.slice(0, 800) })
         }
       }))
       // Brief pause between batches — respect Resend rate limits
@@ -2223,9 +2227,11 @@ export default async function handler(req) {
       `Games: ${parsedGames.length} | Sent: ${sent} | Errors: ${errors}`
     )
 
+    const debugMode = url.searchParams.get('debug') === '1'
     return new Response(JSON.stringify({
       ok: true, type: sendType, week: currentWeek,
       gamesProcessed: parsedGames.length, sent, errors,
+      ...(debugMode ? { errorDetails } : {}),
     }), { headers: { 'Content-Type': 'application/json' } })
 
   } catch (err) {
