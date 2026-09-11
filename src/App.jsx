@@ -4045,60 +4045,71 @@ function InjuriesView({ onScout }) {
   async function fetchAllInjuries() {
     setLoading(true)
     try {
-      // Real per-team injuries endpoint — works for every team all season,
-      // whether or not they've played yet. The previous approach only
-      // scraped injuries out of completed games' box scores, which meant
-      // teams that hadn't played a game yet never showed up at all (e.g.
-      // only the Week 1 opener's two teams showing on kickoff week).
+      // Reverted: ?enable=injuries was confirmed NOT to work — a live debug
+      // check showed ESPN's real response has no injuries field at all
+      // (teamKeys had 19 fields, none of them injuries). Back to
+      // summary.injuries, which was verified with real data earlier this
+      // season — the actual limitation is that it only has data for teams
+      // whose games have been played, which is an ESPN constraint, not a
+      // bug. Widened to the full season-to-date so it captures every
+      // completed game, not just the last couple weeks.
       const ESPN = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl'
-      // Confirmed-correct ESPN team IDs — matches the map already proven
-      // working for the News feature's team filter (no ID collisions).
-      const TEAM_IDS = {
-        ARI:22,ATL:1, BAL:33,BUF:2, CAR:29,CHI:3, CIN:4, CLE:5,
-        DAL:6, DEN:7, DET:8, GB:9,  HOU:34,IND:11,JAC:30,KC:12,
-        LA:14, LAC:24,LV:13, MIA:15,MIN:16,NE:17, NO:18, NYG:19,
-        NYJ:20,PHI:21,PIT:23,SEA:26,SF:25, TB:27, TEN:10,WAS:28,
+      const seasonType = isPreseason() ? 1 : 2
+      const currentWk  = getAutoWeek()
+      const weeks = []
+      if (isPreseason()) {
+        for (let w = 1; w <= Math.min(currentWk, 4); w++) weeks.push(w)
+      } else {
+        for (let w = 1; w <= currentWk; w++) weeks.push(w)
       }
 
-      const results = await Promise.all(
-        Object.entries(TEAM_IDS).map(([abbr, id]) =>
-          fetch(`${ESPN}/teams/${id}?enable=injuries`)
-            .then(r => r.json())
-            .then(data => ({ abbr, injuries: data?.team?.injuries || [], raw: data }))
-            .catch(() => ({ abbr, injuries: [], raw: null }))
+      const boards = await Promise.all(
+        weeks.map(w =>
+          fetch(`${ESPN}/scoreboard?week=${w}&seasontype=${seasonType}&limit=20`)
+            .then(r => r.json()).catch(() => ({ events: [] }))
+        )
+      )
+      const gameIds = []
+      boards.forEach(b => (b.events || []).forEach(ev => {
+        if (ev.status?.type?.state === 'post') gameIds.push(ev.id)
+      }))
+
+      const summaries = await Promise.all(
+        gameIds.slice(0, 40).map(id =>
+          fetch(`${ESPN}/summary?event=${id}`).then(r => r.json()).catch(() => null)
         )
       )
 
-      // Temporary debug — verify the real response shape before fully
-      // trusting this new endpoint (same discipline used for every other
-      // ESPN endpoint fixed this session).
-      const sample = results.find(r => r.injuries.length > 0) || results[0]
-      console.log('Injuries debug:', {
-        abbr: sample?.abbr,
-        injuriesFound: sample?.injuries?.length || 0,
-        topLevelKeys: sample?.raw ? Object.keys(sample.raw) : 'fetch failed',
-        teamKeys: sample?.raw?.team ? Object.keys(sample.raw.team) : 'no team key',
-        totalTeamsWithInjuries: results.filter(r => r.injuries.length > 0).length,
+      const byTeam = {}
+      summaries.filter(Boolean).forEach(summary => {
+        ;(summary.injuries || []).forEach(teamInj => {
+          const abbr = teamInj.team?.abbreviation || ''
+          if (!abbr) return
+          if (!byTeam[abbr]) byTeam[abbr] = {}
+          ;(teamInj.injuries || []).forEach(inj => {
+            const name = inj.athlete?.displayName || ''
+            if (!name) return
+            // Dedup by name — later games overwrite with more current status
+            byTeam[abbr][name] = {
+              name,
+              pos:    inj.athlete?.position?.abbreviation || '—',
+              status: inj.status || inj.type?.description || '—',
+              detail: inj.details?.detail || inj.shortComment || inj.longComment || '',
+              side:   inj.details?.side || '',
+              type:   inj.details?.type || '',
+              date:   inj.date ? new Date(inj.date).toLocaleDateString('en-US', {month:'short', day:'numeric'}) : '',
+            }
+          })
+        })
       })
 
       const byTeamArr = {}
       const order = ['Out','Doubtful','Questionable','Probable','IR','PUP']
-      results.forEach(({ abbr, injuries }) => {
-        if (!injuries.length) return
-        byTeamArr[abbr] = injuries
-          .map(inj => ({
-            name:   inj.athlete?.displayName || '—',
-            pos:    inj.athlete?.position?.abbreviation || '—',
-            status: inj.status || inj.type?.description || '—',
-            detail: inj.details?.detail || inj.shortComment || inj.longComment || '',
-            side:   inj.details?.side || '',
-            type:   inj.details?.type || '',
-            date:   inj.date ? new Date(inj.date).toLocaleDateString('en-US', {month:'short', day:'numeric'}) : '',
-          }))
-          .sort((a, b) =>
-            (order.indexOf(a.status) === -1 ? 99 : order.indexOf(a.status)) -
-            (order.indexOf(b.status) === -1 ? 99 : order.indexOf(b.status))
-          )
+      Object.entries(byTeam).forEach(([abbr, playersMap]) => {
+        byTeamArr[abbr] = Object.values(playersMap).sort((a, b) =>
+          (order.indexOf(a.status) === -1 ? 99 : order.indexOf(a.status)) -
+          (order.indexOf(b.status) === -1 ? 99 : order.indexOf(b.status))
+        )
       })
 
       setInjuries(byTeamArr)
@@ -4160,8 +4171,8 @@ function InjuriesView({ onScout }) {
       {!loading && fetched && totalCount === 0 && (
         <div className="leaders-coming-soon">
           <div className="cs-icon">🏥</div>
-          <div className="cs-title">No injuries currently listed</div>
-          <div className="cs-text">Pulled directly from each team's ESPN injury report. If this seems wrong, ESPN's per-team injuries feed may have changed shape — check back shortly.</div>
+          <div className="cs-title">No injuries found in games played so far</div>
+          <div className="cs-text">We pull injury designations from completed game reports — teams show up here once they've played at least one game. Check back as more of the season is played.</div>
         </div>
       )}
 
