@@ -1846,7 +1846,7 @@ function buildAutoLede(parsedGames, oddsMap, mode) {
 function renderAutoLede(lede) {
   if (!lede) return ''
   return `
-<div style="background:linear-gradient(135deg,#1a1209,#2a1f0e);padding:18px 20px;margin-bottom:2px">
+<div style="background-color:#1a1209;padding:18px 20px;margin-bottom:2px">
   <div style="font-family:monospace;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#c8a84b;margin-bottom:6px">${lede.icon} ${lede.label}</div>
   <div style="font-family:Georgia,serif;font-size:15px;line-height:1.5;color:#f5f0e8">${lede.text}</div>
 </div>`
@@ -2213,6 +2213,14 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
           const key  = `${awayAbbr}@${homeAbbr}`
           const odds = oddsMap[key]
           const oddsStr = odds ? formatOdds(odds) : ''
+          // Weather — was missing entirely here, unlike the general
+          // schedule rows below which already fetch it per-game.
+          const favWx = OUTDOOR_STADIUMS.has(homeAbbr)
+            ? await fetchGameWeather(homeAbbr, favWeekend.date)
+            : null
+          const favWxStr = favWx?.flags?.length
+            ? `⚠️ ${favWx.flags.map(f=>f.text).join(', ')}`
+            : (favWx ? `${favWx.tMax}°F` : '')
           html += `
 <span class="sec-label">⚡ ${favTeam} — This Sunday</span>
 <div style="background:rgba(200,168,75,.06);border-left:3px solid #c8a84b;padding:10px 18px;font-family:monospace;font-size:11px;color:#1a1209">
@@ -2220,6 +2228,7 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
   &nbsp;&nbsp;<span style="color:#9e9080">${kickoff}</span>
   ${tv ? `&nbsp;·&nbsp;<span style="color:#c8a84b">${tv}</span>` : ''}
   ${oddsStr ? `<div style="margin-top:5px;font-size:9px;color:#6b5f4e;letter-spacing:.06em">${oddsStr}</div>` : ''}
+  ${favWxStr ? `<div style="margin-top:3px;font-size:9px;color:#6b5f4e">${favWxStr}</div>` : ''}
 </div>`
           html += standingsHTML
         } else {
