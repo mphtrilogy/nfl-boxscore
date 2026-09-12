@@ -71,6 +71,24 @@ export default function App() {
 
   const [fontTheme,     setFontTheme]     = useState(() => localStorage.getItem('fw-font') || 'classic')
 
+  // Deep-link handling — the newsletter links to ?game=AWAY-HOME for a
+  // specific matchup. On load, jump to Scores and auto-open that game's
+  // box score. openCardId is keyed `${home}-${away}` internally, but the
+  // newsletter link uses away-home order (how the site displays "AWAY @
+  // HOME" everywhere else), so we flip it here rather than change the
+  // public-facing link format.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const gameParam = new URLSearchParams(window.location.search).get('game')
+    if (!gameParam) return
+    const [awayAbbr, homeAbbr] = gameParam.split('-')
+    if (!awayAbbr || !homeAbbr) return
+    const match = SCHEDULE_2026.find(g => g.home === homeAbbr && g.away === awayAbbr)
+    if (match) setActiveWeek(match.week)
+    setActiveView('Scores')
+    setOpenCardId(`${homeAbbr}-${awayAbbr}`)
+  }, [])
+
   // Apply font theme to body
   useEffect(() => {
     document.body.setAttribute('data-font', fontTheme)
@@ -6549,7 +6567,6 @@ function ResourcesView() {
 function NewsletterSignup({ squad, favTeam }) {
   const [email,     setEmail]     = useState('')
   const [team,      setTeam]      = useState(favTeam || 'All')
-  const [mode,      setMode]      = useState('ppr')
   const [sends,     setSends]     = useState(['monday','tuesday','thursday','friday'])
   const [status,    setStatus]    = useState('idle') // idle | loading | ok | error
   const [expanded,  setExpanded]  = useState(false)
@@ -6567,9 +6584,9 @@ function NewsletterSignup({ squad, favTeam }) {
 
   const SEND_OPTIONS = [
     { id:'monday',   label:'Mon · Sunday Recap' },
-    { id:'tuesday',  label:'Tue · Waiver Wire' },
-    { id:'thursday', label:'Thu · TNF Start/Sit' },
-    { id:'friday',   label:'Fri · Weekend Prep' },
+    { id:'tuesday',  label:'Tue · MNF Recap' },
+    { id:'thursday', label:'Thu · TNF Preview' },
+    { id:'friday',   label:'Fri · Weekend Slate' },
   ]
 
   const toggleSend = (id) => {
@@ -6597,7 +6614,6 @@ function NewsletterSignup({ squad, favTeam }) {
           email,
           favTeam: team,
           squadPlayers: squadStr,
-          scoringMode: mode,
           sends,
         }),
       })
@@ -6685,21 +6701,6 @@ function NewsletterSignup({ squad, favTeam }) {
                 <option key={t} value={t}>{t === 'All' ? 'No preference' : t}</option>
               ))}
             </select>
-          </div>
-
-          {/* Scoring mode */}
-          <div className="nl-field">
-            <label className="nl-label">Scoring Format</label>
-            <div className="nl-toggle-row">
-              <button
-                className={`nl-toggle-btn ${mode === 'ppr' ? 'on' : ''}`}
-                onClick={() => setMode('ppr')}
-              >PPR</button>
-              <button
-                className={`nl-toggle-btn ${mode === 'std' ? 'on' : ''}`}
-                onClick={() => setMode('std')}
-              >Standard</button>
-            </div>
           </div>
 
           {/* Which days */}
