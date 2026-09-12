@@ -1895,8 +1895,11 @@ function renderHOFTidbit(weekNum, sendType) {
 // ── Full email assembler per send type ────────────────────────────────────────
 async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
   const { currentWeek, recapWeek } = weekCtx
-  const { email, fav_team: favTeam, squad_players: squadStr, scoring_mode: scoringMode } = sub
-  const mode    = scoringMode === 'std' ? 'std' : 'ppr'   // default to PPR if unset
+  const { email, fav_team: favTeam, squad_players: squadStr } = sub
+  // Scoring format is no longer a subscriber-facing choice — this isn't a
+  // fantasy-first newsletter, PPR is just the modern default for the
+  // occasional player-points number shown in a box score row.
+  const mode = 'ppr'
   const squad   = (squadStr || '').split(',').map(s => s.trim()).filter(Boolean)
   const hasFav  = favTeam && favTeam !== 'All'
   const dispWeek = recapWeek || currentWeek
