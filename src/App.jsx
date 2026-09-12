@@ -3,6 +3,28 @@ import { useScoreboard, useBoxScore, useTeamSchedule, useWeekSchedule, parseESPN
 import { SCHEDULE_2026, WEEK_META, ALL_TEAMS } from './data/schedule2026'
 import { ti, networkColor, fmt, TEAMS } from './utils/teams'
 
+// ── SUPABASE CACHE WRITE ──────────────────────────────────────────────────────
+// Every time a real visitor's browser successfully fetches ESPN data, we
+// quietly also write it to Supabase. The newsletter (which runs server-side
+// on Vercel and gets 403'd by ESPN — a confirmed IP-range block, not a code
+// bug) reads from this cache instead of hitting ESPN directly. Fire-and-
+// forget: never blocks or slows down the actual page, and failures are
+// silent since this is a bonus write, not a page-critical one.
+const SUPABASE_URL_PUBLIC = 'https://fnxoucliekhotvartyfu.supabase.co'
+const SUPABASE_ANON_KEY   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZueG91Y2xpZWtob3R2YXJ0eWZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5NTI3MzEsImV4cCI6MjA4OTUyODczMX0.V4A75JO9s-7MbDRY7VMydwydOvdkU4SNSz_BRoVAoqA'
+
+function cacheEspnData(cacheKey, payload) {
+  fetch(`${SUPABASE_URL_PUBLIC}/rest/v1/fw_espn_cache`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    },
+    body: JSON.stringify({ cache_key: cacheKey, payload }),
+  }).catch(() => {}) // silent — this is a bonus write, never page-critical
+}
+
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
 const ROUND_ORDER = ['Super Bowl','Conf Champs','Divisional','Wild Card']
 const ALL_WEEKS   = [...Array(18)].map((_,i) => i + 1)
@@ -117,6 +139,9 @@ export default function App() {
         setLastUpdated(new Date())
         setError(null)
         setLoading(false)
+        // Cache for the newsletter (server-side, blocked from calling ESPN
+        // directly by an IP-range 403) to read instead of hitting ESPN.
+        cacheEspnData(`scoreboard:week${activeWeek}:type${currentSeasonType}`, data)
       })
       .catch(e => {
         setError(e.message)
@@ -645,7 +670,12 @@ function GameCard({ game: g, isOpen, onToggle, index, squad }) {
     setBoxLoading(true)
     fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${g.espnId}`)
       .then(r => r.json())
-      .then(d => { setBoxData(d); setBoxLoading(false) })
+      .then(d => {
+        setBoxData(d)
+        setBoxLoading(false)
+        // Cache for the newsletter — same reasoning as the scoreboard cache.
+        cacheEspnData(`summary:${g.espnId}`, d)
+      })
       .catch(() => setBoxLoading(false))
   }, [isOpen, g.espnId])
 
