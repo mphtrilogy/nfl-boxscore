@@ -536,18 +536,19 @@ function parseGameSummary(summary, eventMeta) {
     const rb  = byPos.RB?.filter(p => p.team === teamAbbr).sort((a,b)=>b.fpts-a.fpts)[0]
     const wr  = byPos.WR?.filter(p => p.team === teamAbbr).sort((a,b)=>b.fpts-a.fpts)[0]
     const parts = []
+    const pname = (name) => `<strong class="pname">${name}</strong>`
     if (qb) {
       const ca  = qb.vals['C/ATT'] || '—'
       const yds = qb.vals['YDS'] || '0'
       const tds = qb.vals['TD']  || '0'
       const int = qb.vals['INT'] || '0'
-      parts.push(`${qb.name}: ${ca}, ${yds} yds, ${tds} TD${int !== '0' ? `, ${int} INT` : ''}`)
+      parts.push(`${pname(qb.name)}: ${ca}, ${yds} yds, ${tds} TD${int !== '0' ? `, ${int} INT` : ''}`)
     }
     if (rb) {
-      parts.push(`${rb.name}: ${rb.vals['CAR']||'?'} car, ${rb.vals['YDS']||'?'} yds${rb.vals['TD']&&rb.vals['TD']!=='0'?`, ${rb.vals['TD']} TD`:''}`)
+      parts.push(`${pname(rb.name)}: ${rb.vals['CAR']||'?'} car, ${rb.vals['YDS']||'?'} yds${rb.vals['TD']&&rb.vals['TD']!=='0'?`, ${rb.vals['TD']} TD`:''}`)
     }
     if (wr) {
-      parts.push(`${wr.name}: ${wr.vals['REC']||'?'} rec, ${wr.vals['YDS']||'?'} yds${wr.vals['TD']&&wr.vals['TD']!=='0'?`, ${wr.vals['TD']} TD`:''}`)
+      parts.push(`${pname(wr.name)}: ${wr.vals['REC']||'?'} rec, ${wr.vals['YDS']||'?'} yds${wr.vals['TD']&&wr.vals['TD']!=='0'?`, ${wr.vals['TD']} TD`:''}`)
     }
     return parts
   }
@@ -632,7 +633,8 @@ body{margin:0;padding:0;background:#f0ebe0;font-family:Georgia,serif}
 .cg-abbr{font-size:16px;font-weight:700;font-family:Georgia,serif}
 .cg-sc{font-size:22px;font-weight:700;color:#fff;letter-spacing:-1px}
 .cg-fin{font-family:monospace;font-size:7px;color:rgba(200,168,75,.5);letter-spacing:.12em;text-transform:uppercase;margin-top:3px}
-.cg-line{font-family:monospace;font-size:8px;color:rgba(255,255,255,.4);padding:2px 14px 6px;line-height:1.5;letter-spacing:.02em}
+.cg-line{font-family:monospace;font-size:9px;color:rgba(255,255,255,.7);padding:4px 14px 8px;line-height:1.6;letter-spacing:.02em}
+.cg-line strong.pname{color:#f5f0e8;font-weight:700}
 .cg-link{display:block;text-align:right;font-family:monospace;font-size:8px;color:#c8a84b;text-decoration:none;padding:0 14px 8px;letter-spacing:.06em}
 /* Waiver wire */
 .ww-item{padding:9px 18px;border-bottom:1px solid rgba(42,31,14,.1)}
@@ -2155,22 +2157,25 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
 
   // ── FRIDAY: TNF recap + fav team preview + odds + weather + injuries ───────
   else if (sendType === 'friday') {
-    // 1. TNF box score from last night (always full treatment)
+    // Show every completed game found this week, not just one — the
+    // widened 72h window (for testing flexibility) can genuinely surface
+    // more than one completed game (e.g. a Wednesday opener AND Thursday's
+    // game), and dropping all but the first silently lost real data.
     if (parsedGames.length) {
-      const tnfGame  = parsedGames[0]
-      const isFavTNF = hasFav &&
-        (tnfGame?.home.abbr === favTeam || tnfGame?.away.abbr === favTeam)
-
-      // Auto-lede — checks if TNF was an upset, or leads with the best
-      // fantasy performance from the game.
       const fridayLedeOdds = await fetchOdds(currentWeek, 2)
-      const lede = buildAutoLede([tnfGame], fridayLedeOdds, mode)
+      const lede = buildAutoLede(parsedGames, fridayLedeOdds, mode)
       html += renderAutoLede(lede)
 
-      html += `<span class="sec-label">📺 Thursday Night Football — Final</span>`
-      html += isFavTNF
-        ? renderFullGame(tnfGame, squad, mode)
-        : renderCondensedGame(tnfGame)
+      parsedGames.forEach(g => {
+        const isFavGame = hasFav && (g?.home.abbr === favTeam || g?.away.abbr === favTeam)
+        const dayLabel  = g.gameDate
+          ? new Date(g.gameDate).toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long' })
+          : 'Thursday'
+        html += `<span class="sec-label">📺 ${dayLabel} Night Football — Final</span>`
+        html += isFavGame
+          ? renderFullGame(g, squad, mode)
+          : renderCondensedGame(g)
+      })
     } else {
       // Never ship silently empty — an honest one-liner instead of a gap,
       // in case last night's game data hasn't posted yet for any reason.
