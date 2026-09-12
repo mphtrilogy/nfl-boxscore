@@ -635,7 +635,7 @@ body{margin:0;padding:0;background:#f0ebe0;font-family:Georgia,serif}
 .cg-fin{font-family:monospace;font-size:7px;color:rgba(200,168,75,.5);letter-spacing:.12em;text-transform:uppercase;margin-top:3px}
 .cg-line{font-family:monospace;font-size:9px;color:rgba(255,255,255,.7);padding:4px 14px 8px;line-height:1.6;letter-spacing:.02em}
 .cg-line strong.pname{color:#f5f0e8;font-weight:700}
-.cg-link{display:block;text-align:right;font-family:monospace;font-size:8px;color:#c8a84b;text-decoration:none;padding:0 14px 8px;letter-spacing:.06em}
+.cg-link{display:block;text-align:right;font-family:monospace;font-size:8px;color:#c8a84b;text-decoration:underline;padding:0 14px 8px;letter-spacing:.06em}
 /* Waiver wire */
 .ww-item{padding:9px 18px;border-bottom:1px solid rgba(42,31,14,.1)}
 .ww-name{font-family:Georgia,serif;font-size:14px;font-weight:700;color:#1a1209}
@@ -674,9 +674,9 @@ body{margin:0;padding:0;background:#f0ebe0;font-family:Georgia,serif}
 .foot{background:#1a1209;padding:14px 20px;text-align:center}
 .foot-brand{font-family:Georgia,serif;font-size:13px;font-weight:700;color:#c8a84b}
 .foot-links{font-family:monospace;font-size:8px;color:rgba(255,255,255,.35);margin-top:5px;letter-spacing:.06em}
-.foot-links a{color:rgba(255,255,255,.4);text-decoration:none}
+.foot-links a{color:rgba(255,255,255,.5);text-decoration:underline}
 .foot-unsub{font-family:monospace;font-size:7px;color:rgba(255,255,255,.2);margin-top:7px;letter-spacing:.06em}
-.foot-unsub a{color:rgba(255,255,255,.25);text-decoration:none}
+.foot-unsub a{color:rgba(255,255,255,.4);text-decoration:underline}
 `
 
 // ── Scoring mode helper ───────────────────────────────────────────────────────
@@ -955,7 +955,7 @@ function renderScheduleLine(ev, oddsMap, weatherMap, favTeam) {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border-bottom:1px solid rgba(42,31,14,.08);${hl}">
   <tr>
     <td style="padding:8px 8px 8px 18px;vertical-align:top;color:#1a1209;white-space:nowrap">
-      <a href="${deepLink}" style="text-decoration:none;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:#1a1209;white-space:nowrap">${awayAbbr} @ ${homeAbbr}${isFav ? ' ⚡' : ''}</a>
+      <a href="${deepLink}" style="text-decoration:underline;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:#8b1a1a;white-space:nowrap">${awayAbbr} @ ${homeAbbr}${isFav ? ' ⚡' : ''}</a>
       ${oddsStr ? `<br><span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6b5f4e;white-space:nowrap">${oddsStr}</span>` : ''}
     </td>
     <td style="padding:8px 18px 8px 8px;text-align:right;vertical-align:top;font-family:'IBM Plex Mono',monospace;font-size:9px;color:#9e9080;white-space:nowrap">
@@ -1686,7 +1686,7 @@ function renderLeagueNewsSection(articles) {
     ${String(i + 1).padStart(2,'0')} ${a.category ? `· ${a.category}` : ''}
   </div>
   <a href="${a.url}" target="_blank" rel="noopener"
-     style="font-family:Georgia,serif;font-size:13px;font-weight:600;color:#1a1209;text-decoration:none;line-height:1.4;display:block">
+     style="font-family:Georgia,serif;font-size:13px;font-weight:600;color:#8b1a1a;text-decoration:underline;line-height:1.4;display:block">
     ${a.title}
   </a>
   <div style="font-family:monospace;font-size:8px;color:#9e9080;margin-top:3px;letter-spacing:.04em">
@@ -1700,7 +1700,7 @@ function renderLeagueNewsSection(articles) {
   ${rows}
 </div>
 <div style="text-align:center;padding:6px 0 12px">
-  <a href="https://nflboxscore.com" style="font-family:monospace;font-size:8px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#c8a84b;text-decoration:none">
+  <a href="https://nflboxscore.com" style="font-family:monospace;font-size:8px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#c8a84b;text-decoration:underline">
     More NFL News at nflboxscore.com →
   </a>
 </div>`
@@ -1714,7 +1714,7 @@ function renderTeamNewsSection(articles, favTeam) {
   const rows = articles.map(a => `
 <div style="padding:8px 0;border-bottom:1px solid rgba(42,31,14,.1)">
   <a href="${a.url}" target="_blank" rel="noopener"
-     style="font-family:Georgia,serif;font-size:13px;font-weight:600;color:#1a1209;text-decoration:none;line-height:1.4;display:block">
+     style="font-family:Georgia,serif;font-size:13px;font-weight:600;color:#8b1a1a;text-decoration:underline;line-height:1.4;display:block">
     ${a.title}
   </a>
   <div style="font-family:monospace;font-size:8px;color:#9e9080;margin-top:3px;letter-spacing:.04em">
