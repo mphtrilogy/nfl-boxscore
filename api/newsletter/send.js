@@ -1172,6 +1172,33 @@ async function renderWeatherSection(events) {
 // requests per game.
 async function fetchOdds(week, seasonType) {
   const oddsMap = {}
+
+  // Read from the same Supabase cache scoreboard/summary calls already
+  // use — the cached scoreboard payload already contains real odds data
+  // (comp.odds[0]) since that's exactly what this function extracts.
+  // fetchOdds previously made its own live ESPN call, which — like every
+  // other direct call from this Vercel function — gets 403'd by ESPN's
+  // IP-range block. Confirmed via oddsDebug: 0 keys found, every time.
+  const cacheKey = `scoreboard:week${week}:type${seasonType}`
+  const cached = await readEspnCache(cacheKey)
+  if (cached) {
+    ;(cached.events || []).forEach(ev => {
+      const comp = ev.competitions?.[0]
+      const o    = comp?.odds?.[0]
+      if (!o) return
+      const homeTeam = comp.competitors?.find(c => c.homeAway === 'home')?.team?.abbreviation || ''
+      const awayTeam = comp.competitors?.find(c => c.homeAway === 'away')?.team?.abbreviation || ''
+      const key = `${awayTeam}@${homeTeam}`
+      oddsMap[key] = {
+        spread:    o.details    || null,
+        overUnder: o.overUnder  != null ? o.overUnder : null,
+      }
+    })
+    if (Object.keys(oddsMap).length) return oddsMap
+  }
+
+  // Fallback: try ESPN directly anyway — costs nothing extra to attempt,
+  // and would just work on its own if ESPN ever lifts the IP block.
   try {
     const r    = await fetch(
       `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${week}&seasontype=${seasonType}&limit=20`,
