@@ -2124,6 +2124,96 @@ function useESPNPlayerSearch(query) {
   return { results, loading, debug }
 }
 
+// ── PRODUCTION-BASED SCORING (current-season stats only, no prior-year data) ──
+// These four components make up the Trend Score — a pure "how good has
+// this player actually been performing" grade. Ceilings/baselines are
+// reasonable modern-NFL benchmarks for what "elite workload" or "elite
+// efficiency" looks like — tunable constants, not hard rules.
+const USAGE_CEIL = { WR: 0.32, TE: 0.24, RB: 0.60, QB: 38, K: 4 }
+const EFF_BASE   = {
+  WR: { ypt: 8.5, catch: 0.65 },
+  TE: { ypt: 7.5, catch: 0.68 },
+  RB: { ypc: 4.3, ypt: 7.5, catch: 0.75 },
+  QB: { ypa: 7.2 },
+  K:  { pct: 0.85 },
+}
+const TD_BASE = { WR: 0.45, TE: 0.35, RB: 0.55, QB: 1.6, K: 0 }
+
+// Share of team's real opportunities (targets for pass-catchers, carries
+// for backs) — not a raw count. A true WR1 shows up here even in a game
+// with modest yardage; a committee back never maxes it out on volume alone.
+function usageScoreFor(p, games, teamPool) {
+  const pool = teamPool[p.team] || { targets: 1, carries: 1 }
+  if (p.pos === 'QB') {
+    const perGame = (p.passAtt || 0) / games
+    return Math.min(10, (perGame / USAGE_CEIL.QB) * 10)
+  }
+  if (p.pos === 'K') {
+    const perGame = (p.fga || 0) / games
+    return Math.min(10, (perGame / USAGE_CEIL.K) * 10)
+  }
+  if (p.pos === 'RB') {
+    const carryShare  = p.carries / Math.max(pool.carries, 1)
+    const targetShare = p.targets / Math.max(pool.targets, 1)
+    return Math.min(10, ((carryShare * 0.7 + targetShare * 0.3) / USAGE_CEIL.RB) * 10)
+  }
+  const targetShare = p.targets / Math.max(pool.targets, 1)
+  return Math.min(10, (targetShare / (USAGE_CEIL[p.pos] || USAGE_CEIL.WR)) * 10)
+}
+
+// Yards-per-opportunity and reliability, relative to a realistic baseline
+// for the position — rewards quality of usage, not just volume of it.
+function efficiencyScoreFor(p) {
+  if (p.pos === 'QB') {
+    const ypa = p.passAtt > 0 ? p.passYds / p.passAtt : 0
+    return Math.min(10, Math.max(0, (ypa / EFF_BASE.QB.ypa) * 10))
+  }
+  if (p.pos === 'K') {
+    const pct = p.fga > 0 ? p.fgm / p.fga : 0
+    return Math.min(10, (pct / EFF_BASE.K.pct) * 10)
+  }
+  if (p.pos === 'RB') {
+    const ypc  = p.carries > 0 ? p.rushYds / p.carries : 0
+    const ypt  = p.targets > 0 ? p.recYds  / p.targets : 0
+    const cr   = p.targets > 0 ? p.rec     / p.targets : 0
+    const rushEff = (ypc / EFF_BASE.RB.ypc) * 10
+    const recEff  = (ypt / EFF_BASE.RB.ypt) * 6 + cr * 4
+    const rushHeavy = p.carries >= p.targets
+    return Math.min(10, Math.max(0, rushHeavy ? rushEff*0.7 + recEff*0.3 : rushEff*0.3 + recEff*0.7))
+  }
+  const base = EFF_BASE[p.pos] || EFF_BASE.WR
+  const ypt = p.targets > 0 ? p.recYds / p.targets : 0
+  const cr  = p.targets > 0 ? p.rec / p.targets : 0
+  return Math.min(10, Math.max(0, (ypt / base.ypt) * 6 + cr * 4))
+}
+
+// Touchdown involvement relative to a realistic per-game rate for the
+// position — a separate signal from raw yardage so goal-line/red-zone
+// role shows up on its own.
+function scoringRoleFor(p, games) {
+  const tds = p.pos === 'QB' ? (p.passTD||0) + (p.rushTD||0) : (p.recTD||0) + (p.rushTD||0)
+  const base = TD_BASE[p.pos]
+  if (!base) return 5 // kickers — not a meaningful signal, stay neutral
+  return Math.min(10, ((tds / games) / base) * 10)
+}
+
+// Defense-adjusted production: compares this player's real per-game output
+// to what an average player at their position would be expected to score
+// against the SAME defenses they've actually faced this season (using the
+// same points-allowed data the Matchup score uses). Ratio of 1.0 = played
+// like a league-average starter against that schedule (5/10, neutral);
+// well above 1.0 = outproducing the schedule, not just padding stats vs
+// cupcakes.
+function defAdjScoreFor(p, defAvg, games) {
+  const opps = Object.values(p.oppByWeek || {})
+  const expected = opps.map(o => defAvg[o]?.[p.pos]).filter(v => v != null)
+  if (!expected.length) return 5
+  const expectedAvg = expected.reduce((a,b)=>a+b,0) / expected.length
+  if (expectedAvg <= 0) return 5
+  const seasonAvgPts = Object.values(p.weekPts).reduce((a,b)=>a+b,0) / games
+  return Math.min(10, Math.max(0, (seasonAvgPts / expectedAvg) * 5))
+}
+
 function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
   const [players, setPlayers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -2187,14 +2277,25 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
       // Points allowed per position, per defense — built from the exact same
       // fetch as everything else here, no second parallel request needed
       const defenseAllowed = {} // { defTeam: { QB:[pts], RB:[pts], WR:[pts], TE:[pts] } }
+      // Team-level opportunity pools — total targets/carries/pass attempts
+      // for the whole team across all processed games, used to turn a
+      // player's raw counting stats into a real share of the offense.
+      const teamPool = {} // { team: { targets, carries } }
 
-      const addToMap = (name, team, pos, wk, cat, vals, targets=0, carries=0) => {
+      const addToMap = (name, team, pos, wk, opp, cat, vals, targets=0, carries=0) => {
         if (!name || name === '—') return
         if (!['QB','RB','WR','TE','K'].includes(pos)) return
         // Apply TE correction for ESPN mis-classification
         const finalPos = pos === 'WR' && KNOWN_TES.has(name) ? 'TE' : pos
         const key = `${name}|${team}`
-        if (!pmap[key]) pmap[key] = { name, team, pos: finalPos, weekPts: {}, targets: 0, carries: 0 }
+        if (!pmap[key]) pmap[key] = {
+          name, team, pos: finalPos, weekPts: {}, oppByWeek: {},
+          targets: 0, carries: 0,
+          rec: 0, recYds: 0, recTD: 0,
+          rushYds: 0, rushTD: 0,
+          passAtt: 0, passComp: 0, passYds: 0, passTD: 0, passInt: 0,
+          fga: 0, fgm: 0,
+        }
         // Update pos if we got a real TE
         if (finalPos === 'TE') pmap[key].pos = 'TE'
         if (pos === 'K') pmap[key].pos = 'K'
@@ -2202,8 +2303,36 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
         const pts = calcFpts(vals, cat, mode)
         if (!pmap[key].weekPts[wk]) pmap[key].weekPts[wk] = 0
         pmap[key].weekPts[wk] += pts
+        pmap[key].oppByWeek[wk] = opp
         pmap[key].targets += targets
         pmap[key].carries += carries
+
+        // Raw counting stats — the real inputs for share/efficiency/TD-role
+        // scoring below, not just the derived fantasy-point total.
+        const v = (k) => parseFloat(vals[k] || 0)
+        if (cat === 'receiving') {
+          pmap[key].rec    += v('REC')
+          pmap[key].recYds += v('YDS')
+          pmap[key].recTD  += v('TD')
+        }
+        if (cat === 'rushing') {
+          pmap[key].rushYds += v('YDS')
+          pmap[key].rushTD  += v('TD')
+        }
+        if (cat === 'passing') {
+          const [comp, att] = String(vals['C/ATT'] || '0/0').split('/').map(Number)
+          pmap[key].passAtt  += (att  || 0)
+          pmap[key].passComp += (comp || 0)
+          pmap[key].passYds  += v('YDS')
+          pmap[key].passTD   += v('TD')
+          pmap[key].passInt  += v('INT')
+        }
+        if (cat === 'kicking') {
+          const fgm = parseInt(String(vals['FG'] || '0').split('/')[0]) || 0
+          const fga = parseInt(String(vals['FG'] || '0').split('/')[1]) || 0
+          pmap[key].fgm += fgm
+          pmap[key].fga += fga
+        }
       }
 
       summaries.filter(Boolean).forEach(summary => {
@@ -2218,6 +2347,7 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
         teamsData.forEach(td => {
           const team = td.team?.abbreviation || ''
           const opp  = oppOf(team)
+          if (!teamPool[team]) teamPool[team] = { targets: 0, carries: 0 }
 
           // Parse each stat group — same as BoxScoreDrawer PlayerStats
           ;['passing','rushing','receiving','kicking'].forEach(cat => {
@@ -2240,7 +2370,9 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
 
               const targets = cat === 'receiving' ? parseFloat(vals['TGTS']||vals['TGT']||0) : 0
               const carries = cat === 'rushing'   ? parseFloat(vals['CAR']||0) : 0
-              addToMap(name, team, pos, wk, cat, vals, targets, carries)
+              teamPool[team].targets += targets
+              teamPool[team].carries += carries
+              addToMap(name, team, pos, wk, opp, cat, vals, targets, carries)
 
               // Credit these points to the opposing defense for matchup rankings
               if (opp && ['QB','RB','WR','TE'].includes(pos)) {
@@ -2290,16 +2422,20 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
           const last1     = weekPts[weekPts.length - 1] || 0
           const last3avg  = weekPts.slice(-3).reduce((a, b) => a + b, 0) / Math.min(3, games)
 
-          // FW Formula components
-          const trendRatio  = seasonAvg > 0 ? last3avg / seasonAvg : 1
-          const trendScore  = Math.min(10, Math.max(0, trendRatio * 5))
+          // ── TREND SCORE — pure current-season production, no next-week
+          // matchup, no prior-year data. This is the headline number: how
+          // good has this player actually been, right now, based on real
+          // stats (opportunity share, efficiency, TD role, and production
+          // adjusted for the defenses actually faced).
+          const usageScore      = usageScoreFor(p, games, teamPool)
+          const efficiencyScore = efficiencyScoreFor(p)
+          const scoringScore    = scoringRoleFor(p, games)
 
-          const DOME = new Set(['ARI','ATL','DAL','DET','HOU','IND','LA','LAC','LV','MIN','NO','NYG','NYJ'])
+          // Dome/outdoor flag — a stadium-type signal, not live weather.
+          // MetLife (NYG/NYJ) has no roof at all, so it's intentionally
+          // excluded from this list.
+          const DOME = new Set(['ARI','ATL','DAL','DET','HOU','IND','LA','LAC','LV','MIN','NO'])
           const weatherScore = DOME.has(p.team) ? 10 : 7
-
-          const usagePerGame  = (p.targets + p.carries) / games
-          const usageScore    = Math.min(10, usagePerGame * 0.5)
-          const momentumScore = last1 > last3avg ? 8 : last1 > last3avg * 0.7 ? 5 : 3
 
           // Real matchup score — find this player's NEXT scheduled opponent,
           // then rate how many points that defense has actually allowed to
@@ -2314,38 +2450,54 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
             ? Math.min(10, Math.max(0, 2 + ((oppAllowed - min) / Math.max(max - min, 1)) * 7))
             : 5 // no upcoming game scheduled yet or opponent has no data — neutral
 
-          const fwScore = (
-            trendScore    * 0.35 +
-            matchupScore  * 0.30 +
-            usageScore    * 0.20 +
-            weatherScore  * 0.10 +
-            momentumScore * 0.05
+          const defAdjScore = defAdjScoreFor(p, defAvg, games)
+          const trendScore = (
+            usageScore      * 0.35 +
+            efficiencyScore * 0.25 +
+            defAdjScore      * 0.25 +
+            scoringScore    * 0.15
           )
 
-          const projPts = Math.round(last3avg * (fwScore / 7) * 10) / 10
+          // ── START/SIT SCORE — the only forward-looking number. Blends
+          // the Trend Score with next week's matchup + a small home-field
+          // nudge. This is what powers Start/Sit, Waiver Wire, and Trade
+          // comparisons — anywhere the question is "what happens next,"
+          // not "how has he been."
+          const homeBonus = nextGame && nextGame.home === p.team ? 0.3 : 0
+          const startSitScore = Math.min(10,
+            trendScore   * 0.55 +
+            matchupScore * 0.35 +
+            weatherScore * 0.10 +
+            homeBonus
+          )
+
+          const projPts = Math.round(last3avg * (startSitScore / 7) * 10) / 10
 
           return {
             name:      p.name,
             team:      p.team,
             pos:       p.pos,
             games,
+            totalPts:  Math.round(totalPts * 10) / 10,
             seasonAvg: Math.round(seasonAvg * 10) / 10,
             last1:     Math.round(last1 * 10) / 10,
             last3avg:  Math.round(last3avg * 10) / 10,
             opp:       nextOpp || '',
-            fwScore:   Math.round(fwScore * 10) / 10,
+            trendScore:      Math.round(trendScore * 10) / 10,
+            fwScore:         Math.round(startSitScore * 10) / 10,
             projPts,
-            trendScore:    Math.round(trendScore    * 10) / 10,
-            matchupScore:  Math.round(matchupScore  * 10) / 10,
-            usageScore:    Math.round(usageScore    * 10) / 10,
-            momentumScore,
+            usageScore:      Math.round(usageScore * 10) / 10,
+            efficiencyScore: Math.round(efficiencyScore * 10) / 10,
+            defAdjScore:     Math.round(defAdjScore * 10) / 10,
+            scoringScore:    Math.round(scoringScore * 10) / 10,
+            matchupScore:    Math.round(matchupScore * 10) / 10,
             trend: last3avg > seasonAvg * 1.1 ? '🔥 Hot'
                  : last3avg < seasonAvg * 0.8 ? '❄️ Cold'
                  : '➡️ Steady',
           }
         })
         .filter(Boolean)
-        .sort((a, b) => b.fwScore - a.fwScore)
+        .sort((a, b) => b.trendScore - a.trendScore)
 
       const posStr = Object.entries(posCounts).map(([p,n]) => `${p}:${n}`).join(' ')
       setDebug(`${gameIds.length} games processed · ${scored.length} players scored | ${posStr || 'no players found'}`)
@@ -2409,6 +2561,14 @@ function FWFormulaView({ currentWeek, mode, watchlist = [], toggleWatch }) {
     s >= 7.5 ? '#1a5c1a' : s >= 6.5 ? '#4ade80' : s >= 5.5 ? '#c8a84b' :
     s >= 4   ? '#d97706' : '#8b1a1a'
 
+  // Trend Score label — pure current-performance read (no next-week
+  // matchup involved). This is what the big headline cell shows.
+  const trendLabel = (s) =>
+    s >= 8.5 ? '🔥 ELITE' : s >= 7 ? '🟢 STRONG' :
+    s >= 5.5 ? '🟡 SOLID' : s >= 4 ? '🟠 SHAKY' : '🔴 COLD'
+
+  // Start/Sit label — the old wording, kept for the forward-looking chip
+  // (also reused as-is by Waiver Wire / Start-Sit / Trade views elsewhere).
   const scoreLabel = (s) =>
     s >= 7.5 ? '🟢 STRONG START' : s >= 6.5 ? '🟢 START' :
     s >= 5.5 ? '🟡 FLEX' : s >= 4 ? '🟠 RISKY' : '🔴 SIT'
@@ -2467,18 +2627,40 @@ function FWFormulaView({ currentWeek, mode, watchlist = [], toggleWatch }) {
       {/* Header */}
       <div className="fw-formula-header">
         <div className="fw-formula-title">
-          <span>⚡ FW Fantasy Score</span>
+          <span>⚡ FW Formula <span className="fw-title-sub">— Trend Score (how good, right now) + Start/Sit (what to do next week)</span></span>
           <button className="fw-breakdown-btn" onClick={() => setShowBreakdown(!showBreakdown)}>
             {showBreakdown ? 'Hide' : 'Show'} Formula
           </button>
         </div>
         {showBreakdown && (
           <div className="fw-breakdown-panel">
-            <div className="fw-bd-row"><span>📈 Trend (35%)</span><span>Last 3 wks avg vs season avg</span></div>
-            <div className="fw-bd-row"><span>🛡️ Matchup (30%)</span><span>Pts allowed by opp vs position</span></div>
-            <div className="fw-bd-row"><span>📊 Usage (20%)</span><span>Target share + carries per game</span></div>
-            <div className="fw-bd-row"><span>🌤️ Weather (10%)</span><span>Wind/rain/cold penalty (outdoor)</span></div>
-            <div className="fw-bd-row"><span>⚡ Momentum (5%)</span><span>Last game vs last-3 trend</span></div>
+            <div className="fw-bd-section-label">TREND SCORE — pure current-season production (this season only, no prior-year data)</div>
+            <div className="fw-bd-row"><span>🎯 Usage Share (35%)</span><span>Target/carry share of the team's actual plays, not raw counts</span></div>
+            <div className="fw-bd-row"><span>⚙️ Efficiency (25%)</span><span>Yards per target/carry + catch rate vs a real baseline</span></div>
+            <div className="fw-bd-row"><span>🛡️ Defense-Adjusted (25%)</span><span>Output vs. what an avg player would score against the same schedule faced</span></div>
+            <div className="fw-bd-row"><span>🏆 Scoring Role (15%)</span><span>TD involvement per game vs a realistic rate for the position</span></div>
+
+            <div className="fw-bd-section-label" style={{marginTop:12}}>START/SIT SCORE — Trend Score blended forward for next week only</div>
+            <div className="fw-bd-row"><span>📊 Trend Score (55%)</span><span>Carried over from above</span></div>
+            <div className="fw-bd-row"><span>🛡️ Next Matchup (35%)</span><span>Pts allowed by next week's opponent vs this position</span></div>
+            <div className="fw-bd-row"><span>🏟️ Dome/Outdoor (10%)</span><span>Flat bonus for dome teams — not live weather/forecast</span></div>
+            <div className="fw-bd-row"><span>🏠 Home game</span><span>Small flat bonus, not weighted into the 100%</span></div>
+
+            <div className="fw-bd-section-label" style={{marginTop:12}}>TREND SCORE BANDS (0–10)</div>
+            <div className="fw-bd-row"><span style={{color:'#1a5c1a'}}>🔥 8.5+ ELITE</span><span>Producing like a true top-tier player right now</span></div>
+            <div className="fw-bd-row"><span style={{color:'#4ade80'}}>🟢 7.0–8.4 STRONG</span><span>Clearly outproducing an average starter</span></div>
+            <div className="fw-bd-row"><span style={{color:'#c8a84b'}}>🟡 5.5–6.9 SOLID</span><span>Performing about like a typical starter</span></div>
+            <div className="fw-bd-row"><span style={{color:'#d97706'}}>🟠 4.0–5.4 SHAKY</span><span>Below-average role, efficiency, or opportunity</span></div>
+            <div className="fw-bd-row"><span style={{color:'#8b1a1a'}}>🔴 Below 4.0 COLD</span><span>Struggling on the stats that matter most</span></div>
+
+            <div className="fw-bd-section-label" style={{marginTop:12}}>TABLE COLUMNS</div>
+            <div className="fw-bd-row"><span>Start/Sit chip</span><span>STRONG START / START / FLEX / RISKY / SIT — for next week specifically</span></div>
+            <div className="fw-bd-row"><span>Proj</span><span>Projected points, scaled from L3 Avg by the Start/Sit score</span></div>
+            <div className="fw-bd-row"><span>L1</span><span>Points scored last game (green if above season avg)</span></div>
+            <div className="fw-bd-row"><span>L3 Avg</span><span>Average points over last 3 games played</span></div>
+            <div className="fw-bd-row"><span>Trend</span><span>🔥 Hot / ❄️ Cold / ➡️ Steady vs their own season average</span></div>
+            <div className="fw-bd-row"><span>Matchup bar</span><span>Longer + greener bar = softer next-week defense</span></div>
+            <div className="fw-bd-row"><span>Usage bar</span><span>Longer bar = bigger share of the team's targets/carries</span></div>
           </div>
         )}
       </div>
@@ -2527,7 +2709,8 @@ function FWFormulaView({ currentWeek, mode, watchlist = [], toggleWatch }) {
           <thead>
             <tr>
               <th></th>
-              <th>FW Score</th>
+              <th>Trend Score<span className="fw-th-sub">(0–10, current play)</span></th>
+              <th>Start/Sit<span className="fw-th-sub">(next wk)</span></th>
               <th>Player</th>
               <th>Pos</th>
               <th>Team</th>
@@ -2555,14 +2738,20 @@ function FWFormulaView({ currentWeek, mode, watchlist = [], toggleWatch }) {
                   <>
                     <td><div className="fw-score-cell fw-score-empty"><div className="fw-score-lbl">No data yet</div></div></td>
                     <td className="fw-name">{p.name}</td>
-                    <td colSpan={8} className="fw-nodata-note">Tracking — will show FW scores once they log a game</td>
+                    <td colSpan={9} className="fw-nodata-note">Tracking — will show a Trend Score once they log a game</td>
                   </>
                 ) : (
                   <>
                     <td>
-                      <div className="fw-score-cell" style={{background: scoreColor(p.fwScore)}}>
-                        <div className="fw-score-num">{p.fwScore}</div>
-                        <div className="fw-score-lbl">{scoreLabel(p.fwScore)}</div>
+                      <div className="fw-score-cell" style={{background: scoreColor(p.trendScore)}}>
+                        <div className="fw-score-num">{p.trendScore}<span className="fw-score-denom">/10</span></div>
+                        <div className="fw-score-lbl">{trendLabel(p.trendScore)}</div>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="fw-startsit-chip" style={{color: scoreColor(p.fwScore)}}>
+                        <div className="fw-startsit-num">{p.fwScore}/10</div>
+                        <div className="fw-startsit-lbl">{scoreLabel(p.fwScore)}</div>
                       </div>
                     </td>
                     <td className="fw-name">{p.name}</td>
@@ -2738,7 +2927,7 @@ function StartSitView({ mode, currentWeek }) {
           </div>
         ) : (
           <div style={{padding:'12px 16px'}}>
-            <div className="ss-stat-row"><span>FW Score</span><span className="ss-stat-val" style={{color:gradeColor(p.fwScore)}}>{p.fwScore}</span></div>
+            <div className="ss-stat-row"><span>Start/Sit</span><span className="ss-stat-val" style={{color:gradeColor(p.fwScore)}}>{p.fwScore}</span></div>
             <div className="ss-stat-row"><span>Projected</span><span className="ss-stat-val">{p.projPts}</span></div>
             <div className="ss-stat-row"><span>Last Game</span><span className="ss-stat-val">{p.last1}</span></div>
             <div className="ss-stat-row"><span>L3 Avg</span><span className="ss-stat-val">{p.last3avg}</span></div>
@@ -3009,7 +3198,7 @@ function WaiverWireView({ currentWeek, mode }) {
             <div className="ww-meta">
               <span className="ww-team">{p.team}</span>
               <span className="ww-pos">{p.pos}</span>
-              <span className="ww-owned">FW {p.fwScore}</span>
+              <span className="ww-owned">S/S {p.fwScore}</span>
             </div>
             <div className="ww-reason">Last game: {p.last1} pts vs. {p.seasonAvg} season avg — {p.trend}</div>
           </div>
@@ -3238,25 +3427,44 @@ const FANTASY_LEADERS_2025 = {
   ],
 }
 
-function FantasyLeadersView({ mode, squad }) {
+function FantasyLeadersView({ mode, squad, currentWeek }) {
   const [pos, setPos] = useState('QB')
   const seasonStarted = isGameSeason()
-  const data = FANTASY_LEADERS_2025[pos] || []
+
+  // Real 2026 data — same live engine as FW Formula, aggregated to season
+  // totals instead of a single weighted score. Only exists once at least
+  // one game has actually been played and processed.
+  const { players: livePlayers, loading: liveLoading } = useFWFantasyScores(currentWeek, mode)
+  const liveData = livePlayers.filter(p => p.pos === pos)
+  const usingLiveData = seasonStarted && liveData.length > 0
+
   const scoreKey = mode === 'ppr' ? 'ppr' : 'std'
+  const fallbackData = FANTASY_LEADERS_2025[pos] || []
 
   // Sort by selected scoring, then squad to top
-  const sorted = [...data]
-    .sort((a, b) => b[scoreKey] - a[scoreKey])
-    .map((p, i) => ({ ...p, rank: i + 1 }))
-    // If squad is on, float squad players to top
-    .sort((a, b) => {
-      if (!squad?.on) return 0
-      const am = squad?.players?.includes(a.name) || squad?.teams?.includes(a.team)
-      const bm = squad?.players?.includes(b.name) || squad?.teams?.includes(b.team)
-      if (am && !bm) return -1
-      if (!am && bm) return 1
-      return 0
-    })
+  const sorted = usingLiveData
+    ? [...liveData]
+        .sort((a, b) => b.totalPts - a.totalPts)
+        .map((p, i) => ({ ...p, rank: i + 1, gp: p.games, ptsKey: p.totalPts }))
+        .sort((a, b) => {
+          if (!squad?.on) return 0
+          const am = squad?.players?.includes(a.name) || squad?.teams?.includes(a.team)
+          const bm = squad?.players?.includes(b.name) || squad?.teams?.includes(b.team)
+          if (am && !bm) return -1
+          if (!am && bm) return 1
+          return 0
+        })
+    : [...fallbackData]
+        .sort((a, b) => b[scoreKey] - a[scoreKey])
+        .map((p, i) => ({ ...p, rank: i + 1, ptsKey: p[scoreKey] }))
+        .sort((a, b) => {
+          if (!squad?.on) return 0
+          const am = squad?.players?.includes(a.name) || squad?.teams?.includes(a.team)
+          const bm = squad?.players?.includes(b.name) || squad?.teams?.includes(b.team)
+          if (am && !bm) return -1
+          if (!am && bm) return 1
+          return 0
+        })
 
   const getColor = (rank) => {
     if (rank === 1) return '#c8a84b'
@@ -3278,14 +3486,20 @@ function FantasyLeadersView({ mode, squad }) {
           </div>
         </div>
         <div className="fl-scoring-note">
-          Showing {mode === 'ppr' ? 'PPR' : 'Standard'} · Full 2025 season totals ·
-          {seasonStarted ? ' Live 2026 data updating' : ' 2026 preseason data loads Aug 7'}
+          Showing {mode === 'ppr' ? 'PPR' : 'Standard'} ·{' '}
+          {usingLiveData
+            ? `Live 2026 season totals · Week ${currentWeek}`
+            : liveLoading && seasonStarted
+              ? 'Checking for live 2026 games…'
+              : '2025 final season totals (no 2026 games processed yet)'}
         </div>
       </div>
 
-      {!seasonStarted && (
+      {!usingLiveData && (
         <div className="fl-offseason-banner">
-          📊 Showing 2025 final season totals. 2026 live rankings update weekly starting Aug 7.
+          {seasonStarted
+            ? '📊 No completed 2026 games yet for this position — showing 2025 final totals as a reference until real data comes in.'
+            : '📊 Showing 2025 final season totals. 2026 live rankings begin once games are played.'}
         </div>
       )}
 
@@ -3316,8 +3530,8 @@ function FantasyLeadersView({ mode, squad }) {
                     <td className="fl-name">{p.name} <span className="squad-badge">MY SQUAD</span></td>
                     <td className="fl-team"><a href={TEAMS[p.team]?.url||'#'} target="_blank" rel="noopener" className="sb-google-link" onClick={e=>e.stopPropagation()}>{p.team}</a></td>
                     <td className="fl-gp">{p.gp}</td>
-                    <td className="fl-pts" style={{color:getColor(p.rank)}}>{p[scoreKey].toFixed(1)}</td>
-                    <td className="fl-avg">{(p[scoreKey]/p.gp).toFixed(1)}</td>
+                    <td className="fl-pts" style={{color:getColor(p.rank)}}>{p.ptsKey.toFixed(1)}</td>
+                    <td className="fl-avg">{(p.ptsKey/p.gp).toFixed(1)}</td>
                   </tr>
                 ))}
                 <tr><td colSpan={6} className="squad-table-divider" style={{background:'var(--paper-mid)',color:'var(--muted-lt)'}}>ALL PLAYERS</td></tr>
@@ -3332,8 +3546,8 @@ function FantasyLeadersView({ mode, squad }) {
                   <td className="fl-name">{p.name}</td>
                   <td className="fl-team"><a href={TEAMS[p.team]?.url||'#'} target="_blank" rel="noopener" className="sb-google-link" onClick={e=>e.stopPropagation()}>{p.team}</a></td>
                   <td className="fl-gp">{p.gp}</td>
-                  <td className="fl-pts" style={{color:getColor(p.rank)}}>{p[scoreKey].toFixed(1)}</td>
-                  <td className="fl-avg">{(p[scoreKey]/p.gp).toFixed(1)}</td>
+                  <td className="fl-pts" style={{color:getColor(p.rank)}}>{p.ptsKey.toFixed(1)}</td>
+                  <td className="fl-avg">{(p.ptsKey/p.gp).toFixed(1)}</td>
                 </tr>
               ))}
             </>)
@@ -3341,8 +3555,9 @@ function FantasyLeadersView({ mode, squad }) {
         </tbody>
       </table>
       <div className="atl-note">
-        Source: 2025 ESPN final season totals. Standard: Pass 1pt/25yds · 6pt TD · −2 INT · Rush/Rec 1pt/10yds.
-        PPR adds 1pt per reception. Kickers excluded from PPR. Updates live during 2026 season.
+        {usingLiveData
+          ? 'Source: live ESPN 2026 box scores, aggregated per player. Standard: Pass 1pt/25yds · 6pt TD · −2 INT · Rush/Rec 1pt/10yds. PPR adds 1pt per reception.'
+          : 'Source: 2025 ESPN final season totals (reference only). Standard: Pass 1pt/25yds · 6pt TD · −2 INT · Rush/Rec 1pt/10yds. PPR adds 1pt per reception. Kickers excluded from PPR.'}
       </div>
     </div>
   )
@@ -3436,7 +3651,7 @@ function FantasyView({ mode, setMode, currentWeek, squad, watchlist, toggleWatch
           <button key={t.id} className={`htab ${tab === t.id ? 'on' : ''}`} onClick={() => setTab(t.id)}>{t.label}</button>
         ))}
       </div>
-      {tab === 'leaders'  && <TabErrorBoundary><FantasyLeadersView mode={mode} squad={squad} /></TabErrorBoundary>}
+      {tab === 'leaders'  && <TabErrorBoundary><FantasyLeadersView mode={mode} squad={squad} currentWeek={currentWeek} /></TabErrorBoundary>}
       {tab === 'fw'       && <TabErrorBoundary><FWFormulaView currentWeek={currentWeek} mode={mode} squad={squad} watchlist={watchlist} toggleWatch={toggleWatch} /></TabErrorBoundary>}
       {tab === 'startsit' && <TabErrorBoundary><StartSitView mode={mode} currentWeek={currentWeek} /></TabErrorBoundary>}
       {tab === 'matchups' && <TabErrorBoundary><MatchupRaterView currentWeek={currentWeek} /></TabErrorBoundary>}
