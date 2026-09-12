@@ -220,14 +220,45 @@ const FANTASY_HOF = [
 
 // ── ESPN API helpers ──────────────────────────────────────────────────────────
 
+// ── SUPABASE CACHE READ ───────────────────────────────────────────────────────
+// ESPN blocks this Vercel function's IP range wholesale (confirmed via a
+// connectivity probe — every ESPN endpoint 403s here, headers included,
+// while an unrelated control API succeeds). Real visitors' browsers hit
+// ESPN fine, so the frontend writes successful fetches to Supabase
+// (fw_espn_cache), and we read from there instead of ESPN directly.
+async function readEspnCache(cacheKey) {
+  try {
+    const r = await fetch(
+      `${SUPABASE_URL}/rest/v1/fw_espn_cache?cache_key=eq.${encodeURIComponent(cacheKey)}&select=payload,fetched_at&order=fetched_at.desc&limit=1`,
+      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+    )
+    if (!r.ok) return null
+    const rows = await r.json()
+    if (!rows?.[0]) return null
+    return rows[0].payload
+  } catch { return null }
+}
+
 async function espnFetch(path) {
+  // Try the cache first — this is the path that actually works given
+  // ESPN's IP block. Scoreboard calls look like
+  // "/scoreboard?week=1&seasontype=2&limit=20" — map that to the same
+  // cache_key format the frontend writes: "scoreboard:week1:type2".
+  const scoreboardMatch = path.match(/^\/scoreboard\?week=(\d+)&seasontype=(\d+)/)
+  if (scoreboardMatch) {
+    const cacheKey = `scoreboard:week${scoreboardMatch[1]}:type${scoreboardMatch[2]}`
+    const cached = await readEspnCache(cacheKey)
+    if (cached) return cached
+  }
+
   try {
     // ESPN's site.api began rejecting bare (no User-Agent) requests from
     // server IPs. Confirmed via two independent projects hitting the exact
     // same wall: a spoofed browser UA does NOT fix it — ESPN specifically
     // rejects those too. What works is an honest, self-identifying client
     // token (same fix pattern as curl/requests-library defaults, which
-    // pass through fine).
+    // pass through fine). Kept as a fallback attempt in case ESPN ever
+    // lifts the block on this IP range — costs nothing to still try.
     const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl${path}`, {
       headers: ESPN_HEADERS,
     })
@@ -296,6 +327,10 @@ async function getWeekEvents(week, forceSeasonType = null) {
 }
 
 async function getGameSummary(eventId) {
+  // Check cache first — same reasoning as espnFetch above.
+  const cached = await readEspnCache(`summary:${eventId}`)
+  if (cached) return cached
+
   try {
     const r = await fetch(
       `https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${eventId}`,
