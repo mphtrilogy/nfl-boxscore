@@ -215,9 +215,15 @@ const FANTASY_HOF = [
 async function espnFetch(path) {
   try {
     const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl${path}`)
-    if (!r.ok) return null
+    if (!r.ok) {
+      console.error(`espnFetch failed: ${path} -> HTTP ${r.status}`)
+      return { __error: `HTTP ${r.status}`, __path: path }
+    }
     return r.json()
-  } catch { return null }
+  } catch (e) {
+    console.error(`espnFetch exception: ${path} ->`, e.message)
+    return { __error: e.message, __path: path }
+  }
 }
 
 // Determine week context per send type
@@ -265,6 +271,11 @@ function getSeasonType() {
 async function getWeekEvents(week, forceSeasonType = null) {
   const st = forceSeasonType || getSeasonType()
   const sb = await espnFetch(`/scoreboard?week=${week}&seasontype=${st}&limit=20`)
+  if (sb?.__error) {
+    getWeekEvents.lastError = { path: sb.__path, error: sb.__error }
+  } else {
+    getWeekEvents.lastError = null
+  }
   return sb?.events || []
 }
 
@@ -1715,6 +1726,69 @@ const ALL_HOF = [
   ...FANTASY_WHATIF,
 ]
 
+// ── AUTO-LEDE ────────────────────────────────────────────────────────────────
+// A real "top story" line built entirely from data we already fetch — no
+// LLM call, no new API cost. Looks at completed games this week and picks
+// the single most notable thing: an upset (favored team lost), otherwise
+// the best individual fantasy performance. Falls back to nothing if there's
+// no real data yet, rather than showing a generic placeholder.
+function buildAutoLede(parsedGames, oddsMap, mode) {
+  if (!parsedGames?.length) return null
+
+  // 1. Check for an upset — the spread-favored team actually lost.
+  // odds.spread is a pre-formatted string like "SEA -3.5" — the team
+  // abbreviation at the front is who's favored.
+  for (const g of parsedGames) {
+    if (!g) continue
+    const key  = `${g.away.abbr}@${g.home.abbr}`
+    const odds = oddsMap?.[key]
+    if (!odds?.spread) continue
+    const favoredAbbr = odds.spread.split(' ')[0]
+    if (favoredAbbr && favoredAbbr !== g.winner && [g.home.abbr, g.away.abbr].includes(favoredAbbr)) {
+      const loserScore = g.winner === g.home.abbr ? g.away.score : g.home.score
+      const winnerScore = g.winner === g.home.abbr ? g.home.score : g.away.score
+      return {
+        icon: '😱',
+        label: 'Upset Alert',
+        text: `${g.winner} knocked off ${favoredAbbr} (${odds.spread}) — final ${winnerScore}-${loserScore}. Nobody saw that coming.`,
+      }
+    }
+  }
+
+  // 2. No upset found — lead with the single best fantasy performance
+  // across every game processed this week.
+  let best = null
+  parsedGames.forEach(g => {
+    if (!g) return
+    ;['QB','RB','WR'].forEach(pos => {
+      ;(g.byPos?.[pos] || []).forEach(p => {
+        const pts = fp(p, mode)
+        if (pts != null && (!best || pts > best.pts)) {
+          best = { ...p, pts, pos }
+        }
+      })
+    })
+  })
+  if (best && best.pts >= 20) {
+    return {
+      icon: '🔥',
+      label: 'Performance of the Week',
+      text: `${best.name} (${best.team}) put up ${best.pts} fantasy points — the best individual performance of the week so far.`,
+    }
+  }
+
+  return null
+}
+
+function renderAutoLede(lede) {
+  if (!lede) return ''
+  return `
+<div style="background:linear-gradient(135deg,#1a1209,#2a1f0e);padding:18px 20px;margin-bottom:2px">
+  <div style="font-family:monospace;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#c8a84b;margin-bottom:6px">${lede.icon} ${lede.label}</div>
+  <div style="font-family:Georgia,serif;font-size:15px;line-height:1.5;color:#f5f0e8">${lede.text}</div>
+</div>`
+}
+
 function renderHOFTidbit(weekNum, sendType) {
   const dayOffset = { thursday:0, friday:7, monday:14, tuesday:21 }[sendType] || 0
   // During off-season (week 1 stuck), use day-of-year for variety
@@ -1807,6 +1881,13 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
 
   // ── MONDAY: All Sunday games ──────────────────────────────────────────────
   if (sendType === 'monday') {
+    // Auto-generated lede — the single most notable thing this week,
+    // built from real data (upset detection via odds, or best individual
+    // performance). Always first, above everything else.
+    const mondayOddsMap = await fetchOdds(recapWeek, 2)
+    const lede = buildAutoLede(parsedGames, mondayOddsMap, mode)
+    html += renderAutoLede(lede)
+
     if (hasFav) {
       const favGame = parsedGames.find(g =>
         g && (g.home.abbr === favTeam || g.away.abbr === favTeam))
@@ -1876,6 +1957,12 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
       const mnfGame = parsedGames[0]
       const isFavGame = hasFav &&
         (mnfGame?.home.abbr === favTeam || mnfGame?.away.abbr === favTeam)
+
+      // Auto-lede — checks if MNF was an upset, or leads with the best
+      // fantasy performance from the game.
+      const tuesdayOddsMap = await fetchOdds(recapWeek, 2)
+      const lede = buildAutoLede([mnfGame], tuesdayOddsMap, mode)
+      html += renderAutoLede(lede)
 
       html += `<span class="sec-label">🌙 Monday Night Football — Week ${recapWeek} Final</span>`
       html += isFavGame
@@ -1979,7 +2066,6 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
     // fantasy content. Games/storylines lead, fantasy trails.
     html += teamNewsHTML
     html += leagueNewsHTML
-    html += renderHOFTidbit(currentWeek, sendType)
 
     // Start/Sit + FW Formula — now positioned after game context, not
     // immediately following the TNF card.
@@ -1994,8 +2080,13 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
 </div>`
     html += fwTakeHTML
 
-    // Injuries last
+    // Injuries
     html += injuryHTML
+
+    // Closer — a reward for reading this far, framed as one, not a
+    // random mid-email insert.
+    html += `<span class="sec-label">⏰ And Now, Your Moment of Football Zen</span>`
+    html += renderHOFTidbit(currentWeek, sendType)
   }
 
   // ── FRIDAY: TNF recap + fav team preview + odds + weather + injuries ───────
@@ -2005,12 +2096,25 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
       const tnfGame  = parsedGames[0]
       const isFavTNF = hasFav &&
         (tnfGame?.home.abbr === favTeam || tnfGame?.away.abbr === favTeam)
+
+      // Auto-lede — checks if TNF was an upset, or leads with the best
+      // fantasy performance from the game.
+      const fridayLedeOdds = await fetchOdds(currentWeek, 2)
+      const lede = buildAutoLede([tnfGame], fridayLedeOdds, mode)
+      html += renderAutoLede(lede)
+
       html += `<span class="sec-label">📺 Thursday Night Football — Final</span>`
       html += isFavTNF
         ? renderFullGame(tnfGame, squad, mode)
         : renderCondensedGame(tnfGame)
+    } else {
+      // Never ship silently empty — an honest one-liner instead of a gap,
+      // in case last night's game data hasn't posted yet for any reason.
+      html += `
+<div style="padding:14px 18px;font-family:monospace;font-size:10px;color:#6b5f4e;border-bottom:1px solid rgba(42,31,14,.08)">
+  📺 Thursday Night's box score isn't posted yet — check nflboxscore.com for the latest.
+</div>`
     }
-
     // 2. Fetch odds once for the weekend — reused by both the fav-team
     // highlight card below and the compact schedule, avoiding a duplicate
     // fetch of the same data.
@@ -2059,6 +2163,13 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
       // fetched oddsMap in via a pre-fetched-odds variant so it doesn't
       // re-request the same data internally.
       html += await renderCompactSchedule(upcoming, currentWeek, getSeasonType(), favTeam, `Week ${currentWeek} — Full Schedule & Lines`, oddsMap)
+    } else {
+      // A real week's schedule should never actually be empty — if this
+      // shows, it's a data fetch issue, not a legitimately quiet week.
+      html += `
+<div style="padding:14px 18px;font-family:monospace;font-size:10px;color:#6b5f4e;border-bottom:1px solid rgba(42,31,14,.08)">
+  🏈 This week's schedule isn't loading right now — check nflboxscore.com for the full slate.
+</div>`
     }
 
     html += renderPlayoffPicture(favTeam, standings)
@@ -2071,11 +2182,14 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
   <a class="cta" href="${SITE_URL}">FW Formula Scores &rarr;</a>
 </div>`
 
-    html += renderHOFTidbit(currentWeek, sendType)
     html += teamNewsHTML
     html += leagueNewsHTML
     html += fwTakeHTML
     html += injuryHTML
+
+    // Closer — a reward for reading this far, framed as one.
+    html += `<span class="sec-label">⏰ And Now, Your Moment of Football Zen</span>`
+    html += renderHOFTidbit(currentWeek, sendType)
   }
 
   html += foot(email)
@@ -2237,6 +2351,7 @@ export default async function handler(req) {
           currentEventsCount: currentEvents.length,
           recapEventsCount: recapEvents.length,
           targetEventsCount: targetEvents.length,
+          lastFetchError: getWeekEvents.lastError,
           currentEventsSample: currentEvents.slice(0, 3).map(ev => ({
             id: ev.id,
             date: ev.date,
