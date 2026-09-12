@@ -2455,12 +2455,27 @@ export default async function handler(req) {
       }))
     }
 
+    // Direct odds test — fetchOdds calls ESPN live every time (it doesn't
+    // go through the Supabase cache the way scoreboard/summary data does),
+    // so it's still fully subject to the IP block the probe above already
+    // confirms. This makes that concrete: how many real odds entries (if
+    // any) came back for this week.
+    let oddsDebug = null
+    if (debugMode) {
+      const testOddsMap = await fetchOdds(currentWeek, 2)
+      oddsDebug = {
+        keysFound: Object.keys(testOddsMap).length,
+        sample: Object.entries(testOddsMap).slice(0, 3),
+      }
+    }
+
     return new Response(JSON.stringify({
       ok: true, type: sendType, week: currentWeek,
       gamesProcessed: parsedGames.length, sent, errors,
       ...(debugMode ? {
         errorDetails,
         connectivityProbe,
+        oddsDebug,
         diag: {
           currentEventsCount: currentEvents.length,
           recapEventsCount: recapEvents.length,
