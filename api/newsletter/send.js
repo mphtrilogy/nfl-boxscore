@@ -2363,11 +2363,35 @@ export default async function handler(req) {
     )
 
     const debugMode = url.searchParams.get('debug') === '1'
+
+    // Connectivity probe — test several different ESPN URL patterns to
+    // find out whether this is a total IP-range block (everything fails
+    // the same way) or specific to one path/domain. Only runs in debug
+    // mode so it doesn't slow down real sends.
+    let connectivityProbe = null
+    if (debugMode) {
+      const probeUrls = [
+        { name: 'site-v2-scoreboard', url: 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=1&seasontype=2&limit=1' },
+        { name: 'apis-v2-standings',  url: 'https://site.api.espn.com/apis/v2/sports/football/nfl/standings?season=2026' },
+        { name: 'no-headers-scoreboard', url: 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=1&seasontype=2&limit=1', noHeaders: true },
+        { name: 'non-espn-control', url: 'https://api.github.com/zen' },
+      ]
+      connectivityProbe = await Promise.all(probeUrls.map(async p => {
+        try {
+          const r = await fetch(p.url, p.noHeaders ? {} : { headers: ESPN_HEADERS })
+          return { name: p.name, status: r.status, ok: r.ok }
+        } catch (e) {
+          return { name: p.name, status: 'exception', error: e.message }
+        }
+      }))
+    }
+
     return new Response(JSON.stringify({
       ok: true, type: sendType, week: currentWeek,
       gamesProcessed: parsedGames.length, sent, errors,
       ...(debugMode ? {
         errorDetails,
+        connectivityProbe,
         diag: {
           currentEventsCount: currentEvents.length,
           recapEventsCount: recapEvents.length,
