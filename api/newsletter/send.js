@@ -354,11 +354,13 @@ function completedWithinHours(events, hours) {
 
 // For Monday: all completed Sunday games (up to 48h window)
 // For Tuesday: the Monday Night game specifically (up to 30h window)
-// For Friday: the Thursday Night game (up to 30h window)
+// For Friday: the Thursday Night game — widened to 72h so manual testing
+// later in the week (e.g. Saturday) can still find it; on the real
+// Friday-morning cron schedule this is still same-day/next-day data.
 function getTargetEvents(events, sendType) {
   if (sendType === 'monday')  return completedWithinHours(events, 48)
   if (sendType === 'tuesday') return completedWithinHours(events, 30)
-  if (sendType === 'friday')  return completedWithinHours(events, 30)
+  if (sendType === 'friday')  return completedWithinHours(events, 72)
   return []
 }
 
@@ -698,8 +700,8 @@ function shell(subject, dateStr, weekNum, sendLabel, mode = 'ppr') {
 <div class="wrap">
 <div class="mast">
   <div class="mast-logo">The Final Whistle</div>
-  <div class="mast-sub">nflboxscore.com &nbsp;·&nbsp; NFL Fantasy &amp; Scores</div>
-  <div class="mast-date">${dateStr} &nbsp;·&nbsp; Week ${weekNum} &nbsp;·&nbsp; ${sendLabel} &nbsp;·&nbsp; ${mode.toUpperCase()}</div>
+  <div class="mast-sub">nflboxscore.com &nbsp;·&nbsp; NFL Scores &amp; Stats</div>
+  <div class="mast-date">${dateStr} &nbsp;·&nbsp; Week ${weekNum} &nbsp;·&nbsp; ${sendLabel}</div>
 </div>`
 }
 
@@ -935,18 +937,21 @@ function renderScheduleLine(ev, oddsMap, weatherMap, favTeam) {
   const deepLink = `${SITE_URL}?game=${awayAbbr}-${homeAbbr}`
   const hl       = isFav ? 'background:rgba(200,168,75,.08);border-left:3px solid rgba(200,168,75,.5);' : 'border-left:3px solid transparent;'
 
+  // A single <a> wrapping this whole multi-line block gets fragmented by
+  // plain-text email renderers (Yahoo, etc.) into a separate bracketed
+  // link per visible line — exactly the "[TB @ CIN...] [FOX] [88°F]"
+  // look. Instead: only the team matchup itself is a link; everything
+  // else (kickoff, network, weather) is plain text in the same row.
   return `
-<a href="${deepLink}" style="text-decoration:none;display:block">
 <div style="display:table;width:100%;padding:8px 18px;border-bottom:1px solid rgba(42,31,14,.08);box-sizing:border-box;${hl}">
   <span style="display:table-cell;vertical-align:top;color:#1a1209">
-    <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700">${awayAbbr} @ ${homeAbbr}${isFav ? ' ⚡' : ''}</span>
+    <a href="${deepLink}" style="text-decoration:none;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:#1a1209">${awayAbbr} @ ${homeAbbr}${isFav ? ' ⚡' : ''}</a>
     ${oddsStr ? `<br><span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6b5f4e">${oddsStr}</span>` : ''}
   </span>
   <span style="display:table-cell;text-align:right;vertical-align:top;font-family:'IBM Plex Mono',monospace;font-size:9px;color:#9e9080;white-space:nowrap">
     ${kickoff}${tv ? `<br><span style="color:#c8a84b">${tv}</span>` : ''}${wxStr ? `<br>${wxStr}` : ''}
   </span>
-</div>
-</a>`
+</div>`
 }
 
 // Full compact schedule section — fetches odds + weather for all upcoming
