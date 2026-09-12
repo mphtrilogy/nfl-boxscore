@@ -142,6 +142,19 @@ export default function App() {
         // Cache for the newsletter (server-side, blocked from calling ESPN
         // directly by an IP-range 403) to read instead of hitting ESPN.
         cacheEspnData(`scoreboard:week${activeWeek}:type${currentSeasonType}`, data)
+
+        // Also quietly cache box scores for every completed game this
+        // week — so just loading the Scores tab warms the newsletter's
+        // cache for the whole week, without needing to click into each
+        // game's drawer individually. Fire-and-forget, no UI impact.
+        ;(data.events || [])
+          .filter(ev => ev.status?.type?.completed)
+          .forEach(ev => {
+            fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${ev.id}`)
+              .then(r => r.json())
+              .then(d => cacheEspnData(`summary:${ev.id}`, d))
+              .catch(() => {})
+          })
       })
       .catch(e => {
         setError(e.message)
