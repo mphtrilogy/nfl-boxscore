@@ -928,7 +928,7 @@ function renderScheduleLine(ev, oddsMap, weatherMap, favTeam) {
   const tv       = comp?.broadcasts?.[0]?.names?.[0] || ''
   const kickoff  = ev.date
     ? new Date(ev.date).toLocaleString('en-US',
-        { weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit' })
+        { timeZone: 'America/New_York', weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit' })
     : 'TBD'
   const isFav    = favTeam && favTeam !== 'All' && [homeAbbr, awayAbbr].includes(favTeam)
   const key      = `${awayAbbr}@${homeAbbr}`
@@ -1165,7 +1165,8 @@ async function fetchOdds(week, seasonType) {
   const oddsMap = {}
   try {
     const r    = await fetch(
-      `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${week}&seasontype=${seasonType}&limit=20`
+      `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${week}&seasontype=${seasonType}&limit=20`,
+      { headers: ESPN_HEADERS }
     )
     const data = await r.json()
     ;(data.events || []).forEach(ev => {
@@ -1340,7 +1341,8 @@ async function fetchInjuries(favTeam) {
   try {
     // Get league-wide injury report
     const r    = await fetch(
-      'https://site.api.espn.com/apis/site/v2/sports/football/nfl/injuries?limit=50'
+      'https://site.api.espn.com/apis/site/v2/sports/football/nfl/injuries?limit=50',
+      { headers: ESPN_HEADERS }
     )
     const data = await r.json()
     const items = data.injuries || []
@@ -1422,7 +1424,8 @@ async function fetchTeamNews(favTeam) {
   try {
     if (espnId) {
       const r    = await fetch(
-        `https://site.api.espn.com/apis/site/v2/sports/football/nfl/news?team=${espnId}&limit=4`
+        `https://site.api.espn.com/apis/site/v2/sports/football/nfl/news?team=${espnId}&limit=4`,
+        { headers: ESPN_HEADERS }
       )
       const data = await r.json()
       ;(data.articles || []).slice(0, 3).forEach(a => {
@@ -2098,7 +2101,7 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
       const homeAbbr = home?.team?.abbreviation || '?'
       const awayAbbr = away?.team?.abbreviation || '?'
       const kickoff  = new Date(tnf.date).toLocaleTimeString('en-US',
-        {hour:'numeric', minute:'2-digit', timeZoneName:'short'})
+        { timeZone: 'America/New_York', hour:'numeric', minute:'2-digit', timeZoneName:'short'})
       const venue    = comps?.venue?.fullName || ''
       const tv       = comps?.broadcasts?.[0]?.names?.[0] || ''
       const isFavTNF = hasFav && [homeAbbr, awayAbbr].includes(favTeam)
@@ -2208,7 +2211,7 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
           const tv       = comps?.broadcasts?.[0]?.names?.[0] || ''
           const kickoff  = favWeekend.date
             ? new Date(favWeekend.date).toLocaleString('en-US',
-                { weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit' })
+                { timeZone: 'America/New_York', weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit' })
             : ''
           const key  = `${awayAbbr}@${homeAbbr}`
           const odds = oddsMap[key]
