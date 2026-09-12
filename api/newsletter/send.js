@@ -26,6 +26,14 @@ const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY
 const RESEND_KEY   = process.env.RESEND_API_KEY
 const CRON_SECRET  = process.env.CRON_SECRET
 const SITE_URL     = 'https://nflboxscore.com'
+// ESPN's site.api rejects bare (no User-Agent) requests from server IPs —
+// confirmed via independent research on this exact endpoint. A spoofed
+// browser UA does NOT work either; ESPN specifically blocks those too.
+// An honest, self-identifying client token does.
+const ESPN_HEADERS = {
+  'User-Agent': 'TheFinalWhistle/1.0 (+https://nflboxscore.com)',
+  'Accept': 'application/json',
+}
 const FROM_EMAIL   = 'nfl@nysportsdaily.com'
 
 // ── Team city + nickname lookup (mirrors utils/teams.js in the app) ───────────
@@ -214,7 +222,15 @@ const FANTASY_HOF = [
 
 async function espnFetch(path) {
   try {
-    const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl${path}`)
+    // ESPN's site.api began rejecting bare (no User-Agent) requests from
+    // server IPs. Confirmed via two independent projects hitting the exact
+    // same wall: a spoofed browser UA does NOT fix it — ESPN specifically
+    // rejects those too. What works is an honest, self-identifying client
+    // token (same fix pattern as curl/requests-library defaults, which
+    // pass through fine).
+    const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl${path}`, {
+      headers: ESPN_HEADERS,
+    })
     if (!r.ok) {
       console.error(`espnFetch failed: ${path} -> HTTP ${r.status}`)
       return { __error: `HTTP ${r.status}`, __path: path }
@@ -282,7 +298,8 @@ async function getWeekEvents(week, forceSeasonType = null) {
 async function getGameSummary(eventId) {
   try {
     const r = await fetch(
-      `https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${eventId}`
+      `https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${eventId}`,
+      { headers: ESPN_HEADERS }
     )
     if (!r.ok) return null
     return r.json()
@@ -1144,7 +1161,9 @@ async function fetchStandings() {
     // /apis/site/v2/.../standings returns an empty stub ({fullViewLink})
     // for NFL — confirmed live on the site itself. /apis/v2/ (no "site/")
     // returns the real, fully-resolved standings data instead.
-    const r = await fetch('https://site.api.espn.com/apis/v2/sports/football/nfl/standings?season=2026')
+    const r = await fetch('https://site.api.espn.com/apis/v2/sports/football/nfl/standings?season=2026', {
+      headers: ESPN_HEADERS,
+    })
     const data = await r.json()
     const teams = []
     // Response nests conference -> division -> entries, but exact depth
@@ -1439,7 +1458,7 @@ async function fetchFWTake(currentWeek, seasonType) {
 
     const boards = await Promise.all(
       weeks.map(w =>
-        fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${w}&seasontype=${seasonType}&limit=20`)
+        fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${w}&seasontype=${seasonType}&limit=20`, { headers: ESPN_HEADERS })
           .then(r => r.json()).catch(() => ({ events: [] }))
       )
     )
@@ -1453,7 +1472,7 @@ async function fetchFWTake(currentWeek, seasonType) {
 
     const summaries = await Promise.all(
       gameIds.slice(0, 30).map(g =>
-        fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${g.id}`)
+        fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${g.id}`, { headers: ESPN_HEADERS })
           .then(r => r.json()).then(d => ({ ...d, _week: g.week })).catch(() => null)
       )
     )
@@ -1533,7 +1552,9 @@ async function fetchLeagueNews() {
   const articles = []
   try {
     // ESPN general NFL news — most viewed/recent
-    const r    = await fetch('https://site.api.espn.com/apis/site/v2/sports/football/nfl/news?limit=8')
+    const r    = await fetch('https://site.api.espn.com/apis/site/v2/sports/football/nfl/news?limit=8', {
+      headers: ESPN_HEADERS,
+    })
     const data = await r.json()
     ;(data.articles || []).forEach(a => {
       if (articles.length >= 5) return
