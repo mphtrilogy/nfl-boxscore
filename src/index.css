@@ -821,6 +821,9 @@ body::before {
 /* ── FW FORMULA ENGINE ────────────────────────────────────────────────────── */
 .fw-formula-header{padding:10px 16px;background:var(--ink);color:var(--paper);border-bottom:1px solid rgba(255,255,255,.1)}
 .fw-formula-title{display:flex;align-items:center;justify-content:space-between}
+.fw-title-sub{font-size:11px;font-weight:400;color:var(--muted-lt);margin-left:6px}
+.fw-th-sub{display:block;font-size:9px;font-weight:400;text-transform:none;color:var(--muted-lt)}
+.fw-score-denom{font-size:10px;font-weight:400;opacity:0.7}
 .fw-formula-title span{font-family:var(--font-display);font-size:18px;font-weight:700;color:var(--gold)}
 .fw-breakdown-btn{font-family:var(--font-mono);font-size:8px;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border:1px solid rgba(255,255,255,.3);background:none;color:rgba(255,255,255,.7);border-radius:var(--r);cursor:pointer;transition:all .12s}
 .fw-breakdown-btn:hover{background:rgba(255,255,255,.1);color:#fff}
@@ -896,6 +899,10 @@ body::before {
 .fw-score-cell{padding:4px 6px;border-radius:3px;text-align:center;min-width:72px}
 .fw-score-num{font-family:var(--font-display);font-size:16px;font-weight:700;color:#fff;line-height:1}
 .fw-score-lbl{font-family:var(--font-mono);font-size:6px;letter-spacing:.08em;color:rgba(255,255,255,.8);margin-top:2px;white-space:nowrap}
+
+.fw-startsit-chip{padding:2px 6px;border-radius:3px;text-align:center;min-width:60px;border:1px solid currentColor;background:rgba(255,255,255,.5)}
+.fw-startsit-num{font-family:var(--font-mono);font-size:10px;font-weight:700;line-height:1}
+.fw-startsit-lbl{font-family:var(--font-mono);font-size:6px;letter-spacing:.06em;margin-top:1px;white-space:nowrap;opacity:.85}
 
 .fw-name{font-family:var(--font-display);font-size:13px;font-weight:700;color:var(--ink)}
 .fw-pos{color:var(--accent);font-weight:700;font-size:9px}
