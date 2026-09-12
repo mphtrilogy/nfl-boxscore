@@ -944,16 +944,25 @@ function renderScheduleLine(ev, oddsMap, weatherMap, favTeam) {
   // link per visible line — exactly the "[TB @ CIN...] [FOX] [88°F]"
   // look. Instead: only the team matchup itself is a link; everything
   // else (kickoff, network, weather) is plain text in the same row.
+  //
+  // Also: CSS display:table/table-cell (no real <table>) let iOS Mail
+  // wrap the narrow left "cell" character-by-character when the layout
+  // got squeezed on a small screen — the "A / T / L / @ / P / I / T"
+  // vertical letter-stack bug. A real HTML <table> with white-space:
+  // nowrap on the team-name cell renders far more predictably across
+  // mobile mail clients.
   return `
-<div style="display:table;width:100%;padding:8px 18px;border-bottom:1px solid rgba(42,31,14,.08);box-sizing:border-box;${hl}">
-  <span style="display:table-cell;vertical-align:top;color:#1a1209">
-    <a href="${deepLink}" style="text-decoration:none;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:#1a1209">${awayAbbr} @ ${homeAbbr}${isFav ? ' ⚡' : ''}</a>
-    ${oddsStr ? `<br><span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6b5f4e">${oddsStr}</span>` : ''}
-  </span>
-  <span style="display:table-cell;text-align:right;vertical-align:top;font-family:'IBM Plex Mono',monospace;font-size:9px;color:#9e9080;white-space:nowrap">
-    ${kickoff}${tv ? `<br><span style="color:#c8a84b">${tv}</span>` : ''}${wxStr ? `<br>${wxStr}` : ''}
-  </span>
-</div>`
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border-bottom:1px solid rgba(42,31,14,.08);${hl}">
+  <tr>
+    <td style="padding:8px 8px 8px 18px;vertical-align:top;color:#1a1209;white-space:nowrap">
+      <a href="${deepLink}" style="text-decoration:none;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:#1a1209;white-space:nowrap">${awayAbbr} @ ${homeAbbr}${isFav ? ' ⚡' : ''}</a>
+      ${oddsStr ? `<br><span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6b5f4e;white-space:nowrap">${oddsStr}</span>` : ''}
+    </td>
+    <td style="padding:8px 18px 8px 8px;text-align:right;vertical-align:top;font-family:'IBM Plex Mono',monospace;font-size:9px;color:#9e9080;white-space:nowrap">
+      ${kickoff}${tv ? `<br><span style="color:#c8a84b">${tv}</span>` : ''}${wxStr ? `<br>${wxStr}` : ''}
+    </td>
+  </tr>
+</table>`
 }
 
 // Full compact schedule section — fetches odds + weather for all upcoming
