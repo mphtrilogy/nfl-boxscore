@@ -298,7 +298,7 @@ export default function App() {
       </nav>
 
       {/* ── MASTHEAD ── */}
-      <Masthead lastUpdated={lastUpdated} hasLiveGame={hasLiveGame} onRefresh={refresh} fontTheme={fontTheme} setFontTheme={setFontTheme} onHamburger={() => setDrawerOpen(true)} />
+      <Masthead lastUpdated={lastUpdated} hasLiveGame={hasLiveGame} onRefresh={refresh} fontTheme={fontTheme} setFontTheme={setFontTheme} onHamburger={() => setDrawerOpen(true)} setActiveView={setActiveView} />
       <WatchlistBar watchlist={watchlist} watchOn={watchOn} onToggle={setWatchOnPersist} onRemove={toggleWatch} setActiveView={setActiveView} />
 
       {/* ── TOP NAV ── */}
@@ -472,7 +472,7 @@ function useNFLNews() {
 }
 
 // ── MASTHEAD ──────────────────────────────────────────────────────────────────
-function Masthead({ lastUpdated, hasLiveGame, onRefresh, fontTheme, setFontTheme, onHamburger }) {
+function Masthead({ lastUpdated, hasLiveGame, onRefresh, fontTheme, setFontTheme, onHamburger, setActiveView }) {
   const now = new Date()
   const dateStr = now.toLocaleDateString('en-US', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
@@ -524,7 +524,9 @@ function Masthead({ lastUpdated, hasLiveGame, onRefresh, fontTheme, setFontTheme
         <span>{dateStr}</span>
       </div>
       <div className="logo">The Final Whistle</div>
-      <div className="tagline">NFL · Scores · Box Scores · Fantasy · Schedule · nflboxscore.com</div>
+      <div className="tagline">
+        NFL · <button className="tagline-link" onClick={() => setActiveView('Scores')}>Scores</button> · <button className="tagline-link" onClick={() => setActiveView('Scores')}>Box Scores</button> · <button className="tagline-link" onClick={() => setActiveView('Fantasy')}>Fantasy</button> · <button className="tagline-link" onClick={() => setActiveView('Schedule')}>Schedule</button> · nflboxscore.com
+      </div>
       <div className="support-bar">
         <span className="support-text">Independent &amp; ad-free. If it\'s useful,</span>
         <span className="support-div">—</span>
@@ -2232,6 +2234,7 @@ function useESPNPlayerSearch(query) {
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
   const [debug, setDebug] = useState('')
+  const [injuryDebugCount, setInjuryDebugCount] = useState(null)
 
   useEffect(() => {
     if (!query || query.length < 3) { setResults([]); setDebug(''); return }
@@ -2392,34 +2395,9 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
       })
     ).then(entries => Object.fromEntries(entries))
 
-    // Live injury/practice-report status — one lightweight roster fetch per
-    // team (same "site" API pattern as everything else here, no chasing
-    // secondary reference links), fetched in parallel with the box scores.
-    // Keyed by `name|team` to match pmap directly. Defensive by design:
-    // if ESPN's roster response doesn't embed injury data the way expected,
-    // this silently yields "no data" rather than guessing or crashing —
-    // teams just show as healthy until this is confirmed live and adjusted.
-    const injuryPromise = Promise.all(
-      Object.entries(ESPN_TEAM_ID).map(([abbr, id]) =>
-        fetch(`${ESPN_NFL}/teams/${id}?enable=roster`)
-          .then(r => r.json())
-          .then(d => {
-            const athletes = d?.team?.athletes || []
-            const entries = []
-            athletes.forEach(a => {
-              const inj = Array.isArray(a?.injuries) && a.injuries.length ? a.injuries[0] : null
-              if (inj?.status) {
-                entries.push([`${a.displayName}|${abbr}`, {
-                  status: inj.status,
-                  type: inj.details?.type || inj.type?.description || '',
-                }])
-              }
-            })
-            return entries
-          })
-          .catch(() => [])
-      )
-    ).then(perTeam => Object.fromEntries(perTeam.flat()))
+    // Injury/practice-report status is harvested further down from the same
+    // game-summary fetch already used for box scores (summary.injuries) —
+    // no separate request needed. See the box-score parsing loop below.
 
     // Step 1: get all game IDs for these weeks
     const seasonTypeToFetch = useRegular ? 2 : 1
@@ -2430,7 +2408,6 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
     ))
     .then(async boards => {
       const weatherByHost = await weatherPromise
-      const injuryByPlayer = await injuryPromise
       const gameIds = []
       boards.forEach((board, i) => {
         ;(board.events || []).forEach(ev => {
@@ -2520,7 +2497,25 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
         }
       }
 
+      const injuryByPlayer = {}
       summaries.filter(Boolean).forEach(summary => {
+        // Injury status, harvested from data already being fetched here for
+        // box scores — verified working shape (confirmed live elsewhere in
+        // this app): summary.injuries[].injuries[], keyed by athlete name.
+        // Later games overwrite earlier ones with the more current status.
+        ;(summary.injuries || []).forEach(teamInj => {
+          const abbr = teamInj.team?.abbreviation || ''
+          if (!abbr) return
+          ;(teamInj.injuries || []).forEach(inj => {
+            const name = inj.athlete?.displayName || ''
+            if (!name) return
+            injuryByPlayer[`${name}|${abbr}`] = {
+              status: inj.status || inj.type?.description || '',
+              type:   inj.details?.type || '',
+            }
+          })
+        })
+
         const wk = summary._week
         const teamsData = summary.boxscore?.players || []
         // Opponent lookup for this game — needed to credit points allowed
@@ -2696,7 +2691,8 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
         .sort((a, b) => b.trendScore - a.trendScore)
 
       const posStr = Object.entries(posCounts).map(([p,n]) => `${p}:${n}`).join(' ')
-      setDebug(`${gameIds.length} games processed · ${scored.length} players scored | ${posStr || 'no players found'}`)
+      setDebug(`${gameIds.length} games processed · ${scored.length} players scored | ${posStr || 'no players found'} | injuries matched: ${Object.keys(injuryByPlayer).length}`)
+      setInjuryDebugCount(Object.keys(injuryByPlayer).length)
       setPlayers(scored)
       setDefenseRankings(defAvg)
       setLoading(false)
@@ -2707,7 +2703,7 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
     })
   }, [currentWeek, mode, forceRegularSeason])
 
-  return { players, loading, debug, defenseRankings }
+  return { players, loading, debug, defenseRankings, injuryDebugCount }
 }
 
 // ── FW FORMULA VIEW ────────────────────────────────────────────────────────────
@@ -2718,7 +2714,7 @@ function FWFormulaView({ currentWeek, mode, watchlist = [], toggleWatch }) {
   const [search, setSearch]     = useState('')
   const [manualAdd, setManualAdd] = useState('')
   const seasonStarted = isGameSeason()
-  const { players, loading, debug } = useFWFantasyScores(currentWeek, mode)
+  const { players, loading, debug, injuryDebugCount } = useFWFantasyScores(currentWeek, mode)
 
   // Live ESPN player search — finds real players even with zero recorded stats
   // (injured, limited snaps, etc). Only queried once the FW-scored search comes
@@ -2881,6 +2877,11 @@ function FWFormulaView({ currentWeek, mode, watchlist = [], toggleWatch }) {
           onClick={() => setShowWatchOnly(w => !w)}
         >⭐ Watchlist{watchlist.length > 0 ? ` (${watchlist.length})` : ''}</button>
         <span className="fw-week-note">{isPreseason() ? `PS${currentWeek} · Preseason data` : `Wk ${currentWeek} · Next matchup data`}</span>
+        {!loading && injuryDebugCount != null && (
+          <span className="fw-week-note" style={{marginLeft:8, opacity:0.6}}>
+            · {injuryDebugCount} injury statuses matched league-wide
+          </span>
+        )}
       </div>
 
       {/* Search — finds any scored player regardless of table rank cutoff */}
