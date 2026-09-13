@@ -904,6 +904,8 @@ body::before {
 .fw-startsit-num{font-family:var(--font-mono);font-size:10px;font-weight:700;line-height:1}
 .fw-startsit-lbl{font-family:var(--font-mono);font-size:6px;letter-spacing:.06em;margin-top:1px;white-space:nowrap;opacity:.85}
 
+.injury-badge{display:inline-block;margin-left:5px;padding:0 4px;border:1px solid;border-radius:3px;font-family:var(--font-mono);font-size:9px;font-weight:800;line-height:1.4;vertical-align:middle;cursor:help}
+
 .fw-name{font-family:var(--font-display);font-size:13px;font-weight:700;color:var(--ink)}
 .fw-pos{color:var(--accent);font-weight:700;font-size:9px}
 .fw-team{color:var(--muted);font-size:9px}
