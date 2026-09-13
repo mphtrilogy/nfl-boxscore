@@ -2007,6 +2007,97 @@ function LeadersView({ tab, setTab }) {
 // These update automatically as real games are processed via useFWFantasyScores()
 const DEF_BASELINE = { QB:22, RB:24, WR:28, TE:12, K:8 }
 
+// ── STADIUM REFERENCE — for live weather lookups ────────────────────────────
+// Coordinates are stadium/city-level (fine for weather — conditions don't
+// vary meaningfully across a few miles). `dome: true` covers both true
+// domes and retractable-roof buildings — with no reliable feed for whether
+// a retractable roof is actually open on a given Sunday, treating them as
+// climate-controlled is the honest simplification. MetLife (NYG/NYJ) has
+// no roof at all and is correctly NOT in this list.
+const STADIUMS = {
+  ARI: { lat: 33.5276, lon: -112.2626, dome: true },
+  ATL: { lat: 33.7554, lon: -84.4008,  dome: true },
+  BAL: { lat: 39.2780, lon: -76.6227,  dome: false },
+  BUF: { lat: 42.7738, lon: -78.7870,  dome: false },
+  CAR: { lat: 35.2258, lon: -80.8528,  dome: false },
+  CHI: { lat: 41.8623, lon: -87.6167,  dome: false },
+  CIN: { lat: 39.0955, lon: -84.5161,  dome: false },
+  CLE: { lat: 41.5061, lon: -81.6995,  dome: false },
+  DAL: { lat: 32.7473, lon: -97.0945,  dome: true },
+  DEN: { lat: 39.7439, lon: -105.0201, dome: false },
+  DET: { lat: 42.3400, lon: -83.0456,  dome: true },
+  GB:  { lat: 44.5013, lon: -88.0622,  dome: false },
+  HOU: { lat: 29.6847, lon: -95.4107,  dome: true },
+  IND: { lat: 39.7601, lon: -86.1639,  dome: true },
+  JAC: { lat: 30.3239, lon: -81.6373,  dome: false },
+  JAX: { lat: 30.3239, lon: -81.6373,  dome: false },
+  KC:  { lat: 39.0489, lon: -94.4839,  dome: false },
+  LA:  { lat: 33.9535, lon: -118.3392, dome: true },
+  LAC: { lat: 33.9535, lon: -118.3392, dome: true },
+  LV:  { lat: 36.0909, lon: -115.1833, dome: true },
+  MIA: { lat: 25.9580, lon: -80.2389,  dome: false },
+  MIN: { lat: 44.9740, lon: -93.2581,  dome: true },
+  NE:  { lat: 42.0909, lon: -71.2643,  dome: false },
+  NO:  { lat: 29.9511, lon: -90.0812,  dome: true },
+  NYG: { lat: 40.8135, lon: -74.0745,  dome: false },
+  NYJ: { lat: 40.8135, lon: -74.0745,  dome: false },
+  PHI: { lat: 39.9008, lon: -75.1675,  dome: false },
+  PIT: { lat: 40.4468, lon: -80.0158,  dome: false },
+  SEA: { lat: 47.5952, lon: -122.3316, dome: false },
+  SF:  { lat: 37.4032, lon: -121.9698, dome: false },
+  TB:  { lat: 27.9759, lon: -82.5033,  dome: false },
+  TEN: { lat: 36.1665, lon: -86.7713,  dome: false },
+  WAS: { lat: 38.9078, lon: -76.8645,  dome: false },
+}
+
+// Parses a schedule "time" string like "8:20 PM" into a 24-hour integer,
+// used to pick the right hour out of Open-Meteo's hourly forecast.
+function parseKickoffHour(timeStr) {
+  const m = String(timeStr || '').match(/(\d+):(\d+)\s*(AM|PM)/i)
+  if (!m) return 13
+  let h = parseInt(m[1], 10)
+  const isPM = /PM/i.test(m[3])
+  if (isPM && h !== 12) h += 12
+  if (!isPM && h === 12) h = 0
+  return h
+}
+
+// Pulls the forecasted temp/precip-chance/wind for the specific hour of
+// kickoff out of an Open-Meteo hourly response.
+function extractKickoffWeather(data, timeStr) {
+  const times = data?.hourly?.time || []
+  if (!times.length) return null
+  const targetHour = parseKickoffHour(timeStr)
+  const hh = String(targetHour).padStart(2, '0')
+  let idx = times.findIndex(t => t.endsWith(`T${hh}:00`))
+  if (idx === -1) idx = Math.min(targetHour, times.length - 1)
+  return {
+    tempF:    data.hourly.temperature_2m?.[idx],
+    precipPct: data.hourly.precipitation_probability?.[idx],
+    windMph:  data.hourly.windspeed_10m?.[idx],
+  }
+}
+
+// Converts real conditions into a 0-10 score. Wind is weighted heaviest —
+// the biggest real factor for passing and kicking games — then
+// precipitation, then cold. 'DOME' = climate-controlled, always a 10.
+// null = outdoor game but no forecast yet (>16 days out, or the fetch
+// failed) — falls back to the old flat neutral value rather than
+// guessing.
+function weatherScoreFromConditions(w) {
+  if (w === 'DOME') return 10
+  if (!w) return 7
+  let score = 10
+  if (w.windMph >= 25) score -= 5
+  else if (w.windMph >= 18) score -= 3
+  else if (w.windMph >= 12) score -= 1.5
+  if (w.precipPct >= 70) score -= 3
+  else if (w.precipPct >= 40) score -= 1.5
+  if (w.tempF <= 20) score -= 2
+  else if (w.tempF <= 32) score -= 1
+  return Math.max(0, Math.min(10, score))
+}
+
 // Real live defensive rankings — points allowed per position, computed from
 // actual completed games. Replaces the old hardcoded MATCHUP_DATA map that
 // never changed regardless of what actually happened on the field.
@@ -2047,6 +2138,52 @@ const KNOWN_TES = new Set([
 // Merges rushing + receiving stats for same player
 
 const ESPN_NFL = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl'
+
+// ESPN's stable numeric team IDs — needed for the roster/injuries fetch,
+// which is keyed by ID rather than abbreviation. These have stayed fixed
+// across relocations (Raiders, Rams, Chargers all kept their old numeric
+// ID after moving), so this list is a one-time, durable mapping.
+const ESPN_TEAM_ID = {
+  ARI:1, ATL:2, BAL:3, BUF:4, CAR:5, CHI:6, CIN:7, CLE:8, DAL:9, DEN:10,
+  DET:11, GB:12, HOU:13, IND:14, JAC:15, JAX:15, KC:16, MIA:17, MIN:18,
+  NE:19, NO:20, NYG:21, NYJ:22, LV:23, PHI:24, PIT:25, LAC:26, SF:27,
+  SEA:28, LA:29, TB:30, TEN:31, WAS:32,
+}
+
+// Injury designation → severity multiplier applied to the Start/Sit score
+// only (never Trend Score — a real injury doesn't erase how well someone's
+// actually been playing, it just changes whether/how much they'll play
+// THIS week). Questionable players still play more often than not in the
+// real NFL, so it's a nudge, not a verdict; Out/IR/Suspended effectively
+// zero the recommendation out regardless of how good the underlying grade
+// was.
+const INJURY_SEVERITY = {
+  'out':               0.05,
+  'injured reserve':   0.05,
+  'ir':                0.05,
+  'suspension':        0.05,
+  'suspended':         0.05,
+  'doubtful':          0.35,
+  'questionable':      0.85,
+  'day-to-day':        0.90,
+  'limited participation in practice': 0.93,
+}
+function injurySeverityMultiplier(status) {
+  if (!status) return 1
+  const key = String(status).toLowerCase().trim()
+  return INJURY_SEVERITY[key] ?? 1
+}
+// Short badge text + color for the table/card UI.
+function injuryBadge(status) {
+  if (!status) return null
+  const key = String(status).toLowerCase().trim()
+  if (key === 'out' || key.includes('injured reserve') || key === 'ir' || key.includes('suspen'))
+    return { text: 'OUT', color: '#8b1a1a' }
+  if (key === 'doubtful') return { text: 'D', color: '#d97706' }
+  if (key === 'questionable' || key === 'day-to-day') return { text: 'Q', color: '#c8a84b' }
+  if (key.includes('limited')) return { text: 'LP', color: '#c8a84b' }
+  return null
+}
 
 // Normalize ESPN position abbreviations
 function normPos(raw) {
@@ -2238,6 +2375,52 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
 
     setLoading(true)
 
+    // Live weather for next week's outdoor games — fetched in parallel with
+    // the ESPN box scores below so it doesn't add extra wait time. Keyed by
+    // the HOME team, since weather belongs to the stadium hosting the game,
+    // not to whichever team a given player is on.
+    const nextWeekGames = SCHEDULE_2026.filter(g => g.week === currentWeek + 1)
+    const weatherPromise = Promise.all(
+      nextWeekGames.map(g => {
+        const stad = STADIUMS[g.home]
+        if (!stad) return Promise.resolve([g.home, null])
+        if (stad.dome) return Promise.resolve([g.home, 'DOME'])
+        return fetch(`https://api.open-meteo.com/v1/forecast?latitude=${stad.lat}&longitude=${stad.lon}&hourly=temperature_2m,precipitation_probability,windspeed_10m&temperature_unit=fahrenheit&windspeed_unit=mph&start_date=${g.date}&end_date=${g.date}&timezone=auto`)
+          .then(r => r.json())
+          .then(d => [g.home, extractKickoffWeather(d, g.time)])
+          .catch(() => [g.home, null])
+      })
+    ).then(entries => Object.fromEntries(entries))
+
+    // Live injury/practice-report status — one lightweight roster fetch per
+    // team (same "site" API pattern as everything else here, no chasing
+    // secondary reference links), fetched in parallel with the box scores.
+    // Keyed by `name|team` to match pmap directly. Defensive by design:
+    // if ESPN's roster response doesn't embed injury data the way expected,
+    // this silently yields "no data" rather than guessing or crashing —
+    // teams just show as healthy until this is confirmed live and adjusted.
+    const injuryPromise = Promise.all(
+      Object.entries(ESPN_TEAM_ID).map(([abbr, id]) =>
+        fetch(`${ESPN_NFL}/teams/${id}?enable=roster`)
+          .then(r => r.json())
+          .then(d => {
+            const athletes = d?.team?.athletes || []
+            const entries = []
+            athletes.forEach(a => {
+              const inj = Array.isArray(a?.injuries) && a.injuries.length ? a.injuries[0] : null
+              if (inj?.status) {
+                entries.push([`${a.displayName}|${abbr}`, {
+                  status: inj.status,
+                  type: inj.details?.type || inj.type?.description || '',
+                }])
+              }
+            })
+            return entries
+          })
+          .catch(() => [])
+      )
+    ).then(perTeam => Object.fromEntries(perTeam.flat()))
+
     // Step 1: get all game IDs for these weeks
     const seasonTypeToFetch = useRegular ? 2 : 1
     Promise.all(weeks.map(w =>
@@ -2246,6 +2429,8 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
         .catch(() => ({ events: [] }))
     ))
     .then(async boards => {
+      const weatherByHost = await weatherPromise
+      const injuryByPlayer = await injuryPromise
       const gameIds = []
       boards.forEach((board, i) => {
         ;(board.events || []).forEach(ev => {
@@ -2431,12 +2616,6 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
           const efficiencyScore = efficiencyScoreFor(p)
           const scoringScore    = scoringRoleFor(p, games)
 
-          // Dome/outdoor flag — a stadium-type signal, not live weather.
-          // MetLife (NYG/NYJ) has no roof at all, so it's intentionally
-          // excluded from this list.
-          const DOME = new Set(['ARI','ATL','DAL','DET','HOU','IND','LA','LAC','LV','MIN','NO'])
-          const weatherScore = DOME.has(p.team) ? 10 : 7
-
           // Real matchup score — find this player's NEXT scheduled opponent,
           // then rate how many points that defense has actually allowed to
           // this position so far. Higher points allowed = softer matchup.
@@ -2449,6 +2628,14 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
           const matchupScore = oppAllowed != null
             ? Math.min(10, Math.max(0, 2 + ((oppAllowed - min) / Math.max(max - min, 1)) * 7))
             : 5 // no upcoming game scheduled yet or opponent has no data — neutral
+
+          // Live weather for the stadium actually hosting next week's game —
+          // applies the same to both teams playing in that building. Falls
+          // back to neutral (7) if there's no next game yet or the forecast
+          // isn't available (>16 days out).
+          const weatherScore = nextGame
+            ? weatherScoreFromConditions(weatherByHost[nextGame.home])
+            : 7
 
           const defAdjScore = defAdjScoreFor(p, defAvg, games)
           const trendScore = (
@@ -2464,12 +2651,19 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
           // comparisons — anywhere the question is "what happens next,"
           // not "how has he been."
           const homeBonus = nextGame && nextGame.home === p.team ? 0.3 : 0
-          const startSitScore = Math.min(10,
+          const startSitScoreRaw = Math.min(10,
             trendScore   * 0.55 +
             matchupScore * 0.35 +
             weatherScore * 0.10 +
             homeBonus
           )
+
+          // Injury/practice-report status — applied only here, to Start/Sit,
+          // never to Trend Score. A designation changes whether/how much
+          // someone plays THIS week; it doesn't rewrite how well they've
+          // actually been performing.
+          const injury = injuryByPlayer[`${p.name}|${p.team}`] || null
+          const startSitScore = startSitScoreRaw * injurySeverityMultiplier(injury?.status)
 
           const projPts = Math.round(last3avg * (startSitScore / 7) * 10) / 10
 
@@ -2491,6 +2685,8 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
             defAdjScore:     Math.round(defAdjScore * 10) / 10,
             scoringScore:    Math.round(scoringScore * 10) / 10,
             matchupScore:    Math.round(matchupScore * 10) / 10,
+            injuryStatus:    injury?.status || null,
+            injuryType:      injury?.type || '',
             trend: last3avg > seasonAvg * 1.1 ? '🔥 Hot'
                  : last3avg < seasonAvg * 0.8 ? '❄️ Cold'
                  : '➡️ Steady',
@@ -2643,8 +2839,9 @@ function FWFormulaView({ currentWeek, mode, watchlist = [], toggleWatch }) {
             <div className="fw-bd-section-label" style={{marginTop:12}}>START/SIT SCORE — Trend Score blended forward for next week only</div>
             <div className="fw-bd-row"><span>📊 Trend Score (55%)</span><span>Carried over from above</span></div>
             <div className="fw-bd-row"><span>🛡️ Next Matchup (35%)</span><span>Pts allowed by next week's opponent vs this position</span></div>
-            <div className="fw-bd-row"><span>🏟️ Dome/Outdoor (10%)</span><span>Flat bonus for dome teams — not live weather/forecast</span></div>
+            <div className="fw-bd-row"><span>🌦️ Weather (10%)</span><span>Live forecast (wind/rain/cold) for outdoor games; domes always neutral</span></div>
             <div className="fw-bd-row"><span>🏠 Home game</span><span>Small flat bonus, not weighted into the 100%</span></div>
+            <div className="fw-bd-row"><span>🚑 Injury status</span><span>Applied last — Q/D/OUT badges scale the score down, never up</span></div>
 
             <div className="fw-bd-section-label" style={{marginTop:12}}>TREND SCORE BANDS (0–10)</div>
             <div className="fw-bd-row"><span style={{color:'#1a5c1a'}}>🔥 8.5+ ELITE</span><span>Producing like a true top-tier player right now</span></div>
@@ -2654,6 +2851,7 @@ function FWFormulaView({ currentWeek, mode, watchlist = [], toggleWatch }) {
             <div className="fw-bd-row"><span style={{color:'#8b1a1a'}}>🔴 Below 4.0 COLD</span><span>Struggling on the stats that matter most</span></div>
 
             <div className="fw-bd-section-label" style={{marginTop:12}}>TABLE COLUMNS</div>
+            <div className="fw-bd-row"><span>Injury badge</span><span>Q = Questionable · D = Doubtful · OUT = Out/IR/Suspended</span></div>
             <div className="fw-bd-row"><span>Start/Sit chip</span><span>STRONG START / START / FLEX / RISKY / SIT — for next week specifically</span></div>
             <div className="fw-bd-row"><span>Proj</span><span>Projected points, scaled from L3 Avg by the Start/Sit score</span></div>
             <div className="fw-bd-row"><span>L1</span><span>Points scored last game (green if above season avg)</span></div>
@@ -2725,11 +2923,13 @@ function FWFormulaView({ currentWeek, mode, watchlist = [], toggleWatch }) {
           </thead>
           <tbody>
             {filtered.map((p, i) => (
-              <tr key={i} className={`fw-row ${watchSet.has(p.name) ? 'fw-watched' : ''} ${p.noData ? 'fw-nodata' : ''}`}>
+              <tr key={i} className={`fw-row ${watchSet.has(p.name) ? 'fw-watched' : ''} ${p.noData ? 'fw-nodata' : ''}`}
+                onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(p.name+' fantasy football 2026')}`, '_blank')}
+                style={{cursor:'pointer'}}>
                 <td>
                   <button
                     className={`fw-star-btn ${watchSet.has(p.name) ? 'on' : ''}`}
-                    onClick={() => toggleWatch?.(p.name)}
+                    onClick={(e) => { e.stopPropagation(); toggleWatch?.(p.name) }}
                     title={watchSet.has(p.name) ? `Remove ${p.name} from watchlist` : `Add ${p.name} to watchlist`}
                     aria-label={watchSet.has(p.name) ? `Remove ${p.name} from watchlist` : `Add ${p.name} to watchlist`}
                   >{watchSet.has(p.name) ? '★' : '☆'}</button>
@@ -2754,8 +2954,15 @@ function FWFormulaView({ currentWeek, mode, watchlist = [], toggleWatch }) {
                         <div className="fw-startsit-lbl">{scoreLabel(p.fwScore)}</div>
                       </div>
                     </td>
-                    <td className="fw-name">{p.name}</td>
-                    <td className="fw-pos">{p.pos}</td>
+                    <td className="fw-name">
+                      {p.name}
+                      {injuryBadge(p.injuryStatus) && (
+                        <span className="injury-badge" style={{color: injuryBadge(p.injuryStatus).color, borderColor: injuryBadge(p.injuryStatus).color}}
+                          title={`${p.injuryStatus}${p.injuryType ? ' — ' + p.injuryType : ''}`}>
+                          {injuryBadge(p.injuryStatus).text}
+                        </span>
+                      )}
+                    </td>
                     <td className="fw-team">{p.team}</td>
                     <td className="fw-opp">{p.opp || '—'}</td>
                     <td className="fw-proj">{p.projPts}</td>
@@ -2895,9 +3102,9 @@ function StartSitView({ mode, currentWeek }) {
       ]
     : []
 
-  // Score directly from real FW Formula fields — fwScore is already a
-  // 0-10 blend of trend/matchup/usage/weather/momentum, so it IS the
-  // recommendation signal; no separate ad-hoc formula needed.
+  // Score directly from real FW Formula fields — fwScore is the Start/Sit
+  // score (Trend Score blended forward with next week's matchup + weather),
+  // so it IS the recommendation signal; no separate ad-hoc formula needed.
   const scorePlayer = (p) => p?.fwScore ?? null
 
   const scoreA = scorePlayer(playerA)
@@ -2918,7 +3125,15 @@ function StartSitView({ mode, currentWeek }) {
     return (
       <div className={`ss-player-card ${isWinner === true ? 'winner' : isWinner === false ? 'loser' : ''}`}>
         <div className="ss-card-header">
-          <div className="ss-card-name">{p.name}</div>
+          <div className="ss-card-name">
+            {p.name}
+            {injuryBadge(p.injuryStatus) && (
+              <span className="injury-badge" style={{color: injuryBadge(p.injuryStatus).color, borderColor: injuryBadge(p.injuryStatus).color}}
+                title={`${p.injuryStatus}${p.injuryType ? ' — ' + p.injuryType : ''}`}>
+                {injuryBadge(p.injuryStatus).text}
+              </span>
+            )}
+          </div>
           <div className="ss-card-meta">{p.pos || '—'} · {p.team || '—'}{p.opp ? ` · vs ${p.opp}` : ''}</div>
         </div>
         {p.noData ? (
@@ -3023,7 +3238,7 @@ function StartSitView({ mode, currentWeek }) {
         )}
 
         <div className="atl-note">
-          FW Score blends trend, matchup, usage, weather, and momentum from live ESPN box scores — same engine as the FW Formula tab. {mode === 'ppr' ? 'PPR' : 'Standard'} scoring.
+          Start/Sit = Trend Score (usage share, efficiency, defense-adjusted production, scoring role — 55%) blended with next week's specific matchup (35%) and live weather — wind, rain/snow chance, cold — for outdoor games (10%), plus a small home-game bump, then scaled down for Questionable/Doubtful/Out designations. {mode === 'ppr' ? 'PPR' : 'Standard'} scoring.
         </div>
       </div>
     </div>
