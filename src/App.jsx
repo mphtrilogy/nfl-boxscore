@@ -2234,7 +2234,6 @@ function useESPNPlayerSearch(query) {
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
   const [debug, setDebug] = useState('')
-  const [injuryDebugCount, setInjuryDebugCount] = useState(null)
 
   useEffect(() => {
     if (!query || query.length < 3) { setResults([]); setDebug(''); return }
@@ -2692,7 +2691,6 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
 
       const posStr = Object.entries(posCounts).map(([p,n]) => `${p}:${n}`).join(' ')
       setDebug(`${gameIds.length} games processed · ${scored.length} players scored | ${posStr || 'no players found'} | injuries matched: ${Object.keys(injuryByPlayer).length}`)
-      setInjuryDebugCount(Object.keys(injuryByPlayer).length)
       setPlayers(scored)
       setDefenseRankings(defAvg)
       setLoading(false)
@@ -2703,7 +2701,7 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
     })
   }, [currentWeek, mode, forceRegularSeason])
 
-  return { players, loading, debug, defenseRankings, injuryDebugCount }
+  return { players, loading, debug, defenseRankings }
 }
 
 // ── FW FORMULA VIEW ────────────────────────────────────────────────────────────
@@ -2714,7 +2712,7 @@ function FWFormulaView({ currentWeek, mode, watchlist = [], toggleWatch }) {
   const [search, setSearch]     = useState('')
   const [manualAdd, setManualAdd] = useState('')
   const seasonStarted = isGameSeason()
-  const { players, loading, debug, injuryDebugCount } = useFWFantasyScores(currentWeek, mode)
+  const { players, loading, debug } = useFWFantasyScores(currentWeek, mode)
 
   // Live ESPN player search — finds real players even with zero recorded stats
   // (injured, limited snaps, etc). Only queried once the FW-scored search comes
@@ -2877,11 +2875,6 @@ function FWFormulaView({ currentWeek, mode, watchlist = [], toggleWatch }) {
           onClick={() => setShowWatchOnly(w => !w)}
         >⭐ Watchlist{watchlist.length > 0 ? ` (${watchlist.length})` : ''}</button>
         <span className="fw-week-note">{isPreseason() ? `PS${currentWeek} · Preseason data` : `Wk ${currentWeek} · Next matchup data`}</span>
-        {!loading && injuryDebugCount != null && (
-          <span className="fw-week-note" style={{marginLeft:8, opacity:0.6}}>
-            · {injuryDebugCount} injury statuses matched league-wide
-          </span>
-        )}
       </div>
 
       {/* Search — finds any scored player regardless of table rank cutoff */}
