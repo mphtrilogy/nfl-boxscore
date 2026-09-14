@@ -2351,7 +2351,12 @@ async function logSend(type, week, count, status = 'ok', notes = '') {
 // ── Main handler ──────────────────────────────────────────────────────────────
 export default async function handler(req) {
   // Auth — Vercel cron sends secret via Authorization header
-  const url      = new URL(req.url)
+  // Node functions only give req.url as a path ("/api/...?type=monday"),
+  // not a full URL like Edge runtime did — this is the actual cause of the
+  // crash. Passing a base handles both cases: it's used to resolve a
+  // relative path, and silently ignored if req.url is ever already
+  // absolute (e.g. under a future runtime change).
+  const url      = new URL(req.url, `https://${req.headers.get('host') || 'nflboxscore.com'}`)
   const authHdr  = req.headers.get('authorization')?.replace('Bearer ','')
   const qSecret  = url.searchParams.get('secret')
   const body     = req.method === 'POST'
