@@ -2425,7 +2425,7 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
 
       // Step 2: fetch box score summaries
       const summaries = await Promise.all(
-        gameIds.slice(0, 30).map(g =>
+        gameIds.slice(0, 90).map(g =>
           fetch(`${ESPN_NFL}/summary?event=${g.id}`)
             .then(r => r.json())
             .then(d => ({ ...d, _week: g.week }))
@@ -2737,7 +2737,7 @@ function FWFormulaView({ currentWeek, mode, watchlist = [], toggleWatch }) {
     ? posFiltered.filter(p => p.name.toLowerCase().includes(searchLower))
     : showWatchOnly
       ? [...posFiltered.filter(p => watchSet.has(p.name)), ...(pos === 'ALL' ? unscoredWatchlist : [])]
-      : posFiltered.slice(0, pos === 'ALL' ? 40 : 25)
+      : posFiltered.slice(0, pos === 'ALL' ? 80 : ['RB','WR','TE'].includes(pos) ? 50 : 25)
 
   const handleManualAdd = () => {
     const name = manualAdd.trim()
