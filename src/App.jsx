@@ -2601,6 +2601,21 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
         }
       })
 
+      // Position correction pass — for any player ESPN never gave a real
+      // position for in ANY processed game/category (so the earlier
+      // confident-real-position fix had nothing to correct with), fall
+      // back to their actual usage pattern instead of "whichever stat
+      // category happened to be parsed first." This is what catches a
+      // case like CeeDee Lamb: heavy target volume with an occasional
+      // carry should read as WR even with zero reliable position data
+      // from ESPN, rather than getting stuck as RB from a jet-sweep entry.
+      Object.values(pmap).forEach(p => {
+        if (p.posConfident || p.pos === 'K') return
+        if (p.targets > p.carries) p.pos = KNOWN_TES.has(p.name) ? 'TE' : 'WR'
+        else if (p.carries > p.targets) p.pos = 'RB'
+        // else (0-0, or a genuine tie): leave the original category guess
+      })
+
       // Step 4: score each player
       const posCounts = {}
       const scored = Object.values(pmap)
@@ -4059,9 +4074,11 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos }
               if (!playerMap[key]) {
                 playerMap[key] = {
                   name, team: tm, pos: detectedPos, posConfident: !!normPos(rawPos),
-                  weeks: {}, totalPts: 0, weekCount: 0,
+                  weeks: {}, totalPts: 0, weekCount: 0, targets: 0, carries: 0,
                 }
               }
+              if (cat === 'receiving') playerMap[key].targets += parseFloat(vals['TGTS']||vals['TGT']||0)
+              if (cat === 'rushing')   playerMap[key].carries += parseFloat(vals['CAR']||0)
               // Same fix as FW Formula: never let a category-guessed position
               // (e.g. a WR's occasional carry defaulting to RB) permanently
               // override a real one, and let a later real one correct an
@@ -4077,6 +4094,16 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos }
             })
           })
         })
+      })
+
+      // Same usage-based position correction as FW Formula — for any player
+      // ESPN never gave a real position for at all, infer from actual
+      // target/carry volume instead of the first category guessed.
+      Object.values(playerMap).forEach(p => {
+        if (p.posConfident || p.pos === 'K') return
+        const targets = p.targets || 0, carries = p.carries || 0
+        if (targets > carries) p.pos = KNOWN_TES.has(p.name) ? 'TE' : 'WR'
+        else if (carries > targets) p.pos = 'RB'
       })
 
       // Calculate totals, averages, and trend
