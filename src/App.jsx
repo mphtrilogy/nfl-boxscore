@@ -2609,8 +2609,13 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
       // case like CeeDee Lamb: heavy target volume with an occasional
       // carry should read as WR even with zero reliable position data
       // from ESPN, rather than getting stuck as RB from a jet-sweep entry.
+      // QB is excluded — a QB's own carries (scrambles) are always 0
+      // targets vs some carries, which would otherwise misfire this
+      // exact heuristic and reclassify every mobile QB as an RB. The
+      // 'passing' category itself is already a reliable signal for QB,
+      // unlike the genuine RB/WR/TE ambiguity this heuristic targets.
       Object.values(pmap).forEach(p => {
-        if (p.posConfident || p.pos === 'K') return
+        if (p.posConfident || p.pos === 'K' || p.pos === 'QB') return
         if (p.targets > p.carries) p.pos = KNOWN_TES.has(p.name) ? 'TE' : 'WR'
         else if (p.carries > p.targets) p.pos = 'RB'
         // else (0-0, or a genuine tie): leave the original category guess
@@ -4100,7 +4105,7 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos }
       // ESPN never gave a real position for at all, infer from actual
       // target/carry volume instead of the first category guessed.
       Object.values(playerMap).forEach(p => {
-        if (p.posConfident || p.pos === 'K') return
+        if (p.posConfident || p.pos === 'K' || p.pos === 'QB') return
         const targets = p.targets || 0, carries = p.carries || 0
         if (targets > carries) p.pos = KNOWN_TES.has(p.name) ? 'TE' : 'WR'
         else if (carries > targets) p.pos = 'RB'
