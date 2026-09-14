@@ -2349,18 +2349,29 @@ async function logSend(type, week, count, status = 'ok', notes = '') {
 }
 
 // ── Main handler ──────────────────────────────────────────────────────────────
-export default async function handler(req) {
+// This environment's req object has turned out not to match a standard Fetch
+// API Request (confirmed by req.headers.get failing) — so every access below
+// is written to work whether req.headers is a real Headers instance or a
+// plain object, and whether the body needs Fetch-style .clone() or is
+// already parsed onto req.body, rather than assuming either.
+const getHeader = (req, name) =>
+  typeof req.headers?.get === 'function' ? req.headers.get(name) : (req.headers?.[name.toLowerCase()] ?? null)
+
+async function handler(req) {
   // Auth — Vercel cron sends secret via Authorization header
   // Node functions only give req.url as a path ("/api/...?type=monday"),
   // not a full URL like Edge runtime did — this is the actual cause of the
   // crash. Passing a base handles both cases: it's used to resolve a
   // relative path, and silently ignored if req.url is ever already
   // absolute (e.g. under a future runtime change).
-  const url      = new URL(req.url, `https://${req.headers.get('host') || 'nflboxscore.com'}`)
-  const authHdr  = req.headers.get('authorization')?.replace('Bearer ','')
+  const url      = new URL(req.url, `https://${getHeader(req, 'host') || 'nflboxscore.com'}`)
+  const authHdr  = getHeader(req, 'authorization')?.replace('Bearer ','')
   const qSecret  = url.searchParams.get('secret')
   const body     = req.method === 'POST'
-    ? await req.clone().json().catch(() => ({})) : {}
+    ? await (typeof req.clone === 'function'
+        ? req.clone().json().catch(() => ({}))
+        : Promise.resolve(req.body || {}))
+    : {}
   const provided = authHdr || qSecret || body.secret
 
   if (provided !== CRON_SECRET) {
@@ -2539,3 +2550,12 @@ export default async function handler(req) {
     )
   }
 }
+
+// Vercel's Node.js runtime needs a named export per HTTP method to hand
+// over a genuine Fetch-standard Request (real Headers, .clone(), absolute
+// .url) — a default export was giving a plain, non-standard req instead,
+// which was the actual cause of both prior errors. Cron triggers and the
+// dashboard "Run" button both use GET; POST is kept for the documented
+// manual-trigger-with-body path from the top-of-file comment.
+export async function GET(req)  { return handler(req) }
+export async function POST(req) { return handler(req) }
