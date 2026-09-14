@@ -2443,23 +2443,31 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
       // player's raw counting stats into a real share of the offense.
       const teamPool = {} // { team: { targets, carries } }
 
-      const addToMap = (name, team, pos, wk, opp, cat, vals, targets=0, carries=0) => {
+      const addToMap = (name, team, pos, wk, opp, cat, vals, targets=0, carries=0, posIsReal=true) => {
         if (!name || name === '—') return
         if (!['QB','RB','WR','TE','K'].includes(pos)) return
         // Apply TE correction for ESPN mis-classification
         const finalPos = pos === 'WR' && KNOWN_TES.has(name) ? 'TE' : pos
         const key = `${name}|${team}`
         if (!pmap[key]) pmap[key] = {
-          name, team, pos: finalPos, weekPts: {}, oppByWeek: {},
+          name, team, pos: finalPos, posConfident: posIsReal, weekPts: {}, oppByWeek: {},
           targets: 0, carries: 0,
           rec: 0, recYds: 0, recTD: 0,
           rushYds: 0, rushTD: 0,
           passAtt: 0, passComp: 0, passYds: 0, passTD: 0, passInt: 0,
           fga: 0, fgm: 0,
         }
-        // Update pos if we got a real TE
-        if (finalPos === 'TE') pmap[key].pos = 'TE'
-        if (pos === 'K') pmap[key].pos = 'K'
+        // Only let a real ESPN-reported position overwrite what's stored —
+        // a category-based guess (posIsReal=false) never overrides a
+        // position we're already confident in, and never overrides a real
+        // value with another guess. This is what stops a WR's occasional
+        // carry from permanently mislabeling them as an RB.
+        if (posIsReal && !pmap[key].posConfident) {
+          pmap[key].pos = finalPos
+          pmap[key].posConfident = true
+        }
+        if (finalPos === 'TE' && posIsReal) pmap[key].pos = 'TE'
+        if (pos === 'K') { pmap[key].pos = 'K'; pmap[key].posConfident = true }
         // Calculate fantasy points using same function as BoxScoreDrawer
         const pts = calcFpts(vals, cat, mode)
         if (!pmap[key].weekPts[wk]) pmap[key].weekPts[wk] = 0
@@ -2537,8 +2545,16 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
               if (!name) return
               // Get position from athlete object — same as BoxScoreDrawer line 1529
               const rawPos = a.athlete?.position?.abbreviation || ''
-              const pos = cat === 'kicking' ? 'K'
-                : normPos(rawPos) || (cat === 'passing' ? 'QB' : cat === 'rushing' ? 'RB' : 'WR')
+              const realPos = cat === 'kicking' ? 'K' : normPos(rawPos)
+              // If ESPN didn't give us a real position for this specific stat
+              // entry, guess from which category it's in — but this guess
+              // must never be allowed to stick permanently. A WR who takes
+              // an occasional carry (jet sweep, end-around) would otherwise
+              // get locked in as an RB forever if the rushing entry happens
+              // to lack position data, even once their real receiving stats
+              // (correctly tagged WR) arrive later in the same pass.
+              const posIsReal = !!realPos
+              const pos = realPos || (cat === 'passing' ? 'QB' : cat === 'rushing' ? 'RB' : 'WR')
 
               // Build vals object — same as BoxScoreDrawer line 1524
               const vals = {}
@@ -2551,7 +2567,7 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
               const carries = cat === 'rushing'   ? parseFloat(vals['CAR']||0) : 0
               teamPool[team].targets += targets
               teamPool[team].carries += carries
-              addToMap(name, team, pos, wk, opp, cat, vals, targets, carries)
+              addToMap(name, team, pos, wk, opp, cat, vals, targets, carries, posIsReal)
 
               // Credit these points to the opposing defense for matchup rankings
               if (opp && ['QB','RB','WR','TE'].includes(pos)) {
@@ -4042,9 +4058,17 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos }
               const weekPts = calcFpts(vals, cat, mode)
               if (!playerMap[key]) {
                 playerMap[key] = {
-                  name, team: tm, pos: detectedPos,
+                  name, team: tm, pos: detectedPos, posConfident: !!normPos(rawPos),
                   weeks: {}, totalPts: 0, weekCount: 0,
                 }
+              }
+              // Same fix as FW Formula: never let a category-guessed position
+              // (e.g. a WR's occasional carry defaulting to RB) permanently
+              // override a real one, and let a later real one correct an
+              // earlier guess.
+              if (normPos(rawPos) && !playerMap[key].posConfident) {
+                playerMap[key].pos = detectedPos
+                playerMap[key].posConfident = true
               }
               if (!playerMap[key].weeks[bs.week]) {
                 playerMap[key].weeks[bs.week] = 0
