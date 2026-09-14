@@ -19,7 +19,13 @@
 //   Body: { "type": "monday", "secret": "<CRON_SECRET>" }
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export const config = { runtime: 'edge' }
+// Node.js runtime, not edge — edge functions have a hard, non-configurable
+// 25-second "must send an initial response" limit on every plan, and this
+// function does real work (fetching every game's box score, building the
+// full email) before it ever writes a response. That's exactly what was
+// killing every send with a 504. Node functions can be given real headroom
+// via maxDuration below — up to 60s on Hobby, up to 300s on Pro.
+export const maxDuration = 60
 
 const SUPABASE_URL = process.env.SUPABASE_URL
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY
