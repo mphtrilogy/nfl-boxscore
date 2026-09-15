@@ -36,7 +36,21 @@ const LIVE_CACHE_FRESH_MS = 3 * 60 * 1000 // 3 minutes
 // isPermanent: true for completed-game summaries (write once, ever, then
 // never again for that key). false/omitted for the live scoreboard, which
 // uses the time-based freshness check instead.
+// HARD KILL-SWITCH — Sep 15: the throttled version below still couldn't stop
+// this from hammering the shared database, because the whole throttling
+// logic depended on writes eventually succeeding and staying cached. On a
+// database that's failing specifically AT the write step, that condition
+// never triggers, so every visitor kept retrying forever. Confirmed via
+// direct log query: 6,055 requests to fw_espn_cache over 7+ hours, still
+// climbing, well after the throttled version was already live. That
+// load is very likely what's also taking down other unrelated projects
+// sharing this same database (mikejustwatched.com, Now Spinning). Flip this
+// back to false only once the underlying database is confirmed healthy AND
+// this project has been migrated to its own isolated Supabase instance.
+const CACHE_WRITES_DISABLED = true
+
 async function cacheEspnData(cacheKey, payload, isPermanent = false) {
+  if (CACHE_WRITES_DISABLED) return
   if (_cacheCheckedThisSession.has(cacheKey)) return // already handled this tab-session
   _cacheCheckedThisSession.add(cacheKey)
 
