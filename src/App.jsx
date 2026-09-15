@@ -13,16 +13,61 @@ import { ti, networkColor, fmt, TEAMS } from './utils/teams'
 const SUPABASE_URL_PUBLIC = 'https://fnxoucliekhotvartyfu.supabase.co'
 const SUPABASE_ANON_KEY   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZueG91Y2xpZWtob3R2YXJ0eWZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5NTI3MzEsImV4cCI6MjA4OTUyODczMX0.V4A75JO9s-7MbDRY7VMydwydOvdkU4SNSz_BRoVAoqA'
 
-function cacheEspnData(cacheKey, payload) {
-  fetch(`${SUPABASE_URL_PUBLIC}/rest/v1/fw_espn_cache`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-    },
-    body: JSON.stringify({ cache_key: cacheKey, payload }),
-  }).catch(() => {}) // silent — this is a bonus write, never page-critical
+// In-memory guard, scoped to this one browser tab's lifetime — stops a single
+// visitor's own re-renders/effects from re-checking (let alone re-writing)
+// the same key repeatedly. Doesn't help across different visitors, which is
+// what the freshness check below is actually for.
+const _cacheCheckedThisSession = new Set()
+
+// Freshness threshold for data that's still live and can change (the current
+// week's scoreboard). Completed-game summaries don't use this at all — once
+// a game is final, its box score never changes, so those only ever need to
+// be cached once, full stop, not re-checked on a timer.
+const LIVE_CACHE_FRESH_MS = 3 * 60 * 1000 // 3 minutes
+
+// Replaces the old unconditional "write on every page load" version. This
+// was firing a fresh POST for the scoreboard on every single visit, plus one
+// additional POST per completed game in the fan-out loop below — with no
+// throttling at all, that's a dozen-plus unbounded writes from one page load
+// during a normal game week, all landing on a shared, resource-limited
+// database. Root-caused after the DB got pinned to 100% compute/disk I/O and
+// took down other projects sharing the same instance.
+//
+// isPermanent: true for completed-game summaries (write once, ever, then
+// never again for that key). false/omitted for the live scoreboard, which
+// uses the time-based freshness check instead.
+async function cacheEspnData(cacheKey, payload, isPermanent = false) {
+  if (_cacheCheckedThisSession.has(cacheKey)) return // already handled this tab-session
+  _cacheCheckedThisSession.add(cacheKey)
+
+  try {
+    const checkRes = await fetch(
+      `${SUPABASE_URL_PUBLIC}/rest/v1/fw_espn_cache?cache_key=eq.${encodeURIComponent(cacheKey)}&select=fetched_at&order=fetched_at.desc&limit=1`,
+      { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
+    )
+    const existing = await checkRes.json()
+    const existingRow = existing?.[0]
+
+    if (existingRow) {
+      if (isPermanent) return // completed game already cached once — never needs a rewrite
+      const ageMs = Date.now() - new Date(existingRow.fetched_at).getTime()
+      if (ageMs < LIVE_CACHE_FRESH_MS) return // still fresh enough, skip the write
+    }
+
+    // Missing, or stale enough to be worth refreshing — write it.
+    fetch(`${SUPABASE_URL_PUBLIC}/rest/v1/fw_espn_cache`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({ cache_key: cacheKey, payload }),
+    }).catch(() => {}) // silent — this is a bonus write, never page-critical
+  } catch {
+    // silent — the freshness check itself failing shouldn't break the page;
+    // worst case we just skip caching this once rather than risk a write storm
+  }
 }
 
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
@@ -170,7 +215,7 @@ export default function App() {
           .forEach(ev => {
             fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${ev.id}`)
               .then(r => r.json())
-              .then(d => cacheEspnData(`summary:${ev.id}`, d))
+              .then(d => cacheEspnData(`summary:${ev.id}`, d, true))
               .catch(() => {})
           })
       })
@@ -707,7 +752,7 @@ function GameCard({ game: g, isOpen, onToggle, index, squad }) {
         setBoxData(d)
         setBoxLoading(false)
         // Cache for the newsletter — same reasoning as the scoreboard cache.
-        cacheEspnData(`summary:${g.espnId}`, d)
+        cacheEspnData(`summary:${g.espnId}`, d, true)
       })
       .catch(() => setBoxLoading(false))
   }, [isOpen, g.espnId])
