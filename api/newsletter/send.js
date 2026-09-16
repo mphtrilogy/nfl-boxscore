@@ -259,9 +259,10 @@ async function espnFetch(path) {
   if (scoreboardMatch) {
     const cacheKey = `scoreboard:week${scoreboardMatch[1]}:type${scoreboardMatch[2]}`
     const cached = await readEspnCache(cacheKey)
-    if (cached) return cached
+    if (cached) { espnFetch.stats.cacheHits++; return cached }
   }
 
+  espnFetch.stats.liveAttempts++
   try {
     // ESPN's site.api began rejecting bare (no User-Agent) requests from
     // server IPs. Confirmed via two independent projects hitting the exact
@@ -275,14 +276,18 @@ async function espnFetch(path) {
     })
     if (!r.ok) {
       console.error(`espnFetch failed: ${path} -> HTTP ${r.status}`)
+      espnFetch.stats.liveFailures.push({ path, status: r.status })
       return { __error: `HTTP ${r.status}`, __path: path }
     }
+    espnFetch.stats.liveSuccesses++
     return r.json()
   } catch (e) {
     console.error(`espnFetch exception: ${path} ->`, e.message)
+    espnFetch.stats.liveFailures.push({ path, status: `exception: ${e.message}` })
     return { __error: e.message, __path: path }
   }
 }
+espnFetch.stats = { cacheHits: 0, liveAttempts: 0, liveSuccesses: 0, liveFailures: [] }
 
 // Determine week context per send type
 // Monday  → recapWeek = last completed week (all Sunday games)
@@ -340,17 +345,32 @@ async function getWeekEvents(week, forceSeasonType = null) {
 async function getGameSummary(eventId) {
   // Check cache first — same reasoning as espnFetch above.
   const cached = await readEspnCache(`summary:${eventId}`)
-  if (cached) return cached
+  if (cached) {
+    getGameSummary.stats.cacheHits++
+    return cached
+  }
 
+  getGameSummary.stats.liveAttempts++
   try {
     const r = await fetch(
       `https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${eventId}`,
       { headers: ESPN_HEADERS }
     )
-    if (!r.ok) return null
+    if (!r.ok) {
+      getGameSummary.stats.liveFailures.push({ eventId, status: r.status })
+      return null
+    }
+    getGameSummary.stats.liveSuccesses++
     return r.json()
-  } catch { return null }
+  } catch (e) {
+    getGameSummary.stats.liveFailures.push({ eventId, status: `exception: ${e.message}` })
+    return null
+  }
 }
+// Reset explicitly per-request in handler() — a warm serverless instance
+// can persist this static property across invocations otherwise, which
+// would silently blend one request's diagnostics into the next.
+getGameSummary.stats = { cacheHits: 0, liveAttempts: 0, liveSuccesses: 0, liveFailures: [] }
 
 // Filter to games that completed in the last N hours
 function completedWithinHours(events, hours) {
@@ -2458,6 +2478,12 @@ const getHeader = (req, name) =>
   typeof req.headers?.get === 'function' ? req.headers.get(name) : (req.headers?.[name.toLowerCase()] ?? null)
 
 async function handler(req) {
+  // Reset per-request — these are static properties on shared functions,
+  // so a warm serverless instance could otherwise blend one request's
+  // fetch diagnostics into the next request's numbers.
+  espnFetch.stats     = { cacheHits: 0, liveAttempts: 0, liveSuccesses: 0, liveFailures: [] }
+  getGameSummary.stats = { cacheHits: 0, liveAttempts: 0, liveSuccesses: 0, liveFailures: [] }
+
   // Auth — Vercel cron sends secret via Authorization header
   // Node functions only give req.url as a path ("/api/...?type=monday"),
   // not a full URL like Edge runtime did — this is the actual cause of the
@@ -2528,7 +2554,24 @@ async function handler(req) {
       const { html } = await buildEmail(
         sendType, weekCtx, parsedGames, currentEvents, previewSub
       )
-      return new Response(html, {
+      // Real diagnostics, not a guess — exactly how many scoreboard/box
+      // score fetches came from the Supabase cache vs. attempted ESPN
+      // directly, and the real outcome (status code) of each live attempt.
+      // This answers "is ESPN's block total or inconsistent" with actual
+      // numbers instead of theorizing from what data happened to show up.
+      const sbStats = espnFetch.stats
+      const bsStats = getGameSummary.stats
+      const failList = (arr) => arr.length
+        ? ` (${arr.slice(0,8).map(f => f.status).join(', ')}${arr.length > 8 ? `, +${arr.length-8} more` : ''})`
+        : ''
+      const diagHtml = `
+<div style="background:#1a1209;color:#c8a84b;font-family:monospace;font-size:10px;padding:12px 18px;line-height:1.7">
+<strong>🔧 PREVIEW DIAGNOSTICS</strong> (never shown in a real send)<br>
+Scoreboard/events — cache hits: ${sbStats.cacheHits} &middot; live attempts: ${sbStats.liveAttempts} &middot; live OK: ${sbStats.liveSuccesses} &middot; live failed: ${sbStats.liveFailures.length}${failList(sbStats.liveFailures)}<br>
+Box scores — cache hits: ${bsStats.cacheHits} &middot; live attempts: ${bsStats.liveAttempts} &middot; live OK: ${bsStats.liveSuccesses} &middot; live failed: ${bsStats.liveFailures.length}${failList(bsStats.liveFailures)}
+</div>`
+      const htmlWithDiag = html.replace('<div class="wrap">', `<div class="wrap">${diagHtml}`)
+      return new Response(htmlWithDiag, {
         headers: { 'Content-Type': 'text/html; charset=utf-8' },
       })
     }
