@@ -859,7 +859,7 @@ function renderFullGame(g, squad, mode = 'ppr') {
     ['First Downs',   'firstDowns',      true ],
     ['3rd Down Eff.', 'thirdDownEff',    null ],
     ['Turnovers',     'turnovers',       false],
-    ['Sacks',         'sacks',           true ],
+    ['Sacks',         'sacksYardsLost',  true ],
     ['Poss. Time',    'possessionTime',  null ],
   ].map(([lbl, key, moreBetter]) => {
     const av = awayStats[key] || '&mdash;'
