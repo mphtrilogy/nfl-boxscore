@@ -17,6 +17,11 @@
 //
 // Manual trigger: POST /api/newsletter/send
 //   Body: { "type": "monday", "secret": "<CRON_SECRET>" }
+//
+// Preview mode (no subscribers touched, no email sent, ever):
+//   GET /api/newsletter/send?type=monday&secret=<CRON_SECRET>&preview=true
+//   Returns the actual rendered HTML directly — open it in a browser tab.
+//   Add &team=SEA to preview it personalized for that favorite team.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // Node.js runtime, not edge — edge functions have a hard, non-configurable
@@ -2412,6 +2417,26 @@ async function handler(req) {
     const parsedGames = summaries
       .map((s, i) => parseGameSummary(s, targetEvents[i]))
       .filter(Boolean)
+
+    // Preview mode — renders exactly what a real send would produce,
+    // without ever touching subscribers or Resend. Visit with
+    // &preview=true to see the actual HTML in a browser tab instead of an
+    // inbox — safe to hit repeatedly while iterating, nothing goes out to
+    // anyone. Optional &team=SEA previews it personalized the way a real
+    // subscriber with that favorite team would see it.
+    if (url.searchParams.get('preview') === 'true') {
+      const previewSub = {
+        email: 'preview@nflboxscore.com',
+        fav_team: url.searchParams.get('team') || 'All',
+        squad_players: '',
+      }
+      const { subject, html } = await buildEmail(
+        sendType, weekCtx, parsedGames, currentEvents, previewSub
+      )
+      return new Response(html, {
+        headers: { 'Content-Type': 'text/html; charset=utf-8', 'X-Preview-Subject': subject },
+      })
+    }
 
     // 6. Get subscribers
     const subscribers = await getSubscribers(sendType)
