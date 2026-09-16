@@ -2084,6 +2084,13 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
 
   // ── MONDAY: All Sunday games ──────────────────────────────────────────────
   if (sendType === 'monday') {
+    // Events for the week actually being recapped (Sunday's games) — this
+    // was missing entirely before, which is why the bye-week note and SNF
+    // lookup below were referencing a variable that only ever existed in
+    // the outer handler(), not here. That's the "recapEvents is not
+    // defined" crash — this is the actual fix, not a workaround.
+    const recapEvents = recapWeek ? await getWeekEvents(recapWeek) : []
+
     // Auto-generated lede — the single most notable thing this week,
     // built from real data (upset detection via odds, or best individual
     // performance). Always first, above everything else.
