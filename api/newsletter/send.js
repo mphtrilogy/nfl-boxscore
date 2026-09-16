@@ -727,6 +727,7 @@ body{margin:0;padding:0;background:#f0ebe0;font-family:Georgia,serif}
 .fc-pname{font-weight:700}
 .fc-team{font-family:monospace;font-size:8px;color:#9e9080;font-weight:400}
 .fc-pts{float:right;font-family:monospace;font-size:11px;font-weight:700;color:#1a5c1a}
+.fc-line{clear:both;display:block;font-family:monospace;font-size:9px;color:#6b5f4e;padding-top:1px}
 /* Divider */
 .div{height:1px;background:rgba(42,31,14,.12);margin:4px 0}
 /* CTA */
@@ -1168,6 +1169,7 @@ function renderFantasyStatsCorner(parsedGames, mode = 'ppr') {
   <span class="fc-rank">${i+1}</span>
   <span class="fc-pname">${p.name} <span class="fc-team">${p.team}</span></span>
   <span class="fc-pts">${fp(p,mode)}</span>
+  <div class="fc-line">${statLine(p)}</div>
 </div>`).join('')
 
   const fireRow = fireClub.length
