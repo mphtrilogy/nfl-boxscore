@@ -2522,12 +2522,18 @@ async function handler(req) {
     const currentEvents = await getWeekEvents(currentWeek)
 
     // 3. Identify which games to deep-fetch (completed since last night)
-    const targetEvents  = getTargetEvents(
-      sendType === 'tuesday' ? recapEvents :  // MNF = current week\'s final game
-      sendType === 'friday'  ? currentEvents : // TNF = current week Thursday game
-      recapEvents,
-      sendType
-    )
+    // Preview mode bypasses the freshness window on purpose — testing this
+    // days after the real games happened would otherwise silently exclude
+    // everything except the single most recent game, giving a false read
+    // on what's actually fetchable. The real send path is untouched.
+    const isPreview = url.searchParams.get('preview') === 'true'
+    const eventsForTargets =
+      sendType === 'tuesday' ? recapEvents :
+      sendType === 'friday'  ? currentEvents :
+      recapEvents
+    const targetEvents = isPreview
+      ? eventsForTargets.filter(ev => ev.status?.type?.completed)
+      : getTargetEvents(eventsForTargets, sendType)
 
     // 4. Fetch full box scores in parallel (cap at 16)
     const summaries  = await Promise.all(
