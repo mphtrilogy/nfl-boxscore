@@ -655,6 +655,25 @@ body{margin:0;padding:0;background:#f0ebe0;font-family:Georgia,serif}
 .ps td.fp-gold{font-weight:700;color:#9a7a2e}
 .ps tr.sq td{background:rgba(200,168,75,.1) !important;border-left:3px solid #c8a84b}
 .sq-tag{display:inline-block;background:#c8a84b;color:#1a1209;font-family:monospace;font-size:6px;font-weight:700;letter-spacing:.1em;padding:1px 4px;border-radius:2px;margin-left:4px;vertical-align:middle}
+/* Dark-theme override for the full game card (.gc has a near-black
+   background) — the team-stat and player-stat tables above were built
+   assuming a light background like the rest of the newsletter, so
+   several cells (.ps td, .ps td.pn, .ts-vc) were rendering in the exact
+   same color as .gc's background: technically present, completely
+   invisible. This is the actual "can't read the night game stats" fix,
+   scoped so it only touches these tables when they're inside a dark card. */
+.gc .ps-lbl{color:rgba(255,255,255,.4)}
+.gc .ps th{color:rgba(255,255,255,.45);background:rgba(255,255,255,.05)}
+.gc .ps td{color:rgba(255,255,255,.85);border-bottom-color:rgba(255,255,255,.08)}
+.gc .ps td.pn{color:#fff}
+.gc .ps td.tm{color:rgba(255,255,255,.4)}
+.gc .ps td.fp{color:#4ade80}
+.gc .ps td.fp-gold{color:#e0b84e}
+.gc .ts td{border-bottom-color:rgba(255,255,255,.08)}
+.gc .ts-lc{color:rgba(255,255,255,.45)}
+.gc .ts-vc{color:rgba(255,255,255,.85)}
+.gc .ts-vw{color:#4ade80}
+.gc .ts-hdr{background:rgba(255,255,255,.05)}
 /* Condensed game card */
 .cg{background:#1a1209;margin:5px 0;border-left:2px solid rgba(200,168,75,.3)}
 .cg-head{display:table;width:100%;padding:9px 14px;box-sizing:border-box}
