@@ -675,6 +675,18 @@ body{margin:0;padding:0;background:#f0ebe0;font-family:Georgia,serif}
 .sq-sum{background:rgba(200,168,75,.07);border-left:3px solid #c8a84b;padding:10px 14px;margin:8px 0;font-family:Georgia,serif;font-size:13px;line-height:1.6;color:#1a1209;font-style:italic}
 /* Callout */
 .callout{background:rgba(200,168,75,.07);border-left:3px solid #c8a84b;padding:9px 14px;margin:8px 18px;font-family:Georgia,serif;font-size:12px;line-height:1.6;color:#1a1209;font-style:italic}
+/* Fantasy & Stats Corner */
+.fc-statline{background:rgba(200,168,75,.07);border-left:3px solid #c8a84b;padding:10px 14px;margin:8px 18px 4px}
+.fc-statline-lbl{font-family:monospace;font-size:7px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#8b1a1a;margin-bottom:4px}
+.fc-statline-body{font-family:Georgia,serif;font-size:13px;line-height:1.55;color:#1a1209}
+.fc-fire-row{padding:8px 18px 2px}
+.fc-fire-pill{display:inline-block;font-family:monospace;font-size:8px;font-weight:700;color:#8b1a1a;background:rgba(139,26,26,.08);border-radius:10px;padding:3px 8px;margin:0 4px 4px 0}
+.fc-pos-lbl{font-family:monospace;font-size:7px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#6b5f4e;padding:10px 18px 2px}
+.fc-row{padding:3px 18px;border-bottom:1px solid rgba(42,31,14,.06);font-family:Georgia,serif;font-size:12px;color:#1a1209}
+.fc-rank{font-family:monospace;font-size:9px;color:#9e9080;width:14px;display:inline-block}
+.fc-pname{font-weight:700}
+.fc-team{font-family:monospace;font-size:8px;color:#9e9080;font-weight:400}
+.fc-pts{float:right;font-family:monospace;font-size:11px;font-weight:700;color:#1a5c1a}
 /* Divider */
 .div{height:1px;background:rgba(42,31,14,.12);margin:4px 0}
 /* CTA */
@@ -1064,6 +1076,81 @@ ${rows}
 <div class="cta-wrap">
   <a class="cta" href="${SITE_URL}">Full Waiver Analysis &rarr;</a>
 </div>`
+}
+
+// FANTASY & STATS CORNER — a single-week snapshot built entirely from this
+// week's already-parsed box scores (no extra fetch, no extra risk to
+// Supabase or ESPN). Deliberately NOT season-long totals — those need real
+// multi-week aggregation, a separate, bigger piece of work. This is the
+// "easy, interesting win" tier: today's actual results, framed with some
+// personality, closing with a push to the real FW Formula on-site rather
+// than trying to replicate it here.
+function renderFantasyStatsCorner(parsedGames, mode = 'ppr') {
+  if (!parsedGames?.length) return ''
+
+  // Flatten every skill-position player across every game this week,
+  // tagging their opponent for the Stat Line of the Week blurb.
+  const all = []
+  parsedGames.forEach(g => {
+    if (!g) return
+    ;['QB','RB','WR'].forEach(pos => {
+      g.byPos[pos]?.forEach(p => {
+        const opp = p.team === g.home.abbr ? g.away.abbr : g.home.abbr
+        all.push({ ...p, opp })
+      })
+    })
+  })
+  if (!all.length) return ''
+
+  const sorted = [...all].sort((a,b) => fp(b,mode) - fp(a,mode))
+  const star   = sorted[0]
+  if (!star) return ''
+
+  const statLine = (p) => {
+    if (p.pos === 'QB') {
+      const yds = p.vals['YDS']||'0', td = p.vals['TD']||'0', ca = p.vals['C/ATT']||''
+      return `${ca}, ${yds} yds, ${td} TD`
+    }
+    if (p.pos === 'RB') {
+      const yds = p.vals['YDS']||'0', td = p.vals['TD']||'0', car = p.vals['CAR']||'0'
+      return `${car} car, ${yds} yds${td!=='0' ? `, ${td} TD` : ''}`
+    }
+    const yds = p.vals['YDS']||'0', td = p.vals['TD']||'0', rec = p.vals['REC']||'0'
+    return `${rec} rec, ${yds} yds${td!=='0' ? `, ${td} TD` : ''}`
+  }
+
+  const leaders = (pos, n=5) =>
+    all.filter(p => p.pos === pos).sort((a,b) => fp(b,mode)-fp(a,mode)).slice(0, n)
+
+  const FIRE_THRESHOLD = 25
+  const fireClub = sorted.filter(p => fp(p,mode) >= FIRE_THRESHOLD).slice(0, 8)
+
+  const leaderRows = (pos) => leaders(pos).map((p,i) => `
+<div class="fc-row">
+  <span class="fc-rank">${i+1}</span>
+  <span class="fc-pname">${p.name} <span class="fc-team">${p.team}</span></span>
+  <span class="fc-pts">${fp(p,mode)}</span>
+</div>`).join('')
+
+  const fireRow = fireClub.length
+    ? `<div class="fc-fire-row">${fireClub.map(p => `<span class="fc-fire-pill">🔥 ${p.name} — ${fp(p,mode)}</span>`).join(' ')}</div>`
+    : ''
+
+  const posBlock = (pos, label) => leaders(pos).length
+    ? `<div class="fc-pos-lbl">${label}</div>${leaderRows(pos)}`
+    : ''
+
+  return `
+<span class="sec-label">🎯 Fantasy &amp; Stats Corner — This Week</span>
+<div class="fc-statline">
+  <div class="fc-statline-lbl">Stat Line of the Week</div>
+  <div class="fc-statline-body"><strong class="pname">${star.name}</strong> (${star.team}) vs ${star.opp} — ${statLine(star)} &nbsp;&middot;&nbsp; ${fp(star,mode)} FPTS (${fpLabel(mode)})</div>
+</div>
+${fireRow}
+${posBlock('QB','Quarterbacks')}
+${posBlock('RB','Running Backs')}
+${posBlock('WR','Receivers')}
+<div class="callout">This week's raw output only — see full season Trend Scores, Start/Sit grades, and matchup breakdowns on the real <a href="${SITE_URL}?view=Fantasy&amp;tab=fw">FW Formula &rarr;</a></div>`
 }
 
 // SQUAD SUMMARY — "Your fantasy squad this week"
@@ -2060,6 +2147,7 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
     html += renderSquadSummary(parsedGames, squad, mode)
     html += fwTakeHTML
     html += renderWaiverSection(parsedGames, currentWeek, squad, mode)
+    html += renderFantasyStatsCorner(parsedGames, mode)
   }
 
   // ── TUESDAY: MNF game only ────────────────────────────────────────────────
