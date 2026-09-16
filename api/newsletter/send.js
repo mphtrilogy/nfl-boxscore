@@ -671,6 +671,7 @@ body{margin:0;padding:0;background:#f0ebe0;font-family:Georgia,serif}
 .ww-item{padding:9px 18px;border-bottom:1px solid rgba(42,31,14,.1)}
 .ww-name{font-family:Georgia,serif;font-size:14px;font-weight:700;color:#1a1209}
 .ww-badge{display:inline-block;font-family:monospace;font-size:7px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:1px 6px;border-radius:2px;margin-right:5px}
+.ww-rank{font-family:monospace;font-size:10px;font-weight:700;color:#9e9080;margin-right:6px}
 .ww-add{background:#1a5c1a;color:#fff}
 .ww-hi{color:#1a5c1a;font-family:monospace;font-size:8px;font-weight:700}
 .ww-md{color:#d97706;font-family:monospace;font-size:8px;font-weight:700}
@@ -1043,8 +1044,12 @@ async function renderCompactSchedule(events, week, seasonType, favTeam, label, p
 </div>`
 }
 
-// WAIVER WIRE — auto-generated from real box score data
-function renderWaiverSection(parsedGames, nextWeek, squad, mode = 'ppr') {
+// TOP PERFORMERS — auto-generated from real box score data. Deliberately
+// NOT framed as waiver-wire advice: there's no actual roster-ownership
+// data behind this (no way to know who's already rostered in 100% of
+// leagues vs. genuinely available), so calling a locked-in star an "ADD"
+// was actively misleading. This just reports who actually balled out.
+function renderWaiverSection(parsedGames, recapWeek, squad, mode = 'ppr') {
   const seen       = new Set()
   const performers = []
 
@@ -1066,36 +1071,30 @@ function renderWaiverSection(parsedGames, nextWeek, squad, mode = 'ppr') {
 
   if (!targets.length) return ''
 
-  const rows = targets.map(p => {
+  const rows = targets.map((p, i) => {
     const pts     = fp(p, mode)
-    const pri     = pts >= 25 ? 'HIGH' : pts >= 18 ? 'MED' : 'LOW'
-    const priCls  = pri === 'HIGH' ? 'ww-hi' : 'ww-md'
     const isSquad = squad.some(s => p.name.toLowerCase().includes(s.toLowerCase()))
 
-    const reason = p.pos === 'RB'
-      ? `${p.vals['CAR']||'?'} car, ${p.vals['YDS']||'?'} yds${p.vals['TD']&&p.vals['TD']!=='0'?`, ${p.vals['TD']} TD`:''} — usage trending up`
-      : `${p.vals['REC']||'?'} rec/${p.vals['TGT']||'?'} tgt, ${p.vals['YDS']||'?'} yds${p.vals['TD']&&p.vals['TD']!=='0'?`, ${p.vals['TD']} TD`:''} — target share rising`
+    const line = p.pos === 'RB'
+      ? `${p.vals['CAR']||'?'} car, ${p.vals['YDS']||'?'} yds${p.vals['TD']&&p.vals['TD']!=='0'?`, ${p.vals['TD']} TD`:''}`
+      : `${p.vals['REC']||'?'} rec/${p.vals['TGT']||'?'} tgt, ${p.vals['YDS']||'?'} yds${p.vals['TD']&&p.vals['TD']!=='0'?`, ${p.vals['TD']} TD`:''}`
 
     return `
 <div class="ww-item">
   <div>
-    <span class="ww-badge ww-add">ADD</span>
+    <span class="ww-rank">${i+1}</span>
     <strong class="ww-name">${p.name}${isSquad?' ⚡':''}</strong>
     <span style="font-family:monospace;font-size:8px;color:#9e9080"> ${p.pos} &middot; ${p.team}</span>
-    &nbsp;<span class="${priCls}">${pri} PRI</span>
   </div>
-  <div class="ww-reason">${reason}</div>
+  <div class="ww-reason">${line}</div>
   <div class="ww-stat">${pts} FPTS (${fpLabel(mode)}) &nbsp;&middot;&nbsp; ${p.game}</div>
 </div>`
   }).join('')
 
   return `
-<span class="sec-label">📋 Waiver Wire Targets — Week ${nextWeek}</span>
+<span class="sec-label">🔥 Top Fantasy Performers — Week ${recapWeek}</span>
 ${rows}
-<div class="callout">Claims close Wednesday in most leagues. Lead with your top priority — don\'t split waiver position across multiple speculative adds.</div>
-<div class="cta-wrap">
-  <a class="cta" href="${SITE_URL}">Full Waiver Analysis &rarr;</a>
-</div>`
+<div class="callout">Raw output, not roster availability — some of these are locked into 100% of rosters. See the site for real add/drop targets based on actual ownership.</div>`
 }
 
 // FANTASY & STATS CORNER — a single-week snapshot built entirely from this
@@ -2173,7 +2172,7 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
     // Fantasy content — pushed toward the bottom, games and news lead
     html += renderSquadSummary(parsedGames, squad, mode)
     html += fwTakeHTML
-    html += renderWaiverSection(parsedGames, currentWeek, squad, mode)
+    html += renderWaiverSection(parsedGames, recapWeek, squad, mode)
     html += renderFantasyStatsCorner(parsedGames, mode)
   }
 
@@ -2218,7 +2217,7 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
     html += renderSquadSummary(parsedGames, squad, mode)
     html += fwTakeHTML
     html += injuryHTML
-    html += renderWaiverSection(parsedGames, currentWeek, squad, mode)
+    html += renderWaiverSection(parsedGames, recapWeek, squad, mode)
   }
 
   // ── THURSDAY: No recap — preview + HOF ───────────────────────────────────
@@ -2570,11 +2569,24 @@ async function handler(req) {
       const failList = (arr) => arr.length
         ? ` (${arr.slice(0,8).map(f => f.status).join(', ')}${arr.length > 8 ? `, +${arr.length-8} more` : ''})`
         : ''
+      // Same approach applied to the blank team-stats rows and missing
+      // player names reported in the full box score — real ESPN field
+      // names, not another guess at what they might be called.
+      const sampleGame   = parsedGames.find(g => g)
+      const teamStatKeys = sampleGame ? Object.keys(sampleGame.homeStats || {}) : []
+      const rawPassingGroup = summaries.find(s => s?.boxscore?.players?.length)
+        ?.boxscore.players.find(td => td.statistics?.some(s => s.name === 'passing'))
+        ?.statistics.find(s => s.name === 'passing')
+      const rawAthlete     = rawPassingGroup?.athletes?.[0]
+      const rawAthleteKeys = rawAthlete ? Object.keys(rawAthlete) : []
+      const rawAthleteSubKeys = rawAthlete?.athlete ? Object.keys(rawAthlete.athlete) : []
       const diagHtml = `
 <div style="background:#1a1209;color:#c8a84b;font-family:monospace;font-size:10px;padding:12px 18px;line-height:1.7">
 <strong>🔧 PREVIEW DIAGNOSTICS</strong> (never shown in a real send)<br>
 Scoreboard/events — cache hits: ${sbStats.cacheHits} &middot; live attempts: ${sbStats.liveAttempts} &middot; live OK: ${sbStats.liveSuccesses} &middot; live failed: ${sbStats.liveFailures.length}${failList(sbStats.liveFailures)}<br>
-Box scores — cache hits: ${bsStats.cacheHits} &middot; live attempts: ${bsStats.liveAttempts} &middot; live OK: ${bsStats.liveSuccesses} &middot; live failed: ${bsStats.liveFailures.length}${failList(bsStats.liveFailures)}
+Box scores — cache hits: ${bsStats.cacheHits} &middot; live attempts: ${bsStats.liveAttempts} &middot; live OK: ${bsStats.liveSuccesses} &middot; live failed: ${bsStats.liveFailures.length}${failList(bsStats.liveFailures)}<br>
+Team stat keys ESPN actually returned: ${teamStatKeys.join(', ') || 'none found'}<br>
+First passing athlete — raw entry keys: ${rawAthleteKeys.join(', ') || 'none found'} &middot; athlete sub-object keys: ${rawAthleteSubKeys.join(', ') || 'none found'}
 </div>`
       const htmlWithDiag = html.replace('<div class="wrap">', `<div class="wrap">${diagHtml}`)
       return new Response(htmlWithDiag, {
