@@ -676,6 +676,11 @@ body{margin:0;padding:0;background:#f0ebe0;font-family:Georgia,serif}
 .gc .ts-hdr{background:rgba(255,255,255,.05)}
 /* Condensed game card */
 .cg{background:#1a1209;margin:5px 0;border-left:2px solid rgba(200,168,75,.3)}
+/* Compact score strip */
+.ss-row{display:block;padding:6px 18px;border-bottom:1px solid rgba(42,31,14,.06);font-family:monospace;font-size:12px;color:#1a1209;text-decoration:none}
+.ss-win{font-weight:700}
+.ss-los{color:#9e9080}
+.ss-at{color:#9e9080;padding:0 8px;font-size:9px}
 .cg-head{display:table;width:100%;padding:9px 14px;box-sizing:border-box}
 .cg-t{display:table-cell;width:35%;vertical-align:middle}
 .cg-tr{display:table-cell;width:35%;vertical-align:middle;text-align:right}
@@ -933,6 +938,33 @@ ${metaLine}
 }
 
 // CONDENSED game card — for non-fav games
+// COMPACT SCORE STRIP — one row per game, final scores only. Much lighter
+// than renderCondensedGame's mini-card; built for Tuesday's "quick glance
+// at the whole week" alongside the detailed MNF game treatment.
+function renderScoreStrip(events, weekNum) {
+  if (!events?.length) return ''
+  const rows = events.map(ev => {
+    const comps  = ev.competitions?.[0]
+    const home   = comps?.competitors?.find(c => c.homeAway === 'home')
+    const away   = comps?.competitors?.find(c => c.homeAway === 'away')
+    const hAbbr  = home?.team?.abbreviation || '?'
+    const aAbbr  = away?.team?.abbreviation || '?'
+    const hScore = parseInt(home?.score ?? 0)
+    const aScore = parseInt(away?.score ?? 0)
+    const hWon   = hScore > aScore
+    const aWon   = aScore > hScore
+    const deepLink = `${SITE_URL}?game=${aAbbr}-${hAbbr}`
+    return `
+<a href="${deepLink}" class="ss-row">
+  <span class="${aWon?'ss-win':'ss-los'}">${aAbbr} ${aScore}</span><span class="ss-at">@</span><span class="${hWon?'ss-win':'ss-los'}">${hAbbr} ${hScore}</span>
+</a>`
+  }).join('')
+
+  return `
+<span class="sec-label">📊 Week ${weekNum} Final Scores</span>
+<div>${rows}</div>`
+}
+
 function renderCondensedGame(g) {
   if (!g) return ''
   const { home, away, winner, isOT, awayQ, homeQ,
@@ -2219,6 +2251,13 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
       html += isFavGame
         ? renderFullGame(mnfGame, squad, mode)
         : renderCondensedGame(mnfGame)
+
+      // Quick-glance recap of the whole week — allEvents already covers
+      // the full Sun+Mon slate here specifically, since currentWeek and
+      // recapWeek are the same value on Tuesdays (unlike Monday, which
+      // needs its own separate recapEvents fetch for this reason).
+      const weekCompleted = allEvents.filter(ev => ev.status?.type?.completed)
+      html += renderScoreStrip(weekCompleted, recapWeek)
     }
 
     html += teamNewsHTML
