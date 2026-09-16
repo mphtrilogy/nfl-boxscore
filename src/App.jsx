@@ -136,6 +136,7 @@ export default function App() {
   // newsletter link uses away-home order (how the site displays "AWAY @
   // HOME" everywhere else), so we flip it here rather than change the
   // public-facing link format.
+  const [initialFantasyTab, setInitialFantasyTab] = useState('leaders')
   useEffect(() => {
     if (typeof window === 'undefined') return
     const gameParam = new URLSearchParams(window.location.search).get('game')
@@ -146,6 +147,19 @@ export default function App() {
     if (match) setActiveWeek(match.week)
     setActiveView('Scores')
     setOpenCardId(`${homeAbbr}-${awayAbbr}`)
+  }, [])
+
+  // Deep-link straight into a specific Fantasy Hub tab — e.g. newsletter
+  // links use ?view=Fantasy&tab=fw to land subscribers right on FW Formula
+  // instead of the homepage.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const viewParam = params.get('view')
+    if (viewParam !== 'Fantasy') return
+    setActiveView('Fantasy')
+    const tabParam = params.get('tab')
+    if (tabParam) setInitialFantasyTab(tabParam)
   }, [])
 
   // Apply font theme to body
@@ -417,6 +431,7 @@ export default function App() {
             trendsMode={trendsMode} setTrendsMode={setTrendsMode}
             trendsRange={trendsRange} setTrendsRange={setTrendsRange}
             trendsPos={trendsPos} setTrendsPos={setTrendsPos}
+            initialTab={initialFantasyTab}
           />
         )}
         {activeView === 'Draft'     && <DraftView />}
@@ -3924,8 +3939,8 @@ class TabErrorBoundary extends React.Component {
   }
 }
 
-function FantasyView({ mode, setMode, currentWeek, squad, watchlist, toggleWatch, trendsMode, setTrendsMode, trendsRange, setTrendsRange, trendsPos, setTrendsPos }) {
-  const [tab, setTab] = useState('leaders')
+function FantasyView({ mode, setMode, currentWeek, squad, watchlist, toggleWatch, trendsMode, setTrendsMode, trendsRange, setTrendsRange, trendsPos, setTrendsPos, initialTab }) {
+  const [tab, setTab] = useState(initialTab || 'leaders')
   const TABS = [
     { id:'leaders',   label:'📊 Leaders' },
     { id:'fw',        label:'⚡ FW Formula' },
