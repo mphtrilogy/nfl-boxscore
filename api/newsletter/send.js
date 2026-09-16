@@ -2430,11 +2430,11 @@ async function handler(req) {
         fav_team: url.searchParams.get('team') || 'All',
         squad_players: '',
       }
-      const { subject, html } = await buildEmail(
+      const { html } = await buildEmail(
         sendType, weekCtx, parsedGames, currentEvents, previewSub
       )
       return new Response(html, {
-        headers: { 'Content-Type': 'text/html; charset=utf-8', 'X-Preview-Subject': subject },
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
       })
     }
 
