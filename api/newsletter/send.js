@@ -2278,6 +2278,12 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
     html += fwTakeHTML
     html += injuryHTML
     html += renderWaiverSection(parsedGames, recapWeek, squad, mode)
+
+    // Closing trivia tidbit — Thursday and Friday already had this; Tuesday
+    // never did, purely an oversight. renderHOFTidbit already has a
+    // 'tuesday' entry built into its rotation offset, so this was always
+    // meant to be wired in here too.
+    html += renderHOFTidbit(currentWeek, sendType)
   }
 
   // ── THURSDAY: No recap — preview + HOF ───────────────────────────────────
