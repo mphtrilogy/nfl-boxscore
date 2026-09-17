@@ -405,7 +405,7 @@ async function fetchGameWeather(homeTeam, gameDate) {
   const date = gameDate ? new Date(gameDate).toISOString().split('T')[0] : null
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}` +
     `&daily=precipitation_sum,wind_speed_10m_max,temperature_2m_min,temperature_2m_max,weather_code` +
-    `&wind_speed_unit=mph&temperature_unit=fahrenheit&forecast_days=7&timezone=America%2FNew_York`
+    `&wind_speed_unit=mph&temperature_unit=fahrenheit&precipitation_unit=inch&forecast_days=7&timezone=America%2FNew_York`
 
   try {
     const r    = await fetch(url)
