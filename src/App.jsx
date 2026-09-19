@@ -1659,11 +1659,16 @@ function GameInfoDrawer({ game: g }) {
         <div className="gi-row gi-weather">
           <span>Weather</span>
           {weather ? (
-            <span className="gi-weather-val">
+            <a
+              href={`https://www.google.com/search?q=${encodeURIComponent(`weather ${weatherCity.replace(',', ' ')} ${g.date}`)}`}
+              target="_blank" rel="noopener"
+              className="gi-weather-val sb-google-link"
+              onClick={e => e.stopPropagation()}
+            >
               {weather.icon} {weather.temp}°F · {weather.wind}mph wind
               {weather.rain ? ' · Rain' : ''}
               {weather.fantasy && <span className="gi-weather-warning"> {weather.fantasy}</span>}
-            </span>
+            </a>
           ) : (
             <span className="gi-weather-val">☀️ Check closer to game</span>
           )}
