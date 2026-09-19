@@ -162,6 +162,11 @@ export function parseESPNGame(event) {
     espnId:       event.id,
     week:         event.week?.number,
     date:         d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    // Raw ISO date, kept alongside the display-formatted one above —
+    // anything that needs to pass a real date to an API (weather
+    // forecasts, etc.) should use this instead of .date, which is
+    // display-only text like "Sep 20", not a parseable date.
+    dateISO:      event.date ? event.date.split('T')[0] : '',
     day:          d.toLocaleDateString('en-US', { weekday: 'short' }),
     time:         d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
     name:         event.name,
