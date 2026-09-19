@@ -1566,7 +1566,7 @@ function GameInfoDrawer({ game: g }) {
   const homeTeam = g.home
   const isOutdoor = OUTDOOR_STADIUMS.includes(homeTeam)
   const weatherCity = isOutdoor ? STADIUM_CITIES[homeTeam] : null
-  const weather = useWeather(seasonStarted && weatherCity ? weatherCity : null)
+  const weather = useWeather(seasonStarted && weatherCity ? weatherCity : null, g.date)
 
   // Fetch live odds directly — separate spread + over/under, not just g.odds string
   const [odds, setOdds] = useState(null)
@@ -5473,7 +5473,7 @@ const STADIUM_CITIES = {
 // Outdoor stadiums only (indoor = weather irrelevant)
 const OUTDOOR_STADIUMS = ['BUF','CHI','CLE','DAL','DEN','GB','KC','LV','MIA','NE','NYG','NYJ','PHI','PIT','SEA','SF','TEN','WAS','BAL','CIN','JAC','NO','CAR']
 
-function useWeather(city) {
+function useWeather(city, gameDate) {
   const [weather, setWeather] = useState(null)
   useEffect(() => {
     if (!city) return
@@ -5497,25 +5497,33 @@ function useWeather(city) {
     }
     const coords = CITY_COORDS[city]
     if (!coords) return
-    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&current=temperature_2m,precipitation,wind_speed_10m,weather_code&wind_speed_unit=mph&temperature_unit=fahrenheit&forecast_days=1`)
+    // Forecast for the actual game date, not "current" weather — a game
+    // days away needs Sunday's forecast, not what it's like outside right
+    // now. This was the real bug: showing today's sunny sky for a game
+    // that's genuinely forecast to have rain on its actual date.
+    const targetDate = gameDate || new Date().toISOString().split('T')[0]
+    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&daily=temperature_2m_max,precipitation_sum,wind_speed_10m_max,weather_code&wind_speed_unit=mph&temperature_unit=fahrenheit&precipitation_unit=inch&start_date=${targetDate}&end_date=${targetDate}&timezone=auto`)
       .then(r => r.json())
       .then(data => {
-        const c = data.current
-        if (!c) return
-        const code = c.weather_code
+        const d = data.daily
+        if (!d?.time?.length) return
+        const temp = d.temperature_2m_max[0]
+        const wind = d.wind_speed_10m_max[0]
+        const rain = d.precipitation_sum[0] || 0
+        const code = d.weather_code[0]
         const icon = code <= 1 ? '☀️' : code <= 3 ? '⛅' : code <= 48 ? '🌫️' : code <= 67 ? '🌧️' : code <= 77 ? '❄️' : code <= 82 ? '🌦️' : '⛈️'
         setWeather({
-          temp: Math.round(c.temperature_2m),
-          wind: Math.round(c.wind_speed_10m),
-          rain: c.precipitation > 0,
+          temp: Math.round(temp),
+          wind: Math.round(wind),
+          rain: rain > 0,
           icon,
-          fantasy: c.wind_speed_10m > 20 ? '⚠️ High wind — avoid pass catchers' :
-                   c.precipitation > 0.1 ? '🌧️ Rain game — favor RBs' :
-                   c.temperature_2m < 25 ? '🥶 Extreme cold — expect run game' : null,
+          fantasy: wind > 20 ? '⚠️ High wind — avoid pass catchers' :
+                   rain > 0.1 ? '🌧️ Rain game — favor RBs' :
+                   temp < 25 ? '🥶 Extreme cold — expect run game' : null,
         })
       })
       .catch(() => {})
-  }, [city])
+  }, [city, gameDate])
   return weather
 }
 
