@@ -289,7 +289,10 @@ export default function App() {
         // No live match yet (game hasn't been played/ESPN has no data for it) —
         // always mark as upcoming so GameCard renders the Game Info drawer.
         // Normalize tv → network since that's what GameCard/GameInfoDrawer read.
-        return { ...g, status: 'upcoming', homeScore: g.homeScore ?? null, awayScore: g.awayScore ?? null, network: g.tv }
+        // g.date here is still SCHEDULE_2026's raw ISO string (unlike the
+        // live branch above, where parseESPNGame's .date overwrites it with
+        // a display-formatted one) — dateISO stays consistent either way.
+        return { ...g, status: 'upcoming', homeScore: g.homeScore ?? null, awayScore: g.awayScore ?? null, network: g.tv, dateISO: g.date }
       })
 
   // Detect if any game is live (for auto-refresh indicator)
@@ -1566,7 +1569,7 @@ function GameInfoDrawer({ game: g }) {
   const homeTeam = g.home
   const isOutdoor = OUTDOOR_STADIUMS.includes(homeTeam)
   const weatherCity = isOutdoor ? STADIUM_CITIES[homeTeam] : null
-  const weather = useWeather(seasonStarted && weatherCity ? weatherCity : null, g.date)
+  const weather = useWeather(seasonStarted && weatherCity ? weatherCity : null, g.dateISO)
 
   // Fetch live odds directly — separate spread + over/under, not just g.odds string
   const [odds, setOdds] = useState(null)
