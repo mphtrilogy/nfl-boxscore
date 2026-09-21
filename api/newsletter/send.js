@@ -309,8 +309,14 @@ async function getWeekContext(sendType) {
   }
 
   if (sendType === 'monday') {
-    // Sunday games belong to the week that just completed
-    return { currentWeek: week, recapWeek: Math.max(1, week - 1) }
+    // Sunday's games belong to the SAME week number this date-formula
+    // already computes — it rolls over on Wednesdays (Week 1 opened on
+    // one), so the whole Wed-through-Mon window, including yesterday's
+    // full Sunday slate, is already "week N." Subtracting one here was
+    // wrong — it only ever looked right on the very first Monday send,
+    // where week-1 underflowed to 0 and got clamped back up to 1 by
+    // coincidence. This is the real fix, not the clamp.
+    return { currentWeek: week, recapWeek: week }
   }
   if (sendType === 'tuesday') {
     // MNF is the last game of the current week
