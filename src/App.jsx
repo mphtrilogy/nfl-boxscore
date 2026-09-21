@@ -295,6 +295,16 @@ export default function App() {
         return { ...g, status: 'upcoming', homeScore: g.homeScore ?? null, awayScore: g.awayScore ?? null, network: g.tv, dateISO: g.date }
       })
 
+  // Temporary visible diagnostic — add ?debug=1 to the URL to see exactly
+  // what ESPN's live scoreboard actually returned this week vs. what the
+  // schedule expects, instead of guessing at another theory. Safe to
+  // remove once the real cause is confirmed.
+  const debugMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1'
+  const scheduleThisWeek = SCHEDULE_2026.filter(g => g.week === activeWeek)
+  const unmatched = scheduleThisWeek.filter(g =>
+    !liveGames.find(lg => lg.home === g.home && lg.away === g.away)
+  )
+
   // Detect if any game is live (for auto-refresh indicator)
   const hasLiveGame = seasonStarted && liveGames.some(g => g.status === 'live')
 
@@ -391,6 +401,16 @@ export default function App() {
       {/* ── CONTENT + SIDEBAR ── */}
       <div className="app-body">
         <main className="app-main">
+        {activeView === 'Scores' && debugMode && (
+          <div style={{background:'#1a1209', color:'#c8a84b', fontFamily:'monospace', fontSize:'10px', padding:'12px 18px', lineHeight:1.7}}>
+            <strong>🔧 SCORES DEBUG</strong> (remove ?debug=1 to hide)<br/>
+            Schedule Week {activeWeek}: {scheduleThisWeek.length} games &middot; Live events from ESPN: {liveGames.length}<br/>
+            Live matchups found: {liveGames.map(lg => `${lg.away}@${lg.home}`).join(', ') || 'none'}<br/>
+            {unmatched.length > 0 && (
+              <>Schedule entries with NO live match: {unmatched.map(g => `${g.away}@${g.home}`).join(', ')}</>
+            )}
+          </div>
+        )}
         {activeView === 'Scores'    && (
           <ScoresView
             week={activeWeek}
