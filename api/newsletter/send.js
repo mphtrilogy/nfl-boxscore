@@ -2168,52 +2168,57 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
     // the outer handler(), not here. That's the "recapEvents is not
     // defined" crash — this is the actual fix, not a workaround.
     const recapEvents = recapWeek ? await getWeekEvents(recapWeek) : []
+    const completedEvents = recapEvents.filter(ev => ev.status?.type?.completed)
 
-    // Auto-generated lede — the single most notable thing this week,
-    // built from real data (upset detection via odds, or best individual
-    // performance). Always first, above everything else.
-    const mondayOddsMap = await fetchOdds(recapWeek, 2)
-    const lede = buildAutoLede(parsedGames, mondayOddsMap, mode)
-    html += renderAutoLede(lede)
+    // Same fix as the Scores tab's live-matching bug — a schedule/ESPN
+    // team-code mismatch (e.g. JAC vs JAX) would otherwise silently break
+    // the favorite-team lookup below.
+    const ABBR_MAP = { 'LAR': 'LA', 'WSH': 'WAS', 'JAX': 'JAC' }
+    const normAbbr = (a) => ABBR_MAP[a] || a
 
-    if (hasFav) {
-      const favGame = parsedGames.find(g =>
-        g && (g.home.abbr === favTeam || g.away.abbr === favTeam))
-
-      if (favGame) {
-        const won = favGame.winner === favTeam
-        html += `<span class="sec-label">⚡ ${favTeam} — ${won ? '✅ WIN' : '❌ LOSS'}</span>`
-        html += renderFullGame(favGame, squad, mode)
-        html += standingsHTML
-      } else {
-        html += renderByeWeekNote(favTeam, recapWeek, recapEvents)
-        html += standingsHTML
+    // ── PRIMARY CONTENT — a lightweight score strip built from just the
+    // scoreboard fetch, not the 16 separate per-game box-score fetches
+    // that used to be required here. That heavier path is exactly what
+    // has been failing when nothing had recently warmed the cache for
+    // every single game — this only needs the ONE scoreboard call to
+    // have real data, which is a much smaller, much more reliable ask.
+    if (completedEvents.length) {
+      if (hasFav) {
+        const favEvent = completedEvents.find(ev => {
+          const comps = ev.competitions?.[0]
+          return comps?.competitors?.some(c => normAbbr(c.team?.abbreviation) === favTeam)
+        })
+        if (favEvent) {
+          const comps = favEvent.competitions[0]
+          const home  = comps.competitors.find(c => c.homeAway === 'home')
+          const away  = comps.competitors.find(c => c.homeAway === 'away')
+          const isHome = normAbbr(home.team.abbreviation) === favTeam
+          const favScore = parseInt(isHome ? home.score : away.score)
+          const oppScore = parseInt(isHome ? away.score : home.score)
+          const won = favScore > oppScore
+          const oppAbbr = isHome ? away.team.abbreviation : home.team.abbreviation
+          const deepLink = `${SITE_URL}?game=${away.team.abbreviation}-${home.team.abbreviation}`
+          html += `<span class="sec-label">⚡ ${favTeam} — ${won ? '✅ WIN' : '❌ LOSS'}</span>`
+          html += `<div style="padding:10px 18px;font-family:Georgia,serif;font-size:14px;color:#1a1209"><a href="${deepLink}" style="color:inherit;text-decoration:none;border-bottom:1px dotted #9e9080"><strong>${favTeam} ${favScore} — ${oppAbbr} ${oppScore}</strong></a></div>`
+          html += standingsHTML
+        } else {
+          html += renderByeWeekNote(favTeam, recapWeek, recapEvents)
+          html += standingsHTML
+        }
       }
-
-      // SNF featured game (if different from fav team game)
-      const snfGame = findSNFGame(parsedGames, recapEvents)
-      if (snfGame && snfGame !== favGame) {
-        html += `<span class="sec-label">🌙 Sunday Night Football — Featured Game</span>`
-        html += renderFullGame(snfGame, squad, mode)
-      }
-
-      // All other games condensed
-      const others = parsedGames.filter(g =>
-        g && g !== favGame && g !== snfGame)
-      if (others.length) {
-        html += `<span class="sec-label">🏈 Sunday Results — Week ${recapWeek}</span>`
-        others.forEach(g => { html += renderCondensedGame(g) })
-      }
+      html += renderScoreStrip(completedEvents, recapWeek)
     } else {
-      // All Teams subscriber — show SNF featured, rest condensed
-      const snfGame = findSNFGame(parsedGames, recapEvents)
-      if (snfGame) {
-        html += `<span class="sec-label">🌙 Sunday Night Football — Featured Game</span>`
-        html += renderFullGame(snfGame, squad, mode)
-      }
-      const others = parsedGames.filter(g => g && g !== snfGame)
-      html += `<span class="sec-label">🏈 Sunday Results — Week ${recapWeek}</span>`
-      others.forEach(g => { html += renderCondensedGame(g) })
+      html += `<div style="padding:20px 18px;font-family:monospace;font-size:10px;color:#6b5f4e">Scores aren't posted yet — check nflboxscore.com for the latest.</div>`
+    }
+
+    // ── BONUS CONTENT — the richer, per-player detail below only shows up
+    // when the deeper box-score data happens to already be cached. It's
+    // real and worth having when available, but the email no longer
+    // depends on it to have real content at all.
+    if (parsedGames.length) {
+      const mondayOddsMap = await fetchOdds(recapWeek, 2)
+      const lede = buildAutoLede(parsedGames, mondayOddsMap, mode)
+      html += renderAutoLede(lede)
     }
 
     html += teamNewsHTML
@@ -2228,7 +2233,9 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
     html += renderPlayoffPicture(favTeam, standings)
     html += injuryHTML
 
-    // Fantasy content — pushed toward the bottom, games and news lead
+    // Fantasy content — pushed toward the bottom, games and news lead.
+    // Each of these already gracefully renders nothing on its own if
+    // parsedGames is empty, so no extra guarding needed here.
     html += renderSquadSummary(parsedGames, squad, mode)
     html += fwTakeHTML
     html += renderWaiverSection(parsedGames, recapWeek, squad, mode)
@@ -2240,29 +2247,40 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
     // Tuesday's job is purely "what happened Monday night" — the full
     // Sunday recap (including the fav team, if they played Sunday) is
     // already owned entirely by Monday's send. No need to repeat it here.
-    if (!parsedGames.length) {
+    const weekCompleted = allEvents.filter(ev => ev.status?.type?.completed)
+
+    if (!weekCompleted.length) {
       html += `<div style="padding:20px 18px;font-family:monospace;font-size:10px;color:#6b5f4e">No completed Monday Night game found yet — check nflboxscore.com for live scores.</div>`
     } else {
-      const mnfGame = parsedGames[0]
-      const isFavGame = hasFav &&
-        (mnfGame?.home.abbr === favTeam || mnfGame?.away.abbr === favTeam)
-
-      // Auto-lede — checks if MNF was an upset, or leads with the best
-      // fantasy performance from the game.
-      const tuesdayOddsMap = await fetchOdds(recapWeek, 2)
-      const lede = buildAutoLede([mnfGame], tuesdayOddsMap, mode)
-      html += renderAutoLede(lede)
-
+      // MNF is always the chronologically last game of the week — find it
+      // from the raw scoreboard data alone, no per-game box-score fetch
+      // needed for this part.
+      const mnfEvent = [...weekCompleted].sort((a,b) => new Date(b.date) - new Date(a.date))[0]
+      const mComps = mnfEvent.competitions[0]
+      const mHome  = mComps.competitors.find(c => c.homeAway === 'home')
+      const mAway  = mComps.competitors.find(c => c.homeAway === 'away')
+      const mLink  = `${SITE_URL}?game=${mAway.team.abbreviation}-${mHome.team.abbreviation}`
       html += `<span class="sec-label">🌙 Monday Night Football — Week ${recapWeek} Final</span>`
-      html += isFavGame
-        ? renderFullGame(mnfGame, squad, mode)
-        : renderCondensedGame(mnfGame)
+      html += `<div style="padding:10px 18px;font-family:Georgia,serif;font-size:14px;color:#1a1209"><a href="${mLink}" style="color:inherit;text-decoration:none;border-bottom:1px dotted #9e9080"><strong>${mAway.team.abbreviation} ${mAway.score} — ${mHome.team.abbreviation} ${mHome.score}</strong></a></div>`
+
+      // Bonus — the richer per-player box score card, only shown when
+      // that deeper data happened to already be cached.
+      if (parsedGames.length) {
+        const mnfGame = parsedGames[0]
+        const isFavGame = hasFav &&
+          (mnfGame?.home.abbr === favTeam || mnfGame?.away.abbr === favTeam)
+        const tuesdayOddsMap = await fetchOdds(recapWeek, 2)
+        const lede = buildAutoLede([mnfGame], tuesdayOddsMap, mode)
+        html += renderAutoLede(lede)
+        html += isFavGame
+          ? renderFullGame(mnfGame, squad, mode)
+          : renderCondensedGame(mnfGame)
+      }
 
       // Quick-glance recap of the whole week — allEvents already covers
       // the full Sun+Mon slate here specifically, since currentWeek and
       // recapWeek are the same value on Tuesdays (unlike Monday, which
       // needs its own separate recapEvents fetch for this reason).
-      const weekCompleted = allEvents.filter(ev => ev.status?.type?.completed)
       html += renderScoreStrip(weekCompleted, recapWeek)
     }
 
@@ -2393,25 +2411,37 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
 
   // ── FRIDAY: TNF recap + fav team preview + odds + weather + injuries ───────
   else if (sendType === 'friday') {
-    // Show every completed game found this week, not just one — the
-    // widened 72h window (for testing flexibility) can genuinely surface
-    // more than one completed game (e.g. a Wednesday opener AND Thursday's
-    // game), and dropping all but the first silently lost real data.
-    if (parsedGames.length) {
-      const fridayLedeOdds = await fetchOdds(currentWeek, 2)
-      const lede = buildAutoLede(parsedGames, fridayLedeOdds, mode)
-      html += renderAutoLede(lede)
-
-      parsedGames.forEach(g => {
-        const isFavGame = hasFav && (g?.home.abbr === favTeam || g?.away.abbr === favTeam)
-        const dayLabel  = g.gameDate
-          ? new Date(g.gameDate).toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long' })
+    // Lightweight, reliable recap first — built from the scoreboard fetch
+    // alone (allEvents), not the per-game box-score fetches that used to
+    // be required for this section to show anything at all.
+    const fridayCompleted = allEvents.filter(ev => ev.status?.type?.completed)
+    if (fridayCompleted.length) {
+      fridayCompleted.forEach(ev => {
+        const comps = ev.competitions[0]
+        const home  = comps.competitors.find(c => c.homeAway === 'home')
+        const away  = comps.competitors.find(c => c.homeAway === 'away')
+        const link  = `${SITE_URL}?game=${away.team.abbreviation}-${home.team.abbreviation}`
+        const dayLabel = ev.date
+          ? new Date(ev.date).toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long' })
           : 'Thursday'
         html += `<span class="sec-label">📺 ${dayLabel} Night Football — Final</span>`
-        html += isFavGame
-          ? renderFullGame(g, squad, mode)
-          : renderCondensedGame(g)
+        html += `<div style="padding:10px 18px;font-family:Georgia,serif;font-size:14px;color:#1a1209"><a href="${link}" style="color:inherit;text-decoration:none;border-bottom:1px dotted #9e9080"><strong>${away.team.abbreviation} ${away.score} — ${home.team.abbreviation} ${home.score}</strong></a></div>`
       })
+
+      // Bonus — richer per-player box score cards, only when that deeper
+      // data happened to already be cached.
+      if (parsedGames.length) {
+        const fridayLedeOdds = await fetchOdds(currentWeek, 2)
+        const lede = buildAutoLede(parsedGames, fridayLedeOdds, mode)
+        html += renderAutoLede(lede)
+
+        parsedGames.forEach(g => {
+          const isFavGame = hasFav && (g?.home.abbr === favTeam || g?.away.abbr === favTeam)
+          html += isFavGame
+            ? renderFullGame(g, squad, mode)
+            : renderCondensedGame(g)
+        })
+      }
     } else {
       // Never ship silently empty — an honest one-liner instead of a gap,
       // in case last night's game data hasn't posted yet for any reason.
