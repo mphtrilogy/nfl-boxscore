@@ -1,0 +1,38 @@
+name: Warm ESPN Cache
+
+# Runs on GitHub's own servers, not Vercel — ESPN's IP block on Vercel
+# doesn't apply here at all, so this fetches real live data on a real,
+# predictable schedule instead of depending on a visitor happening to
+# have loaded the right page recently. Writes go into the same Supabase
+# cache table (fw_espn_cache) the site and newsletter already read from.
+
+on:
+  schedule:
+    # Every 30 minutes, every day, all season. GitHub's scheduler runs on
+    # UTC and is "best effort" (can slip a few minutes under load) — that's
+    # fine here, this only needs to land sometime before each newsletter
+    # send, not to the exact minute. A 30-second job every 30 minutes uses
+    # roughly 700-800 minutes/month — well inside GitHub's free tier even
+    # on a private repo (2,000 min/month), free and unlimited on a public one.
+    - cron: '*/30 * * * *'
+  workflow_dispatch: {}   # manual "Run workflow" button in the Actions tab —
+                          # same idea as the newsletter's own manual trigger,
+                          # useful for testing or warming the cache on demand
+                          # right before a send.
+
+jobs:
+  warm-cache:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Warm ESPN cache
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: node scripts/warm-espn-cache.js
