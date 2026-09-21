@@ -282,8 +282,17 @@ export default function App() {
   // Merge live scores into schedule — only during season
   // In preseason, games come directly from ESPN (not in SCHEDULE_2026)
   const mergedGames = SCHEDULE_2026.filter(g => g.week === activeWeek).map(g => {
+        // Matches on the pair of teams regardless of which is listed as
+        // home/away — a straight home===home && away===away check would
+        // silently fail to match a real live game if the schedule data
+        // ever has home/away backwards for that entry (confirmed real
+        // case: PIT@NE, SF@MIA, DEN@JAC all had this exact mistake and
+        // permanently showed no score until the schedule data was fixed
+        // AND this fallback was added, so a future typo like that one
+        // can't cause the same silent failure again).
         const live = seasonStarted ? liveGames.find(lg =>
-          lg.home === g.home && lg.away === g.away
+          (lg.home === g.home && lg.away === g.away) ||
+          (lg.home === g.away && lg.away === g.home)
         ) : null
         if (live) return { ...g, ...live, network: live.network || g.tv }
         // No live match yet (game hasn't been played/ESPN has no data for it) —
