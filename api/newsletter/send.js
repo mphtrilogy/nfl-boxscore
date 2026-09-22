@@ -41,10 +41,14 @@ const SITE_URL     = 'https://nflboxscore.com'
 // confirmed via independent research on this exact endpoint. A spoofed
 // browser UA does NOT work either; ESPN specifically blocks those too.
 // An honest, self-identifying client token does.
-const ESPN_HEADERS = {
-  'User-Agent': 'TheFinalWhistle/1.0 (+https://nflboxscore.com)',
-  'Accept': 'application/json',
-}
+// TEST: nysportsdaily's digest successfully pulls from this exact same
+// site.api.espn.com endpoint using a bare fetch() with zero custom
+// headers — no User-Agent, nothing. This project's custom
+// "TheFinalWhistle/1.0" User-Agent may be the actual thing triggering
+// ESPN's block, not server traffic in general. Testing the same
+// no-headers approach here to see if it's genuinely blanket-blocked or
+// if it was this specific header pattern all along.
+const ESPN_HEADERS = {}
 const FROM_EMAIL   = 'nfl@nysportsdaily.com'
 
 // ── Team city + nickname lookup (mirrors utils/teams.js in the app) ───────────
@@ -2287,14 +2291,19 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
     html += teamNewsHTML
     html += leagueNewsHTML
 
-    // Rest of the week ahead — compact schedule. Always regular season here:
-    // the newsletter's Tue/Thu/Fri sends are inherently about the regular
+    // Week ahead — compact schedule. Always regular season here: the
+    // newsletter's Tue/Thu/Fri sends are inherently about the regular
     // season week, even on a send date that technically falls just before
     // kickoff (getSeasonType() would otherwise still say "preseason").
-    const restOfWeekEvents = await getWeekEvents(currentWeek, 2)
+    // currentWeek+1 here, not currentWeek — Tuesday's currentWeek IS the
+    // week that just finished (that's what MNF was), so asking about
+    // currentWeek again just re-shows the same now-completed week instead
+    // of what's actually still ahead.
+    const nextWeek = currentWeek + 1
+    const restOfWeekEvents = await getWeekEvents(nextWeek, 2)
     const upcomingEvents = restOfWeekEvents.filter(ev => !ev.status?.type?.completed)
     if (upcomingEvents.length) {
-      html += await renderCompactSchedule(upcomingEvents, currentWeek, 2, favTeam, `Rest of Week ${currentWeek}`)
+      html += await renderCompactSchedule(upcomingEvents, nextWeek, 2, favTeam, `Week ${nextWeek} — Coming Up`)
     }
 
     // Fantasy content — pushed toward the bottom, games and news lead
