@@ -2786,6 +2786,31 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
             scoringScore    * 0.15
           )
 
+          // ── REST-OF-SEASON OUTLOOK — a different question from Start/Sit:
+          // not "what about next week" but "who's positioned better across
+          // everything left on the schedule." Blends proven current
+          // production (Trend Score, the dominant factor — real production
+          // is a better predictor than schedule alone) with the AVERAGE
+          // matchup difficulty across every remaining game this season, not
+          // just the next one. Reuses the same min/max range already
+          // computed above for this position.
+          const remainingGames = SCHEDULE_2026.filter(g =>
+            g.week > currentWeek && (g.home === p.team || g.away === p.team)
+          )
+          const remainingMatchupScores = remainingGames.map(g => {
+            const opp = g.home === p.team ? g.away : g.home
+            const allowed = defAvg[opp]?.[p.pos]
+            if (allowed == null) return 5
+            return Math.min(10, Math.max(0, 2 + ((allowed - min) / Math.max(max - min, 1)) * 7))
+          })
+          const avgRemainingMatchup = remainingMatchupScores.length
+            ? remainingMatchupScores.reduce((a,b)=>a+b,0) / remainingMatchupScores.length
+            : 5
+          const restOfSeasonScore = Math.min(10,
+            trendScore          * 0.7 +
+            avgRemainingMatchup * 0.3
+          )
+
           // ── START/SIT SCORE — the only forward-looking number. Blends
           // the Trend Score with next week's matchup + a small home-field
           // nudge. This is what powers Start/Sit, Waiver Wire, and Trade
@@ -2819,6 +2844,8 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
             last3avg:  Math.round(last3avg * 10) / 10,
             opp:       nextOpp || '',
             trendScore:      Math.round(trendScore * 10) / 10,
+            restOfSeasonScore: Math.round(restOfSeasonScore * 10) / 10,
+            gamesRemaining:  remainingGames.length,
             fwScore:         Math.round(startSitScore * 10) / 10,
             projPts,
             usageScore:      Math.round(usageScore * 10) / 10,
@@ -3254,6 +3281,14 @@ function StartSitView({ mode, currentWeek }) {
     ? scoreA > scoreB ? { start: playerA, sit: playerB } : { start: playerB, sit: playerA }
     : null
 
+  // Separate verdict for the whole rest of the season — deliberately not
+  // the same comparison as above, which only answers "next week."
+  const rosA = playerA?.restOfSeasonScore ?? null
+  const rosB = playerB?.restOfSeasonScore ?? null
+  const rosRecommendation = playerA && playerB && rosA != null && rosB != null
+    ? rosA > rosB ? { better: playerA, worse: playerB } : { better: playerB, worse: playerA }
+    : null
+
   const gradeColor = (rating) => {
     if (rating == null) return 'var(--muted-lt)'
     if (rating >= 7.5) return '#1a5c1a'
@@ -3288,6 +3323,11 @@ function StartSitView({ mode, currentWeek }) {
             <div className="ss-stat-row"><span>Last Game</span><span className="ss-stat-val">{p.last1}</span></div>
             <div className="ss-stat-row"><span>L3 Avg</span><span className="ss-stat-val">{p.last3avg}</span></div>
             <div className="ss-stat-row"><span>Trend</span><span className="ss-stat-val">{p.trend}</span></div>
+            <div className="ss-stat-row" style={{borderTop:'1px dashed var(--rule)', paddingTop:8, marginTop:4}}>
+              <span>Rest of Season</span>
+              <span className="ss-stat-val" style={{color:gradeColor(p.restOfSeasonScore)}}>{p.restOfSeasonScore}</span>
+            </div>
+            <div className="ss-stat-row"><span>Games Left</span><span className="ss-stat-val">{p.gamesRemaining}</span></div>
           </div>
         )}
       </div>
@@ -3378,8 +3418,23 @@ function StartSitView({ mode, currentWeek }) {
           </div>
         )}
 
+        {!loading && playerA && playerB && rosRecommendation && (
+          <div className="ss-comparison" style={{marginTop:8}}>
+            <div />
+            <div className="ss-verdict">
+              <div className="ss-verdict-label">Rest of Season</div>
+              <div className="ss-verdict-val start">{rosRecommendation.better.name}</div>
+              <div className="ss-rec-badge start">Better Outlook</div>
+              <div style={{fontFamily:'var(--font-mono)', fontSize:9, color:'var(--muted-lt)', marginTop:6, padding:'0 8px'}}>
+                {rosRecommendation.better.name} {rosRecommendation.better.gamesRemaining} gm left vs. {rosRecommendation.worse.name} {rosRecommendation.worse.gamesRemaining} gm left — current production weighted heavier than remaining schedule.
+              </div>
+            </div>
+            <div />
+          </div>
+        )}
+
         <div className="atl-note">
-          Start/Sit = Trend Score (usage share, efficiency, defense-adjusted production, scoring role — 55%) blended with next week's specific matchup (35%) and live weather — wind, rain/snow chance, cold — for outdoor games (10%), plus a small home-game bump, then scaled down for Questionable/Doubtful/Out designations. {mode === 'ppr' ? 'PPR' : 'Standard'} scoring.
+          Start/Sit = Trend Score (usage share, efficiency, defense-adjusted production, scoring role — 55%) blended with next week's specific matchup (35%) and live weather — wind, rain/snow chance, cold — for outdoor games (10%), plus a small home-game bump, then scaled down for Questionable/Doubtful/Out designations. Rest of Season = Trend Score (70%) blended with the average matchup difficulty across every game left on that player's schedule, not just next week (30%) — current production weighted heavier since it's a better predictor than schedule alone. {mode === 'ppr' ? 'PPR' : 'Standard'} scoring.
         </div>
       </div>
     </div>
