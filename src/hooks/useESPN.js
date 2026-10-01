@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 const ESPN_BASE = '/api/espn'
 
 const ESPN_ABBR_MAP = { 'LAR': 'LA', 'WSH': 'WAS', 'JAX': 'JAC' }
-function normalizeAbbr(abbr) { return ESPN_ABBR_MAP[abbr] || abbr }
+export function normalizeAbbr(abbr) { return ESPN_ABBR_MAP[abbr] || abbr }
 
 export function useScoreboard(week = null, seasontype = 2) {
   const [data, setData] = useState(null)
