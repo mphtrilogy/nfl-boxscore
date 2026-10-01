@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { useScoreboard, useBoxScore, useTeamSchedule, useWeekSchedule, parseESPNGame } from './hooks/useESPN'
+import { useScoreboard, useBoxScore, useTeamSchedule, useWeekSchedule, parseESPNGame, normalizeAbbr } from './hooks/useESPN'
 import { SCHEDULE_2026, WEEK_META, ALL_TEAMS } from './data/schedule2026'
 import { ti, networkColor, fmt, TEAMS } from './utils/teams'
 
@@ -2639,11 +2639,18 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
         // Opponent lookup for this game — needed to credit points allowed
         // to the correct defense, computed from data already being fetched
         // here rather than a second parallel fetch.
-        const teamAbbrs = teamsData.map(td => td.team?.abbreviation || '')
+        // Normalized right here at the source — ESPN's raw box score data
+        // says 'WSH' for Washington, but SCHEDULE_2026 (and every lookup
+        // that compares a player's team against it — next matchup, weather,
+        // rest-of-season schedule) uses 'WAS'. Without this, every one of
+        // those comparisons silently fails for that team's players, the
+        // same bug already fixed in two other spots tonight (the live
+        // Scores tab and the newsletter) but never applied here.
+        const teamAbbrs = teamsData.map(td => normalizeAbbr(td.team?.abbreviation || ''))
         const oppOf = (abbr) => teamAbbrs.find(a => a !== abbr) || ''
 
         teamsData.forEach(td => {
-          const team = td.team?.abbreviation || ''
+          const team = normalizeAbbr(td.team?.abbreviation || '')
           const opp  = oppOf(team)
           if (!teamPool[team]) teamPool[team] = { targets: 0, carries: 0 }
 
@@ -6033,7 +6040,7 @@ function usePlayerStats(season, category) {
       const pmap = {}
       summaries.filter(Boolean).forEach(summary => {
         ;(summary.boxscore?.players || []).forEach(td => {
-          const team = td.team?.abbreviation || ''
+          const team = normalizeAbbr(td.team?.abbreviation || '')
           const sg = td.statistics?.find(s => s.name === espnCat)
           if (!sg) return
           sg.athletes?.forEach(a => {
