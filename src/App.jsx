@@ -4767,6 +4767,30 @@ function InjuriesView({ onScout }) {
   const [statusFilter, setStatusFilter] = useState('All')
   const [fetched,  setFetched]    = useState(false)
 
+  // TEMPORARY diagnostic — checking whether ESPN's roster endpoint (a
+  // different data source than the weekly game-report injuries above)
+  // actually carries IR/roster-level status, before guessing at field
+  // names blind. Remove once confirmed one way or the other.
+  const [rosterDebug, setRosterDebug] = useState(null)
+  async function checkRosterStatus(teamAbbr, playerLastName) {
+    setRosterDebug({ loading: true })
+    try {
+      const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/${teamAbbr}/roster`)
+      const data = await r.json()
+      const allAthletes = (data.athletes || []).flatMap(group => group.items || [])
+      const match = allAthletes.find(a =>
+        (a.displayName || a.fullName || '').toLowerCase().includes(playerLastName.toLowerCase())
+      )
+      setRosterDebug({
+        totalFound: allAthletes.length,
+        topLevelKeys: allAthletes[0] ? Object.keys(allAthletes[0]) : [],
+        match: match || null,
+      })
+    } catch (e) {
+      setRosterDebug({ error: e.message })
+    }
+  }
+
   const STATUS_ORDER = ['Out', 'Doubtful', 'Questionable', 'Probable', 'IR', 'PUP']
   const STATUS_COLORS = {
     'Out':          { bg: '#c00',    text: '#fff' },
@@ -4827,7 +4851,13 @@ function InjuriesView({ onScout }) {
       const byTeam = {}
       summaries.filter(Boolean).forEach(summary => {
         ;(summary.injuries || []).forEach(teamInj => {
-          const abbr = teamInj.team?.abbreviation || ''
+          // Normalized at the source — ESPN's raw data says 'LAR'/'WSH'/'JAX',
+          // but the team filter buttons (ALL_TEAMS) use 'LA'/'WAS'/'JAC'. Without
+          // this, real injury data for those three teams gets filed under a key
+          // the filter can never match, making it silently disappear — the same
+          // bug already found and fixed twice tonight elsewhere, just never
+          // applied to this page.
+          const abbr = normalizeAbbr(teamInj.team?.abbreviation || '')
           if (!abbr) return
           if (!byTeam[abbr]) byTeam[abbr] = {}
           ;(teamInj.injuries || []).forEach(inj => {
@@ -4886,6 +4916,22 @@ function InjuriesView({ onScout }) {
         <span className="sb-ct">
           {loading ? 'Loading…' : fetched ? `${totalCount} players listed` : 'All 32 Teams'}
         </span>
+      </div>
+
+      {/* TEMPORARY — checking whether the roster endpoint actually has
+          IR status before building anything on top of a guess. */}
+      <div style={{padding:'8px 18px', background:'#1a1209'}}>
+        <button
+          onClick={() => checkRosterStatus('no', 'etienne')}
+          style={{fontFamily:'monospace', fontSize:10, padding:'6px 10px', background:'#c8a84b', border:'none', borderRadius:4, cursor:'pointer'}}
+        >
+          🔧 Check NO roster for Etienne
+        </button>
+        {rosterDebug && (
+          <pre style={{color:'#c8a84b', fontFamily:'monospace', fontSize:9, whiteSpace:'pre-wrap', marginTop:8, maxHeight:300, overflow:'auto'}}>
+            {JSON.stringify(rosterDebug, null, 2)}
+          </pre>
+        )}
       </div>
 
       {/* Filters */}
