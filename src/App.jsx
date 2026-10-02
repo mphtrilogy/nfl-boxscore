@@ -2306,6 +2306,23 @@ function longTermInjuryMultiplier(status) {
   return LONG_TERM_INJURY_SEVERITY[key] ?? 1
 }
 // Short badge text + color for the table/card UI.
+// One sharp, prioritized callout from whatever real signal is strongest —
+// not every signal stacked into a run-on sentence. Real analysts lead
+// with the one thing that actually matters, not every caveat at once.
+function buildStorylineBlurb(p) {
+  if (p.teamTrend === 'hot' && p.teamTrendPct >= 20)
+    return `📈 ${p.team}'s whole offense has been rolling — up ${p.teamTrendPct}% over their last 3 games.`
+  if (p.nextGameSpread != null && p.nextGameSpread > 6 && ['WR','TE'].includes(p.pos))
+    return `🎯 Lined up as a big underdog next week — teams playing from behind lean on the pass, which tends to mean extra volume.`
+  if (p.nextGameSpread != null && p.nextGameSpread < -6 && p.pos === 'RB')
+    return `🏃 Favored by a big margin next week — expect a heavier workload late to run out the clock.`
+  if (p.trend === 'hot')
+    return `🔥 Individually heating up — his last 3 games are running well above his season pace.`
+  if (p.teamTrend === 'cold' && p.teamTrendPct <= -20)
+    return `❄️ Whole offense has cooled off — down ${Math.abs(p.teamTrendPct)}% over the last 3 games.`
+  return null
+}
+
 function injuryBadge(status) {
   if (!status) return null
   const key = String(status).toLowerCase().trim()
@@ -2536,6 +2553,31 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
     // even for a player who's actually on IR — verified this distinction
     // directly before relying on it). Fetched here, in parallel, same
     // pattern as the weather fetch above.
+    // Vegas lines for next week — real game-script signal a pure stats
+    // model otherwise has no way to know: a team expected to trail tends
+    // to lean on its pass-catchers (and QB volume) more, a team expected
+    // to lead comfortably tends to lean on the run more to protect it.
+    // Same scoreboard/odds shape already proven working in GameInfoDrawer.
+    const oddsPromise = fetch(`${ESPN_NFL}/scoreboard?week=${currentWeek + 1}&seasontype=2&limit=20`)
+      .then(r => r.json())
+      .then(data => {
+        const spreadByTeam = {}
+        ;(data.events || []).forEach(ev => {
+          const comp = ev.competitions?.[0]
+          const home = comp?.competitors?.find(c => c.homeAway === 'home')
+          const away = comp?.competitors?.find(c => c.homeAway === 'away')
+          const o = comp?.odds?.[0]
+          const homeSpread = typeof o?.spread === 'number' ? o.spread : null
+          if (!home || !away || homeSpread == null) return
+          const homeAbbr = normalizeAbbr(home.team?.abbreviation || '')
+          const awayAbbr = normalizeAbbr(away.team?.abbreviation || '')
+          if (homeAbbr) spreadByTeam[homeAbbr] = homeSpread
+          if (awayAbbr) spreadByTeam[awayAbbr] = -homeSpread
+        })
+        return spreadByTeam
+      })
+      .catch(() => ({}))
+
     const LONG_TERM_ROSTER_STATUSES = ['injured reserve', 'ir', 'suspension', 'suspended', 'pup']
     const rosterIRPromise = Promise.all(
       ALL_TEAMS.map(abbr =>
@@ -2573,6 +2615,7 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
     .then(async boards => {
       const weatherByHost = await weatherPromise
       const rosterIRByPlayer = await rosterIRPromise
+      const teamSpreads = await oddsPromise
       const gameIds = []
       boards.forEach((board, i) => {
         ;(board.events || []).forEach(ev => {
@@ -2603,11 +2646,16 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
       const pmap = {}
       // Points allowed per position, per defense — built from the exact same
       // fetch as everything else here, no second parallel request needed
-      const defenseAllowed = {} // { defTeam: { QB:[pts], RB:[pts], WR:[pts], TE:[pts] } }
+      const defenseAllowed = {} // { defTeam: { QB:[{pts,week}], RB:[...], WR:[...], TE:[...] } }
       // Team-level opportunity pools — total targets/carries/pass attempts
       // for the whole team across all processed games, used to turn a
       // player's raw counting stats into a real share of the offense.
       const teamPool = {} // { team: { targets, carries } }
+      // Team-level offensive output by week — "is this offense actually
+      // cooking lately" is a real signal a stats-only, player-isolated
+      // model otherwise misses entirely. Built from the exact same pass,
+      // no extra fetch.
+      const offenseScored = {} // { team: { week: totalFantasyPts } }
 
       const addToMap = (name, team, pos, wk, opp, cat, vals, targets=0, carries=0, posIsReal=true) => {
         if (!name || name === '—') return
@@ -2747,12 +2795,21 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
               teamPool[team].carries += carries
               addToMap(name, team, pos, wk, opp, cat, vals, targets, carries, posIsReal)
 
-              // Credit these points to the opposing defense for matchup rankings
+              // Credit these points to the opposing defense for matchup
+              // rankings — week tagged alongside so recent games can count
+              // more than older ones below, rather than one flat average
+              // treating Week 1 and last week's defense as equally current.
               if (opp && ['QB','RB','WR','TE'].includes(pos)) {
                 const pts = calcFpts(vals, cat, mode)
                 if (pts > 0) {
                   if (!defenseAllowed[opp]) defenseAllowed[opp] = { QB:[], RB:[], WR:[], TE:[] }
-                  defenseAllowed[opp][pos].push(pts)
+                  defenseAllowed[opp][pos].push({ pts, week: wk })
+
+                  // Same points, credited to the player's OWN team's
+                  // offensive output for that week — "is this offense
+                  // trending up" below.
+                  if (!offenseScored[team]) offenseScored[team] = {}
+                  offenseScored[team][wk] = (offenseScored[team][wk] || 0) + pts
                 }
               }
             })
@@ -2760,13 +2817,43 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
         })
       })
 
-      // Average points allowed per position, per defense — real matchup data
+      // Recency-weighted average points allowed per position, per defense —
+      // a defense that's tightened up the last 3 weeks should be judged on
+      // that, not diluted by how it played back in Week 1. The most recent
+      // week in the lookback window gets the most weight, decaying linearly
+      // back to 1 for the oldest included week — real data, just weighted
+      // toward "how is this defense playing right now."
       const defAvg = {}
       Object.entries(defenseAllowed).forEach(([team, byPos]) => {
         defAvg[team] = {}
         Object.entries(byPos).forEach(([pos, arr]) => {
-          defAvg[team][pos] = arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : null
+          if (!arr.length) { defAvg[team][pos] = null; return }
+          let weightedSum = 0, totalWeight = 0
+          arr.forEach(({ pts, week }) => {
+            const weeksAgo = currentWeek - week
+            const weight = Math.max(1, weeks.length - weeksAgo)
+            weightedSum += pts * weight
+            totalWeight += weight
+          })
+          defAvg[team][pos] = totalWeight > 0 ? weightedSum / totalWeight : null
         })
+      })
+
+      // Team-level "is this offense trending up lately" — last 3 weeks'
+      // average output vs. the full-window season average. A rising tide
+      // lifts every player on that offense, often before any one guy's own
+      // numbers fully catch up to it.
+      const offenseTrend = {}
+      Object.entries(offenseScored).forEach(([team, byWeek]) => {
+        const allWeeks = Object.entries(byWeek).sort((a,b) => a[0]-b[0])
+        const seasonAvg = allWeeks.reduce((s,[,p])=>s+p,0) / Math.max(1, allWeeks.length)
+        const last3 = allWeeks.slice(-3)
+        const last3Avg = last3.reduce((s,[,p])=>s+p,0) / Math.max(1, last3.length)
+        const pctChange = seasonAvg > 0 ? (last3Avg - seasonAvg) / seasonAvg : 0
+        offenseTrend[team] = {
+          label: pctChange > 0.15 ? 'hot' : pctChange < -0.15 ? 'cold' : 'steady',
+          pctChange: Math.round(pctChange * 100),
+        }
       })
       // League-wide range per position, for scaling matchup ratings honestly
       // against what's actually happened this season rather than a guess
@@ -2833,9 +2920,29 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
           const nextOpp = nextGame ? (nextGame.home === p.team ? nextGame.away : nextGame.home) : null
           const oppAllowed = nextOpp ? defAvg[nextOpp]?.[p.pos] : null
           const { min, max } = posRange[p.pos] || { min: DEF_BASELINE[p.pos]*0.7, max: DEF_BASELINE[p.pos]*1.3 }
-          const matchupScore = oppAllowed != null
+          const matchupScoreBase = oppAllowed != null
             ? Math.min(10, Math.max(0, 2 + ((oppAllowed - min) / Math.max(max - min, 1)) * 7))
             : 5 // no upcoming game scheduled yet or opponent has no data — neutral
+
+          // Vegas game-script lean — real signal a stats-only model can't
+          // see on its own. A team expected to trail tends to lean on
+          // pass-catchers (and QB volume); a team expected to lead
+          // comfortably tends to lean on the run to protect it. Capped
+          // small on purpose — context, not a replacement for the real
+          // matchup number above.
+          const teamSpread = teamSpreads[p.team] // + = underdog, - = favored
+          let gameScriptAdj = 0
+          if (teamSpread != null) {
+            const magnitude = Math.min(Math.abs(teamSpread), 14)
+            if (['WR','TE'].includes(p.pos)) {
+              gameScriptAdj = teamSpread > 3 ? magnitude * 0.04 : teamSpread < -3 ? -magnitude * 0.02 : 0
+            } else if (p.pos === 'RB') {
+              gameScriptAdj = teamSpread < -3 ? magnitude * 0.04 : teamSpread > 3 ? -magnitude * 0.02 : 0
+            } else if (p.pos === 'QB') {
+              gameScriptAdj = teamSpread > 3 ? magnitude * 0.02 : 0
+            }
+          }
+          const matchupScore = Math.max(0, Math.min(10, matchupScoreBase + gameScriptAdj))
 
           // Live weather for the stadium actually hosting next week's game —
           // applies the same to both teams playing in that building. Falls
@@ -2846,12 +2953,22 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
             : 7
 
           const defAdjScore = defAdjScoreFor(p, defAvg, games)
-          const trendScore = (
+          const trendScoreRaw = (
             usageScore      * 0.35 +
             efficiencyScore * 0.25 +
             defAdjScore      * 0.25 +
             scoringScore    * 0.15
           )
+
+          // Deliberately small, capped nudge from team-level offensive
+          // trend — real context ("this offense is cooking lately"), not
+          // something allowed to override a player's own actual production.
+          // +/-0.3 max on a 0-10 scale either direction.
+          const teamTrend = offenseTrend[p.team] || null
+          const teamTrendNudge = teamTrend
+            ? Math.max(-0.3, Math.min(0.3, teamTrend.pctChange * 0.015))
+            : 0
+          const trendScore = Math.max(0, Math.min(10, trendScoreRaw + teamTrendNudge))
 
           // ── REST-OF-SEASON OUTLOOK — a different question from Start/Sit:
           // not "what about next week" but "who's positioned better across
@@ -2928,6 +3045,9 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
             trendScore:      Math.round(trendScore * 10) / 10,
             restOfSeasonScore: Math.round(restOfSeasonScore * 10) / 10,
             gamesRemaining:  remainingGames.length,
+            teamTrend:       teamTrend?.label || null,
+            teamTrendPct:    teamTrend?.pctChange ?? null,
+            nextGameSpread:  teamSpread ?? null,
             fwScore:         Math.round(startSitScore * 10) / 10,
             projPts,
             usageScore:      Math.round(usageScore * 10) / 10,
@@ -3414,6 +3534,11 @@ function StartSitView({ mode, currentWeek }) {
               <span className="ss-stat-val" style={{color:gradeColor(p.restOfSeasonScore)}}>{p.restOfSeasonScore}<i style={{fontSize:9, opacity:0.55}}>/10</i></span>
             </div>
             <div className="ss-stat-row"><span>Games Left</span><span className="ss-stat-val">{p.gamesRemaining}</span></div>
+            {buildStorylineBlurb(p) && (
+              <div style={{marginTop:10, padding:'8px 10px', background:'rgba(200,168,75,0.12)', borderRadius:4, fontFamily:'Georgia,serif', fontSize:11, lineHeight:1.4, fontStyle:'italic'}}>
+                {buildStorylineBlurb(p)}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -3520,7 +3645,7 @@ function StartSitView({ mode, currentWeek }) {
         )}
 
         <div className="atl-note">
-          Start/Sit = Trend Score (usage share, efficiency, defense-adjusted production, scoring role — 55%) blended with next week's specific matchup (35%) and live weather — wind, rain/snow chance, cold — for outdoor games (10%), plus a small home-game bump, then scaled down for Questionable/Doubtful/Out designations. Rest of Season = Trend Score (70%) blended with the average matchup difficulty across every game left on that player's schedule, not just next week (30%) — current production weighted heavier since it's a better predictor than schedule alone. Scaled down for a confirmed Injured Reserve/Suspended/PUP designation specifically (pulled from each team's actual roster, not the weekly practice report, which doesn't track players once they're on IR) — but NOT for a single week's questionable/doubtful/out tag, which shouldn't define his whole season outlook. A confirmed IR/Suspended designation is also an automatic no-start for Start/Sit, regardless of any other signal. {mode === 'ppr' ? 'PPR' : 'Standard'} scoring.
+          Start/Sit = Trend Score (usage share, efficiency, defense-adjusted production, scoring role — 55%) blended with next week's specific matchup (35%) and live weather — wind, rain/snow chance, cold — for outdoor games (10%), plus a small home-game bump, then scaled down for Questionable/Doubtful/Out designations. Rest of Season = Trend Score (70%) blended with the average matchup difficulty across every game left on that player's schedule, not just next week (30%) — current production weighted heavier since it's a better predictor than schedule alone. Scaled down for a confirmed Injured Reserve/Suspended/PUP designation specifically (pulled from each team's actual roster, not the weekly practice report, which doesn't track players once they're on IR) — but NOT for a single week's questionable/doubtful/out tag, which shouldn't define his whole season outlook. A confirmed IR/Suspended designation is also an automatic no-start for Start/Sit, regardless of any other signal. Defense matchup ratings weight recent games more than early-season ones, since defenses change over a year. A small, capped nudge also comes from two extra signals a pure stats model otherwise misses: whether the player's whole offense has genuinely been trending up or down the last 3 games, and next week's Vegas line — teams expected to trail lean on the pass, teams expected to lead comfortably lean on the run. Neither is allowed to override real production, just to add real context. {mode === 'ppr' ? 'PPR' : 'Standard'} scoring.
         </div>
       </div>
     </div>
