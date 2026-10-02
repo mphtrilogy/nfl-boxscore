@@ -2527,6 +2527,41 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
     // Injury/practice-report status is harvested further down from the same
     // game-summary fetch already used for box scores (summary.injuries) —
     // no separate request needed. See the box-score parsing loop below.
+    // That weekly report ONLY covers "will he play this week" questions
+    // though — a player already placed on IR isn't part of that question
+    // at all and never appears in it. Confirmed via real data: ESPN's
+    // roster endpoint carries this instead, specifically in each athlete's
+    // injuries[].status field (NOT the more obvious-looking top-level
+    // status field, which just says something generic like "Day-To-Day"
+    // even for a player who's actually on IR — verified this distinction
+    // directly before relying on it). Fetched here, in parallel, same
+    // pattern as the weather fetch above.
+    const LONG_TERM_ROSTER_STATUSES = ['injured reserve', 'ir', 'suspension', 'suspended', 'pup']
+    const rosterIRPromise = Promise.all(
+      ALL_TEAMS.map(abbr =>
+        fetch(`${ESPN_NFL}/teams/${abbr.toLowerCase()}/roster`)
+          .then(r => r.json())
+          .then(data => ({
+            team: normalizeAbbr(abbr),
+            athletes: (data.athletes || []).flatMap(g => g.items || []),
+          }))
+          .catch(() => ({ team: normalizeAbbr(abbr), athletes: [] }))
+      )
+    ).then(teamRosters => {
+      const map = {}
+      teamRosters.forEach(({ team, athletes }) => {
+        athletes.forEach(a => {
+          const longTermEntry = (a.injuries || []).find(inj =>
+            LONG_TERM_ROSTER_STATUSES.includes(String(inj.status || '').toLowerCase())
+          )
+          if (!longTermEntry) return
+          const name = a.displayName || a.fullName || ''
+          if (!name) return
+          map[`${name}|${team}`] = longTermEntry.status
+        })
+      })
+      return map
+    }).catch(() => ({}))
 
     // Step 1: get all game IDs for these weeks
     const seasonTypeToFetch = useRegular ? 2 : 1
@@ -2537,6 +2572,7 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
     ))
     .then(async boards => {
       const weatherByHost = await weatherPromise
+      const rosterIRByPlayer = await rosterIRPromise
       const gameIds = []
       boards.forEach((board, i) => {
         ;(board.events || []).forEach(ev => {
@@ -2641,7 +2677,12 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
         // this app): summary.injuries[].injuries[], keyed by athlete name.
         // Later games overwrite earlier ones with the more current status.
         ;(summary.injuries || []).forEach(teamInj => {
-          const abbr = teamInj.team?.abbreviation || ''
+          // Normalized here too — same bug as the two other spots fixed
+          // tonight, just caught a third time: this map gets looked up
+          // later using the already-normalized p.team, so storing it
+          // under the raw, un-normalized key would silently never match
+          // for WAS/LA/JAC players.
+          const abbr = normalizeAbbr(teamInj.team?.abbreviation || '')
           if (!abbr) return
           ;(teamInj.injuries || []).forEach(inj => {
             const name = inj.athlete?.displayName || ''
@@ -2836,10 +2877,17 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
           // scores can use it — Start/Sit reacts to any designation,
           // Rest of Season only to genuinely multi-week ones.
           const injury = injuryByPlayer[`${p.name}|${p.team}`] || null
+          // Confirmed real roster-level status (Injured Reserve/Suspended/
+          // PUP) — a completely different, more authoritative signal than
+          // the weekly report above, which structurally never sees these
+          // players at all once they're actually placed on IR. Falls back
+          // to the weekly injury field only if the roster fetch found
+          // nothing for this player.
+          const rosterIRStatus = rosterIRByPlayer[`${p.name}|${p.team}`] || null
           const restOfSeasonScore = Math.min(10,
             trendScore          * 0.7 +
             avgRemainingMatchup * 0.3
-          ) * longTermInjuryMultiplier(injury?.status)
+          ) * longTermInjuryMultiplier(rosterIRStatus || injury?.status)
 
           // ── START/SIT SCORE — the only forward-looking number. Blends
           // the Trend Score with next week's matchup + a small home-field
@@ -2857,8 +2905,13 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
           // Injury/practice-report status — applied only here, to Start/Sit,
           // never to Trend Score. A designation changes whether/how much
           // someone plays THIS week; it doesn't rewrite how well they've
-          // actually been performing.
-          const startSitScore = startSitScoreRaw * injurySeverityMultiplier(injury?.status)
+          // actually been performing. A confirmed roster-level IR/Suspended
+          // status overrides everything else — a genuine instant no-start,
+          // since this player isn't eligible to play at all, regardless of
+          // what the week-to-week practice report (if any) happens to say.
+          const startSitScore = rosterIRStatus
+            ? 0.1
+            : startSitScoreRaw * injurySeverityMultiplier(injury?.status)
 
           const projPts = Math.round(last3avg * (startSitScore / 7) * 10) / 10
 
@@ -2882,7 +2935,8 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
             defAdjScore:     Math.round(defAdjScore * 10) / 10,
             scoringScore:    Math.round(scoringScore * 10) / 10,
             matchupScore:    Math.round(matchupScore * 10) / 10,
-            injuryStatus:    injury?.status || null,
+            injuryStatus:    rosterIRStatus || injury?.status || null,
+            isRosterIR:      !!rosterIRStatus,
             injuryType:      injury?.type || '',
             trend: last3avg > seasonAvg * 1.1 ? '🔥 Hot'
                  : last3avg < seasonAvg * 0.8 ? '❄️ Cold'
@@ -3466,7 +3520,7 @@ function StartSitView({ mode, currentWeek }) {
         )}
 
         <div className="atl-note">
-          Start/Sit = Trend Score (usage share, efficiency, defense-adjusted production, scoring role — 55%) blended with next week's specific matchup (35%) and live weather — wind, rain/snow chance, cold — for outdoor games (10%), plus a small home-game bump, then scaled down for Questionable/Doubtful/Out designations. Rest of Season = Trend Score (70%) blended with the average matchup difficulty across every game left on that player's schedule, not just next week (30%) — current production weighted heavier since it's a better predictor than schedule alone. Scaled down for IR/suspension specifically, since those affect how many of the remaining games he'll actually play — but NOT for a single week's questionable/doubtful/out tag, which shouldn't define his whole season outlook. {mode === 'ppr' ? 'PPR' : 'Standard'} scoring.
+          Start/Sit = Trend Score (usage share, efficiency, defense-adjusted production, scoring role — 55%) blended with next week's specific matchup (35%) and live weather — wind, rain/snow chance, cold — for outdoor games (10%), plus a small home-game bump, then scaled down for Questionable/Doubtful/Out designations. Rest of Season = Trend Score (70%) blended with the average matchup difficulty across every game left on that player's schedule, not just next week (30%) — current production weighted heavier since it's a better predictor than schedule alone. Scaled down for a confirmed Injured Reserve/Suspended/PUP designation specifically (pulled from each team's actual roster, not the weekly practice report, which doesn't track players once they're on IR) — but NOT for a single week's questionable/doubtful/out tag, which shouldn't define his whole season outlook. A confirmed IR/Suspended designation is also an automatic no-start for Start/Sit, regardless of any other signal. {mode === 'ppr' ? 'PPR' : 'Standard'} scoring.
         </div>
       </div>
     </div>
@@ -4767,29 +4821,7 @@ function InjuriesView({ onScout }) {
   const [statusFilter, setStatusFilter] = useState('All')
   const [fetched,  setFetched]    = useState(false)
 
-  // TEMPORARY diagnostic — checking whether ESPN's roster endpoint (a
-  // different data source than the weekly game-report injuries above)
-  // actually carries IR/roster-level status, before guessing at field
-  // names blind. Remove once confirmed one way or the other.
-  const [rosterDebug, setRosterDebug] = useState(null)
-  async function checkRosterStatus(teamAbbr, playerLastName) {
-    setRosterDebug({ loading: true })
-    try {
-      const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/${teamAbbr}/roster`)
-      const data = await r.json()
-      const allAthletes = (data.athletes || []).flatMap(group => group.items || [])
-      const match = allAthletes.find(a =>
-        (a.displayName || a.fullName || '').toLowerCase().includes(playerLastName.toLowerCase())
-      )
-      setRosterDebug({
-        totalFound: allAthletes.length,
-        topLevelKeys: allAthletes[0] ? Object.keys(allAthletes[0]) : [],
-        match: match || null,
-      })
-    } catch (e) {
-      setRosterDebug({ error: e.message })
-    }
-  }
+
 
   const STATUS_ORDER = ['Out', 'Doubtful', 'Questionable', 'Probable', 'IR', 'PUP']
   const STATUS_COLORS = {
@@ -4916,22 +4948,6 @@ function InjuriesView({ onScout }) {
         <span className="sb-ct">
           {loading ? 'Loading…' : fetched ? `${totalCount} players listed` : 'All 32 Teams'}
         </span>
-      </div>
-
-      {/* TEMPORARY — checking whether the roster endpoint actually has
-          IR status before building anything on top of a guess. */}
-      <div style={{padding:'8px 18px', background:'#1a1209'}}>
-        <button
-          onClick={() => checkRosterStatus('no', 'etienne')}
-          style={{fontFamily:'monospace', fontSize:10, padding:'6px 10px', background:'#c8a84b', border:'none', borderRadius:4, cursor:'pointer'}}
-        >
-          🔧 Check NO roster for Etienne
-        </button>
-        {rosterDebug && (
-          <pre style={{color:'#c8a84b', fontFamily:'monospace', fontSize:9, whiteSpace:'pre-wrap', marginTop:8, maxHeight:300, overflow:'auto'}}>
-            {JSON.stringify(rosterDebug, null, 2)}
-          </pre>
-        )}
       </div>
 
       {/* Filters */}
