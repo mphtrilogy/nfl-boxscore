@@ -2286,6 +2286,25 @@ function injurySeverityMultiplier(status) {
   const key = String(status).toLowerCase().trim()
   return INJURY_SEVERITY[key] ?? 1
 }
+// Rest-of-Season specific — deliberately does NOT react to week-to-week
+// designations like questionable/doubtful/a single-game out, the way
+// injurySeverityMultiplier above does. A guy banged up for one week
+// shouldn't have his whole remaining-season outlook crushed over it.
+// Only genuinely multi-week situations (IR, suspension) actually affect
+// how many of his remaining games he'll realistically play — and even
+// then, a moderate discount, not a wipeout, since IR stints are often
+// shorter than a full season under current rules.
+const LONG_TERM_INJURY_SEVERITY = {
+  'injured reserve': 0.3,
+  'ir':               0.3,
+  'suspension':       0.3,
+  'suspended':        0.3,
+}
+function longTermInjuryMultiplier(status) {
+  if (!status) return 1
+  const key = String(status).toLowerCase().trim()
+  return LONG_TERM_INJURY_SEVERITY[key] ?? 1
+}
 // Short badge text + color for the table/card UI.
 function injuryBadge(status) {
   if (!status) return null
@@ -2813,10 +2832,14 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
           const avgRemainingMatchup = remainingMatchupScores.length
             ? remainingMatchupScores.reduce((a,b)=>a+b,0) / remainingMatchupScores.length
             : 5
+          // Looked up here (rather than down by Start/Sit below) so both
+          // scores can use it — Start/Sit reacts to any designation,
+          // Rest of Season only to genuinely multi-week ones.
+          const injury = injuryByPlayer[`${p.name}|${p.team}`] || null
           const restOfSeasonScore = Math.min(10,
             trendScore          * 0.7 +
             avgRemainingMatchup * 0.3
-          )
+          ) * longTermInjuryMultiplier(injury?.status)
 
           // ── START/SIT SCORE — the only forward-looking number. Blends
           // the Trend Score with next week's matchup + a small home-field
@@ -2835,7 +2858,6 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
           // never to Trend Score. A designation changes whether/how much
           // someone plays THIS week; it doesn't rewrite how well they've
           // actually been performing.
-          const injury = injuryByPlayer[`${p.name}|${p.team}`] || null
           const startSitScore = startSitScoreRaw * injurySeverityMultiplier(injury?.status)
 
           const projPts = Math.round(last3avg * (startSitScore / 7) * 10) / 10
@@ -3325,14 +3347,17 @@ function StartSitView({ mode, currentWeek }) {
           </div>
         ) : (
           <div style={{padding:'12px 16px'}}>
-            <div className="ss-stat-row"><span>Start/Sit</span><span className="ss-stat-val" style={{color:gradeColor(p.fwScore)}}>{p.fwScore}</span></div>
-            <div className="ss-stat-row"><span>Projected</span><span className="ss-stat-val">{p.projPts}</span></div>
-            <div className="ss-stat-row"><span>Last Game</span><span className="ss-stat-val">{p.last1}</span></div>
-            <div className="ss-stat-row"><span>L3 Avg</span><span className="ss-stat-val">{p.last3avg}</span></div>
+            <div className="ss-stat-row">
+              <span>Start/Sit <i style={{fontSize:9, opacity:0.6}}>— next game grade</i></span>
+              <span className="ss-stat-val" style={{color:gradeColor(p.fwScore)}}>{p.fwScore}<i style={{fontSize:9, opacity:0.55}}>/10</i></span>
+            </div>
+            <div className="ss-stat-row"><span>Projected</span><span className="ss-stat-val">{p.projPts} <i style={{fontSize:9, opacity:0.55}}>pts</i></span></div>
+            <div className="ss-stat-row"><span>Last Game</span><span className="ss-stat-val">{p.last1} <i style={{fontSize:9, opacity:0.55}}>pts</i></span></div>
+            <div className="ss-stat-row"><span>L3 Avg</span><span className="ss-stat-val">{p.last3avg} <i style={{fontSize:9, opacity:0.55}}>pts</i></span></div>
             <div className="ss-stat-row"><span>Trend</span><span className="ss-stat-val">{p.trend}</span></div>
             <div className="ss-stat-row" style={{borderTop:'1px dashed var(--rule)', paddingTop:8, marginTop:4}}>
-              <span>Rest of Season</span>
-              <span className="ss-stat-val" style={{color:gradeColor(p.restOfSeasonScore)}}>{p.restOfSeasonScore}</span>
+              <span>Rest of Season <i style={{fontSize:9, opacity:0.6}}>— full-year outlook</i></span>
+              <span className="ss-stat-val" style={{color:gradeColor(p.restOfSeasonScore)}}>{p.restOfSeasonScore}<i style={{fontSize:9, opacity:0.55}}>/10</i></span>
             </div>
             <div className="ss-stat-row"><span>Games Left</span><span className="ss-stat-val">{p.gamesRemaining}</span></div>
           </div>
@@ -3441,7 +3466,7 @@ function StartSitView({ mode, currentWeek }) {
         )}
 
         <div className="atl-note">
-          Start/Sit = Trend Score (usage share, efficiency, defense-adjusted production, scoring role — 55%) blended with next week's specific matchup (35%) and live weather — wind, rain/snow chance, cold — for outdoor games (10%), plus a small home-game bump, then scaled down for Questionable/Doubtful/Out designations. Rest of Season = Trend Score (70%) blended with the average matchup difficulty across every game left on that player's schedule, not just next week (30%) — current production weighted heavier since it's a better predictor than schedule alone. {mode === 'ppr' ? 'PPR' : 'Standard'} scoring.
+          Start/Sit = Trend Score (usage share, efficiency, defense-adjusted production, scoring role — 55%) blended with next week's specific matchup (35%) and live weather — wind, rain/snow chance, cold — for outdoor games (10%), plus a small home-game bump, then scaled down for Questionable/Doubtful/Out designations. Rest of Season = Trend Score (70%) blended with the average matchup difficulty across every game left on that player's schedule, not just next week (30%) — current production weighted heavier since it's a better predictor than schedule alone. Scaled down for IR/suspension specifically, since those affect how many of the remaining games he'll actually play — but NOT for a single week's questionable/doubtful/out tag, which shouldn't define his whole season outlook. {mode === 'ppr' ? 'PPR' : 'Standard'} scoring.
         </div>
       </div>
     </div>
