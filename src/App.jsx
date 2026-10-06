@@ -2449,10 +2449,19 @@ function usageScoreFor(p, games, teamPool) {
 
 // Yards-per-opportunity and reliability, relative to a realistic baseline
 // for the position — rewards quality of usage, not just volume of it.
-function efficiencyScoreFor(p) {
+function efficiencyScoreFor(p, games = 1) {
   if (p.pos === 'QB') {
     const ypa = p.passAtt > 0 ? p.passYds / p.passAtt : 0
-    return Math.min(10, Math.max(0, (ypa / EFF_BASE.QB.ypa) * 10))
+    const passEff = Math.min(10, Math.max(0, (ypa / EFF_BASE.QB.ypa) * 10))
+    // Rushing production is real value "yards per pass attempt" completely
+    // misses — a dual-threat QB's rushing yards/TDs are a huge chunk of his
+    // actual fantasy output, not a footnote. Scaled by real rushing volume
+    // (per game), so a QB with one scramble on film doesn't get the same
+    // credit as a genuine 40+ rush-yard/game threat — capped so this stays
+    // a bonus on top of real passing efficiency, never a replacement for it.
+    const rushYdsPerGame = (p.rushYds || 0) / Math.max(1, games)
+    const rushBonus = Math.min(2, rushYdsPerGame / 20)
+    return Math.min(10, passEff * 0.85 + rushBonus)
   }
   if (p.pos === 'K') {
     const pct = p.fga > 0 ? p.fgm / p.fga : 0
@@ -2908,7 +2917,7 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
           // stats (opportunity share, efficiency, TD role, and production
           // adjusted for the defenses actually faced).
           const usageScore      = usageScoreFor(p, games, teamPool)
-          const efficiencyScore = efficiencyScoreFor(p)
+          const efficiencyScore = efficiencyScoreFor(p, games)
           const scoringScore    = scoringRoleFor(p, games)
 
           // Real matchup score — find this player's NEXT scheduled opponent,
@@ -3203,7 +3212,7 @@ function FWFormulaView({ currentWeek, mode, watchlist = [], toggleWatch }) {
           <div className="fw-breakdown-panel">
             <div className="fw-bd-section-label">TREND SCORE — pure current-season production (this season only, no prior-year data)</div>
             <div className="fw-bd-row"><span>🎯 Usage Share (35%)</span><span>Target/carry share of the team's actual plays, not raw counts</span></div>
-            <div className="fw-bd-row"><span>⚙️ Efficiency (25%)</span><span>Yards per target/carry + catch rate vs a real baseline</span></div>
+            <div className="fw-bd-row"><span>⚙️ Efficiency (25%)</span><span>Yards per target/carry + catch rate vs a real baseline (for QBs: yards/attempt, plus a real bonus for rushing production — a dual-threat QB's legs are real value, not a footnote)</span></div>
             <div className="fw-bd-row"><span>🛡️ Defense-Adjusted (25%)</span><span>Output vs. what an avg player would score against the same schedule faced</span></div>
             <div className="fw-bd-row"><span>🏆 Scoring Role (15%)</span><span>TD involvement per game vs a realistic rate for the position</span></div>
 
