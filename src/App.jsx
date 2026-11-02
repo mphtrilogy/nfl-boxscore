@@ -4432,6 +4432,11 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos }
   const [loading, setLoading]   = useState(false)
   const [error,   setError]     = useState(null)
   const [fetched, setFetched]   = useState(false)
+  // Separate from the rolling-window total — "who just went off" is a
+  // different question than "who's been best over N weeks," and a real
+  // breakout game can sit on a low total if the earlier weeks in the
+  // window were quiet. Local-only, resets on reload; no need to lift it.
+  const [sortBy, setSortBy]     = useState('total') // 'total' | 'lastwk'
 
   const POSITIONS = ['ALL', 'QB', 'RB', 'WR', 'TE', 'K', 'DEF']
   const RANGES    = [
@@ -4446,7 +4451,12 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos }
   useEffect(() => {
     if (!seasonStarted) return
     fetchTrends()
-  }, [range, currentWeek])
+    // mode (PPR vs Standard) has to be in here — every player's points are
+    // computed from the raw box scores inside fetchTrends using whatever
+    // `mode` was in scope at that moment. Without it as a dependency,
+    // toggling PPR/Standard updated the button highlight but never
+    // actually recomputed a single point total.
+  }, [range, currentWeek, mode])
 
   async function fetchTrends() {
     setLoading(true)
@@ -4558,19 +4568,43 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos }
 
       // Calculate totals, averages, and trend
       const allPlayers = Object.values(playerMap).map(p => {
+        // p.weeks is keyed by week number, not a plain array — there is no
+        // p.weekArr (that field was never built anywhere), so the old
+        // lookup always fell through to the || 0 fallback. Every single
+        // player's "Last Wk" column, and the hot/cold trend icon that
+        // depends on it, has been silently showing 0/cold regardless of
+        // how they actually did. Get the real most-recent week by sorting
+        // the actual week numbers present.
+        const weekNums = Object.keys(p.weeks).map(Number).sort((a, b) => a - b)
+        const lastWeekNum = weekNums[weekNums.length - 1]
+        const lastWk = lastWeekNum != null ? p.weeks[lastWeekNum] : 0
+
         const weekPts = Object.values(p.weeks)
         const total   = weekPts.reduce((a, b) => a + b, 0)
         const avg     = weekPts.length > 0 ? total / weekPts.length : 0
-        const lastWk  = p.weekArr?.[p.weekArr.length-1] || 0
         const trend   = weekPts.length > 1
           ? lastWk >= avg ? 'hot' : 'cold'
           : 'new'
+
+        // "Boom" — a real, single-week explosion, independent of where the
+        // rolling window's TOTAL happens to rank them. A guy who was
+        // quiet/inactive for the earlier weeks in this window and then
+        // suddenly produces (a rookie getting his shot, a committee back
+        // stealing goal-line work) can have a low enough total to get
+        // buried on page 2 of this table even though last week was the
+        // exact thing worth seeing. Compares the last week against the
+        // player's OWN prior weeks in this window, not the field.
+        const priorWeeks = weekNums.slice(0, -1).map(w => p.weeks[w])
+        const priorAvg   = priorWeeks.length ? priorWeeks.reduce((a,b)=>a+b,0) / priorWeeks.length : 0
+        const isBoom     = lastWk >= 10 && (priorAvg === 0 || lastWk > priorAvg * 1.8)
+
         return {
           ...p,
           totalPts:  Math.round(total * 10) / 10,
           avgPts:    Math.round(avg   * 10) / 10,
           lastWkPts: Math.round(lastWk * 10) / 10,
           trend,
+          isBoom,
           weekCount: weekPts.length,
         }
       })
@@ -4586,10 +4620,15 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos }
     }
   }
 
-  // Filter by position
+  // Filter by position, then sort either by rolling total (default) or by
+  // last week alone — the latter is what actually surfaces a real one-game
+  // explosion that a multi-week total would otherwise bury.
+  const sorted = sortBy === 'lastwk'
+    ? [...players].sort((a, b) => b.lastWkPts - a.lastWkPts)
+    : players
   const filtered = pos === 'ALL'
-    ? players.slice(0, 30)
-    : players.filter(p => p.pos === pos).slice(0, 15)
+    ? sorted.slice(0, 30)
+    : sorted.filter(p => p.pos === pos).slice(0, 15)
 
   const rangeLabel = RANGES.find(r => r.value === range)?.label || 'Last 3'
 
@@ -4623,6 +4662,16 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos }
           <div className="tc-btns">
             <button className={`tc-btn ${mode === 'std' ? 'on' : ''}`} onClick={() => setMode('std')}>Standard</button>
             <button className={`tc-btn ${mode === 'ppr' ? 'on' : ''}`} onClick={() => setMode('ppr')}>PPR</button>
+          </div>
+        </div>
+
+        {/* Sort — total (steady producers) vs last week alone (who just
+            went off, even if the rest of the window was quiet) */}
+        <div className="tc-group">
+          <span className="tc-label">Sort</span>
+          <div className="tc-btns">
+            <button className={`tc-btn ${sortBy === 'total' ? 'on' : ''}`} onClick={() => setSortBy('total')}>Total</button>
+            <button className={`tc-btn ${sortBy === 'lastwk' ? 'on' : ''}`} onClick={() => setSortBy('lastwk')}>🔥 Last Wk</button>
           </div>
         </div>
 
@@ -4686,7 +4735,19 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos }
               {filtered.map((p, i) => (
                 <tr key={`${p.name}-${p.team}`} className={i < 3 ? 'tt-top3' : ''}>
                   <td className="tt-rank">{i + 1}</td>
-                  <td className="tt-name">{p.name}</td>
+                  <td className="tt-name">
+                    {p.name}
+                    {p.isBoom && (
+                      <span
+                        title="Just had a real breakout game — came from a quiet stretch to a big week, independent of the rolling-window total"
+                        style={{
+                          marginLeft: 6, fontSize: 9, fontWeight: 800, letterSpacing: '.04em',
+                          padding: '2px 6px', borderRadius: 10, whiteSpace: 'nowrap',
+                          background: '#e8470b', color: '#fff', verticalAlign: 'middle',
+                        }}
+                      >💥 BOOM</span>
+                    )}
+                  </td>
                   <td className="tt-team">{p.team}</td>
                   <td className="tt-pos">{p.pos}</td>
                   <td className="tt-pts">{p.totalPts}</td>
