@@ -2588,9 +2588,18 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
       .catch(() => ({}))
 
     const LONG_TERM_ROSTER_STATUSES = ['injured reserve', 'ir', 'suspension', 'suspended', 'pup']
+    // ALL_TEAMS holds the app's own display abbreviations (WAS/JAC/LA), but
+    // ESPN's /teams/{slug}/roster endpoint only recognizes its own raw
+    // slugs for these three franchises (WSH/JAX/LAR) — the same mismatch
+    // normalizeAbbr exists to paper over everywhere ELSE ESPN data comes
+    // in. This is the inverse direction: app abbr -> ESPN roster slug.
+    // Without this, those three teams' roster fetches 404/return nothing,
+    // so every player on WAS/JAC/LA was silently invisible to the IR
+    // override no matter how recently or obviously they were placed on IR.
+    const ESPN_ROSTER_SLUG = { WAS: 'wsh', JAC: 'jax', LA: 'lar' }
     const rosterIRPromise = Promise.all(
       ALL_TEAMS.map(abbr =>
-        fetch(`${ESPN_NFL}/teams/${abbr.toLowerCase()}/roster`)
+        fetch(`${ESPN_NFL}/teams/${(ESPN_ROSTER_SLUG[abbr] || abbr).toLowerCase()}/roster`)
           .then(r => r.json())
           .then(data => ({
             team: normalizeAbbr(abbr),
