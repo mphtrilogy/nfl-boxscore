@@ -3026,15 +3026,22 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
 
           // Small-sample guard. usageScoreFor/efficiencyScoreFor/
           // defAdjScoreFor/scoringRoleFor are all plain per-game averages.
-          // With only 1-2 real games in this window (a backup/committee
-          // guy who was buried on the depth chart until recently), one
-          // monster outing single-handedly maxes out the average, and the
-          // math can't tell "sustained excellence" from "one huge game,
-          // tiny sample" — which is how a guy with one good outing ends up
-          // reading as flat-out ELITE. Shrink the composite toward a
-          // neutral 5.0 the fewer real games back it up; a full 4+ game
-          // sample is unaffected (confidence = 1, no change at all).
-          const sampleConfidence = Math.min(1, games / 4)
+          // `games` counts ANY week with a nonzero stat line — including
+          // a token 2-carry appearance from before a player actually took
+          // over a role. That made this guard nearly useless for the real
+          // case it needs to catch: someone who's had 2 genuinely great
+          // weeks mixed in with a couple of earlier throwaway weeks still
+          // hit "full confidence" here, reading identically to someone
+          // who's been great essentially every week in the window. Count
+          // weeks that were actually GOOD (fantasy-relevant production),
+          // not just weeks with any stat line at all — that's the real
+          // sample size "how good, right now" should be built on. A full
+          // 4+ good-week stretch is unaffected (confidence = 1); 2 good
+          // weeks (even great ones) gets meaningfully discounted relative
+          // to someone who's proven it over the whole window.
+          const GOOD_WEEK_PTS = 10
+          const goodWeeks = weekPts.filter(pts => pts >= GOOD_WEEK_PTS).length
+          const sampleConfidence = Math.min(1, goodWeeks / 4)
 
           // Concentration guard — catches a DIFFERENT shape of the same
           // problem that games-count alone can't see: a player can have
