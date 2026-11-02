@@ -2242,6 +2242,8 @@ const KNOWN_TES = new Set([
   // Additional notable TEs
   'Will Mallory','Marlin Klein','Theo Johnson','Dalton Kincaid','Quintin Morris',
   'Charlie Kolar','Devin Asiasi','Durham Smythe','Pharaoh Brown',
+  'Colston Loveland','Elijah Arroyo','Mason Taylor','Harold Fannin Jr.',
+  'Gunnar Helm','Terrance Ferguson','Oronde Gadsden II',
 ])
 
 // Pass-catching/passing-down running backs — the RB-side mirror of
@@ -3098,6 +3100,16 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
             trend: last3avg > seasonAvg * 1.1 ? '🔥 Hot'
                  : last3avg < seasonAvg * 0.8 ? '❄️ Cold'
                  : '➡️ Steady',
+            // "Breakout" — a different question than the Hot/Cold trend
+            // label above. Hot/Cold just compares a player to their OWN
+            // recent average, so an already-elite stud having a normal
+            // great week shows the same quiet 🔥 as a rookie or committee
+            // guy whose role is visibly changing under him. This flags the
+            // second case specifically: a real recent spike (not just
+            // mildly above average) combined with a Trend Score that
+            // hasn't caught up yet — i.e. someone worth a second look who
+            // the table would otherwise bury next to everyone else.
+            isBreakout: last3avg > seasonAvg * 1.3 && trendScore < 7.5 && games >= 1,
           }
         })
         .filter(Boolean)
@@ -3364,6 +3376,16 @@ function FWFormulaView({ currentWeek, mode, watchlist = [], toggleWatch }) {
                     </td>
                     <td className="fw-name">
                       {p.name}
+                      {p.isBreakout && (
+                        <span
+                          title="Breakout — surging opportunity/production that hasn't shown up in the overall Trend Score yet"
+                          style={{
+                            marginLeft: 6, fontSize: 9, fontWeight: 800, letterSpacing: '.04em',
+                            padding: '2px 6px', borderRadius: 10, whiteSpace: 'nowrap',
+                            background: '#ff6a00', color: '#fff', verticalAlign: 'middle',
+                          }}
+                        >🔥 BREAKOUT</span>
+                      )}
                       {injuryBadge(p.injuryStatus) && (
                         <span className="injury-badge" style={{color: injuryBadge(p.injuryStatus).color, borderColor: injuryBadge(p.injuryStatus).color}}
                           title={`${p.injuryStatus}${p.injuryType ? ' — ' + p.injuryType : ''}`}>
@@ -3371,12 +3393,20 @@ function FWFormulaView({ currentWeek, mode, watchlist = [], toggleWatch }) {
                         </span>
                       )}
                     </td>
+                    <td className="fw-pos">{p.pos}</td>
                     <td className="fw-team">{p.team}</td>
                     <td className="fw-opp">{p.opp || '—'}</td>
                     <td className="fw-proj">{p.projPts}</td>
                     <td className={`fw-last ${p.last1 > p.seasonAvg ? 'fw-up' : 'fw-dn'}`}>{p.last1}</td>
                     <td className="fw-avg">{p.last3avg}</td>
-                    <td className="fw-trend">{p.trend}</td>
+                    <td className="fw-trend">
+                      <span style={{
+                        display: 'inline-block', padding: '2px 8px', borderRadius: 10,
+                        fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap',
+                        background: p.trend === '🔥 Hot' ? '#fff1e0' : p.trend === '❄️ Cold' ? '#eaf1fb' : 'transparent',
+                        color:      p.trend === '🔥 Hot' ? '#b24a00' : p.trend === '❄️ Cold' ? '#2a5a8c' : 'inherit',
+                      }}>{p.trend}</span>
+                    </td>
                     <td>
                       <div className="fw-mini-bar">
                         <div style={{width:`${p.matchupScore * 10}%`, background: scoreColor(p.matchupScore)}} />
