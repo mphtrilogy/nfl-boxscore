@@ -17,15 +17,38 @@
 //
 // Manual trigger: POST /api/newsletter/send
 //   Body: { "type": "monday", "secret": "<CRON_SECRET>" }
+//
+// Preview mode (no subscribers touched, no email sent, ever):
+//   GET /api/newsletter/send?type=monday&secret=<CRON_SECRET>&preview=true
+//   Returns the actual rendered HTML directly — open it in a browser tab.
+//   Add &team=SEA to preview it personalized for that favorite team.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export const config = { runtime: 'edge' }
+// Node.js runtime, not edge — edge functions have a hard, non-configurable
+// 25-second "must send an initial response" limit on every plan, and this
+// function does real work (fetching every game's box score, building the
+// full email) before it ever writes a response. That's exactly what was
+// killing every send with a 504. Node functions can be given real headroom
+// via maxDuration below — up to 60s on Hobby, up to 300s on Pro.
+export const maxDuration = 60
 
 const SUPABASE_URL = process.env.SUPABASE_URL
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY
 const RESEND_KEY   = process.env.RESEND_API_KEY
 const CRON_SECRET  = process.env.CRON_SECRET
 const SITE_URL     = 'https://nflboxscore.com'
+// ESPN's site.api rejects bare (no User-Agent) requests from server IPs —
+// confirmed via independent research on this exact endpoint. A spoofed
+// browser UA does NOT work either; ESPN specifically blocks those too.
+// An honest, self-identifying client token does.
+// TEST: nysportsdaily's digest successfully pulls from this exact same
+// site.api.espn.com endpoint using a bare fetch() with zero custom
+// headers — no User-Agent, nothing. This project's custom
+// "TheFinalWhistle/1.0" User-Agent may be the actual thing triggering
+// ESPN's block, not server traffic in general. Testing the same
+// no-headers approach here to see if it's genuinely blanket-blocked or
+// if it was this specific header pattern all along.
+const ESPN_HEADERS = {}
 const FROM_EMAIL   = 'nfl@nysportsdaily.com'
 
 // ── Team city + nickname lookup (mirrors utils/teams.js in the app) ───────────
@@ -212,13 +235,63 @@ const FANTASY_HOF = [
 
 // ── ESPN API helpers ──────────────────────────────────────────────────────────
 
-async function espnFetch(path) {
+// ── SUPABASE CACHE READ ───────────────────────────────────────────────────────
+// ESPN blocks this Vercel function's IP range wholesale (confirmed via a
+// connectivity probe — every ESPN endpoint 403s here, headers included,
+// while an unrelated control API succeeds). Real visitors' browsers hit
+// ESPN fine, so the frontend writes successful fetches to Supabase
+// (fw_espn_cache), and we read from there instead of ESPN directly.
+async function readEspnCache(cacheKey) {
   try {
-    const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl${path}`)
+    const r = await fetch(
+      `${SUPABASE_URL}/rest/v1/fw_espn_cache?cache_key=eq.${encodeURIComponent(cacheKey)}&select=payload,fetched_at&order=fetched_at.desc&limit=1`,
+      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+    )
     if (!r.ok) return null
-    return r.json()
+    const rows = await r.json()
+    if (!rows?.[0]) return null
+    return rows[0].payload
   } catch { return null }
 }
+
+async function espnFetch(path) {
+  // Try the cache first — this is the path that actually works given
+  // ESPN's IP block. Scoreboard calls look like
+  // "/scoreboard?week=1&seasontype=2&limit=20" — map that to the same
+  // cache_key format the frontend writes: "scoreboard:week1:type2".
+  const scoreboardMatch = path.match(/^\/scoreboard\?week=(\d+)&seasontype=(\d+)/)
+  if (scoreboardMatch) {
+    const cacheKey = `scoreboard:week${scoreboardMatch[1]}:type${scoreboardMatch[2]}`
+    const cached = await readEspnCache(cacheKey)
+    if (cached) { espnFetch.stats.cacheHits++; return cached }
+  }
+
+  espnFetch.stats.liveAttempts++
+  try {
+    // ESPN's site.api began rejecting bare (no User-Agent) requests from
+    // server IPs. Confirmed via two independent projects hitting the exact
+    // same wall: a spoofed browser UA does NOT fix it — ESPN specifically
+    // rejects those too. What works is an honest, self-identifying client
+    // token (same fix pattern as curl/requests-library defaults, which
+    // pass through fine). Kept as a fallback attempt in case ESPN ever
+    // lifts the block on this IP range — costs nothing to still try.
+    const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl${path}`, {
+      headers: ESPN_HEADERS,
+    })
+    if (!r.ok) {
+      console.error(`espnFetch failed: ${path} -> HTTP ${r.status}`)
+      espnFetch.stats.liveFailures.push({ path, status: r.status })
+      return { __error: `HTTP ${r.status}`, __path: path }
+    }
+    espnFetch.stats.liveSuccesses++
+    return r.json()
+  } catch (e) {
+    console.error(`espnFetch exception: ${path} ->`, e.message)
+    espnFetch.stats.liveFailures.push({ path, status: `exception: ${e.message}` })
+    return { __error: e.message, __path: path }
+  }
+}
+espnFetch.stats = { cacheHits: 0, liveAttempts: 0, liveSuccesses: 0, liveFailures: [] }
 
 // Determine week context per send type
 // Monday  → recapWeek = last completed week (all Sunday games)
@@ -240,8 +313,14 @@ async function getWeekContext(sendType) {
   }
 
   if (sendType === 'monday') {
-    // Sunday games belong to the week that just completed
-    return { currentWeek: week, recapWeek: Math.max(1, week - 1) }
+    // Sunday's games belong to the SAME week number this date-formula
+    // already computes — it rolls over on Wednesdays (Week 1 opened on
+    // one), so the whole Wed-through-Mon window, including yesterday's
+    // full Sunday slate, is already "week N." Subtracting one here was
+    // wrong — it only ever looked right on the very first Monday send,
+    // where week-1 underflowed to 0 and got clamped back up to 1 by
+    // coincidence. This is the real fix, not the clamp.
+    return { currentWeek: week, recapWeek: week }
   }
   if (sendType === 'tuesday') {
     // MNF is the last game of the current week
@@ -265,18 +344,43 @@ function getSeasonType() {
 async function getWeekEvents(week, forceSeasonType = null) {
   const st = forceSeasonType || getSeasonType()
   const sb = await espnFetch(`/scoreboard?week=${week}&seasontype=${st}&limit=20`)
+  if (sb?.__error) {
+    getWeekEvents.lastError = { path: sb.__path, error: sb.__error }
+  } else {
+    getWeekEvents.lastError = null
+  }
   return sb?.events || []
 }
 
 async function getGameSummary(eventId) {
+  // Check cache first — same reasoning as espnFetch above.
+  const cached = await readEspnCache(`summary:${eventId}`)
+  if (cached) {
+    getGameSummary.stats.cacheHits++
+    return cached
+  }
+
+  getGameSummary.stats.liveAttempts++
   try {
     const r = await fetch(
-      `https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${eventId}`
+      `https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${eventId}`,
+      { headers: ESPN_HEADERS }
     )
-    if (!r.ok) return null
+    if (!r.ok) {
+      getGameSummary.stats.liveFailures.push({ eventId, status: r.status })
+      return null
+    }
+    getGameSummary.stats.liveSuccesses++
     return r.json()
-  } catch { return null }
+  } catch (e) {
+    getGameSummary.stats.liveFailures.push({ eventId, status: `exception: ${e.message}` })
+    return null
+  }
 }
+// Reset explicitly per-request in handler() — a warm serverless instance
+// can persist this static property across invocations otherwise, which
+// would silently blend one request's diagnostics into the next.
+getGameSummary.stats = { cacheHits: 0, liveAttempts: 0, liveSuccesses: 0, liveFailures: [] }
 
 // Filter to games that completed in the last N hours
 function completedWithinHours(events, hours) {
@@ -291,11 +395,13 @@ function completedWithinHours(events, hours) {
 
 // For Monday: all completed Sunday games (up to 48h window)
 // For Tuesday: the Monday Night game specifically (up to 30h window)
-// For Friday: the Thursday Night game (up to 30h window)
+// For Friday: the Thursday Night game — widened to 72h so manual testing
+// later in the week (e.g. Saturday) can still find it; on the real
+// Friday-morning cron schedule this is still same-day/next-day data.
 function getTargetEvents(events, sendType) {
   if (sendType === 'monday')  return completedWithinHours(events, 48)
   if (sendType === 'tuesday') return completedWithinHours(events, 30)
-  if (sendType === 'friday')  return completedWithinHours(events, 30)
+  if (sendType === 'friday')  return completedWithinHours(events, 72)
   return []
 }
 
@@ -309,7 +415,7 @@ async function fetchGameWeather(homeTeam, gameDate) {
   const date = gameDate ? new Date(gameDate).toISOString().split('T')[0] : null
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}` +
     `&daily=precipitation_sum,wind_speed_10m_max,temperature_2m_min,temperature_2m_max,weather_code` +
-    `&wind_speed_unit=mph&temperature_unit=fahrenheit&forecast_days=7&timezone=America%2FNew_York`
+    `&wind_speed_unit=mph&temperature_unit=fahrenheit&precipitation_unit=inch&forecast_days=7&timezone=America%2FNew_York`
 
   try {
     const r    = await fetch(url)
@@ -471,18 +577,19 @@ function parseGameSummary(summary, eventMeta) {
     const rb  = byPos.RB?.filter(p => p.team === teamAbbr).sort((a,b)=>b.fpts-a.fpts)[0]
     const wr  = byPos.WR?.filter(p => p.team === teamAbbr).sort((a,b)=>b.fpts-a.fpts)[0]
     const parts = []
+    const pname = (name) => `<strong class="pname">${name}</strong>`
     if (qb) {
       const ca  = qb.vals['C/ATT'] || '—'
       const yds = qb.vals['YDS'] || '0'
       const tds = qb.vals['TD']  || '0'
       const int = qb.vals['INT'] || '0'
-      parts.push(`${qb.name}: ${ca}, ${yds} yds, ${tds} TD${int !== '0' ? `, ${int} INT` : ''}`)
+      parts.push(`${pname(qb.name)}: ${ca}, ${yds} yds, ${tds} TD${int !== '0' ? `, ${int} INT` : ''}`)
     }
     if (rb) {
-      parts.push(`${rb.name}: ${rb.vals['CAR']||'?'} car, ${rb.vals['YDS']||'?'} yds${rb.vals['TD']&&rb.vals['TD']!=='0'?`, ${rb.vals['TD']} TD`:''}`)
+      parts.push(`${pname(rb.name)}: ${rb.vals['CAR']||'?'} car, ${rb.vals['YDS']||'?'} yds${rb.vals['TD']&&rb.vals['TD']!=='0'?`, ${rb.vals['TD']} TD`:''}`)
     }
     if (wr) {
-      parts.push(`${wr.name}: ${wr.vals['REC']||'?'} rec, ${wr.vals['YDS']||'?'} yds${wr.vals['TD']&&wr.vals['TD']!=='0'?`, ${wr.vals['TD']} TD`:''}`)
+      parts.push(`${pname(wr.name)}: ${wr.vals['REC']||'?'} rec, ${wr.vals['YDS']||'?'} yds${wr.vals['TD']&&wr.vals['TD']!=='0'?`, ${wr.vals['TD']} TD`:''}`)
     }
     return parts
   }
@@ -558,8 +665,32 @@ body{margin:0;padding:0;background:#f0ebe0;font-family:Georgia,serif}
 .ps td.fp-gold{font-weight:700;color:#9a7a2e}
 .ps tr.sq td{background:rgba(200,168,75,.1) !important;border-left:3px solid #c8a84b}
 .sq-tag{display:inline-block;background:#c8a84b;color:#1a1209;font-family:monospace;font-size:6px;font-weight:700;letter-spacing:.1em;padding:1px 4px;border-radius:2px;margin-left:4px;vertical-align:middle}
+/* Dark-theme override for the full game card (.gc has a near-black
+   background) — the team-stat and player-stat tables above were built
+   assuming a light background like the rest of the newsletter, so
+   several cells (.ps td, .ps td.pn, .ts-vc) were rendering in the exact
+   same color as .gc's background: technically present, completely
+   invisible. This is the actual "can't read the night game stats" fix,
+   scoped so it only touches these tables when they're inside a dark card. */
+.gc .ps-lbl{color:rgba(255,255,255,.4)}
+.gc .ps th{color:rgba(255,255,255,.45);background:rgba(255,255,255,.05)}
+.gc .ps td{color:rgba(255,255,255,.85);border-bottom-color:rgba(255,255,255,.08)}
+.gc .ps td.pn{color:#fff}
+.gc .ps td.tm{color:rgba(255,255,255,.4)}
+.gc .ps td.fp{color:#4ade80}
+.gc .ps td.fp-gold{color:#e0b84e}
+.gc .ts td{border-bottom-color:rgba(255,255,255,.08)}
+.gc .ts-lc{color:rgba(255,255,255,.45)}
+.gc .ts-vc{color:rgba(255,255,255,.85)}
+.gc .ts-vw{color:#4ade80}
+.gc .ts-hdr{background:rgba(255,255,255,.05)}
 /* Condensed game card */
 .cg{background:#1a1209;margin:5px 0;border-left:2px solid rgba(200,168,75,.3)}
+/* Compact score strip */
+.ss-row{display:block;padding:6px 18px;border-bottom:1px solid rgba(42,31,14,.06);font-family:monospace;font-size:12px;color:#1a1209;text-decoration:none}
+.ss-win{font-weight:700}
+.ss-los{color:#9e9080}
+.ss-at{color:#9e9080;padding:0 8px;font-size:9px}
 .cg-head{display:table;width:100%;padding:9px 14px;box-sizing:border-box}
 .cg-t{display:table-cell;width:35%;vertical-align:middle}
 .cg-tr{display:table-cell;width:35%;vertical-align:middle;text-align:right}
@@ -567,12 +698,14 @@ body{margin:0;padding:0;background:#f0ebe0;font-family:Georgia,serif}
 .cg-abbr{font-size:16px;font-weight:700;font-family:Georgia,serif}
 .cg-sc{font-size:22px;font-weight:700;color:#fff;letter-spacing:-1px}
 .cg-fin{font-family:monospace;font-size:7px;color:rgba(200,168,75,.5);letter-spacing:.12em;text-transform:uppercase;margin-top:3px}
-.cg-line{font-family:monospace;font-size:8px;color:rgba(255,255,255,.4);padding:2px 14px 6px;line-height:1.5;letter-spacing:.02em}
-.cg-link{display:block;text-align:right;font-family:monospace;font-size:8px;color:#c8a84b;text-decoration:none;padding:0 14px 8px;letter-spacing:.06em}
+.cg-line{font-family:monospace;font-size:9px;color:rgba(255,255,255,.7);padding:4px 14px 8px;line-height:1.6;letter-spacing:.02em}
+.cg-line strong.pname{color:#f5f0e8;font-weight:700}
+.cg-link{display:block;text-align:right;font-family:monospace;font-size:8px;color:#c8a84b;text-decoration:underline;padding:0 14px 8px;letter-spacing:.06em}
 /* Waiver wire */
 .ww-item{padding:9px 18px;border-bottom:1px solid rgba(42,31,14,.1)}
 .ww-name{font-family:Georgia,serif;font-size:14px;font-weight:700;color:#1a1209}
 .ww-badge{display:inline-block;font-family:monospace;font-size:7px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:1px 6px;border-radius:2px;margin-right:5px}
+.ww-rank{font-family:monospace;font-size:10px;font-weight:700;color:#9e9080;margin-right:6px}
 .ww-add{background:#1a5c1a;color:#fff}
 .ww-hi{color:#1a5c1a;font-family:monospace;font-size:8px;font-weight:700}
 .ww-md{color:#d97706;font-family:monospace;font-size:8px;font-weight:700}
@@ -597,6 +730,19 @@ body{margin:0;padding:0;background:#f0ebe0;font-family:Georgia,serif}
 .sq-sum{background:rgba(200,168,75,.07);border-left:3px solid #c8a84b;padding:10px 14px;margin:8px 0;font-family:Georgia,serif;font-size:13px;line-height:1.6;color:#1a1209;font-style:italic}
 /* Callout */
 .callout{background:rgba(200,168,75,.07);border-left:3px solid #c8a84b;padding:9px 14px;margin:8px 18px;font-family:Georgia,serif;font-size:12px;line-height:1.6;color:#1a1209;font-style:italic}
+/* Fantasy & Stats Corner */
+.fc-statline{background:rgba(200,168,75,.07);border-left:3px solid #c8a84b;padding:10px 14px;margin:8px 18px 4px}
+.fc-statline-lbl{font-family:monospace;font-size:7px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#8b1a1a;margin-bottom:4px}
+.fc-statline-body{font-family:Georgia,serif;font-size:13px;line-height:1.55;color:#1a1209}
+.fc-fire-row{padding:8px 18px 2px}
+.fc-fire-pill{display:inline-block;font-family:monospace;font-size:8px;font-weight:700;color:#8b1a1a;background:rgba(139,26,26,.08);border-radius:10px;padding:3px 8px;margin:0 4px 4px 0}
+.fc-pos-lbl{font-family:monospace;font-size:7px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#6b5f4e;padding:10px 18px 2px}
+.fc-row{padding:3px 18px;border-bottom:1px solid rgba(42,31,14,.06);font-family:Georgia,serif;font-size:12px;color:#1a1209}
+.fc-rank{font-family:monospace;font-size:9px;color:#9e9080;width:14px;display:inline-block}
+.fc-pname{font-weight:700}
+.fc-team{font-family:monospace;font-size:8px;color:#9e9080;font-weight:400}
+.fc-pts{float:right;font-family:monospace;font-size:11px;font-weight:700;color:#1a5c1a}
+.fc-line{clear:both;display:block;font-family:monospace;font-size:9px;color:#6b5f4e;padding-top:1px}
 /* Divider */
 .div{height:1px;background:rgba(42,31,14,.12);margin:4px 0}
 /* CTA */
@@ -607,9 +753,9 @@ body{margin:0;padding:0;background:#f0ebe0;font-family:Georgia,serif}
 .foot{background:#1a1209;padding:14px 20px;text-align:center}
 .foot-brand{font-family:Georgia,serif;font-size:13px;font-weight:700;color:#c8a84b}
 .foot-links{font-family:monospace;font-size:8px;color:rgba(255,255,255,.35);margin-top:5px;letter-spacing:.06em}
-.foot-links a{color:rgba(255,255,255,.4);text-decoration:none}
+.foot-links a{color:rgba(255,255,255,.5);text-decoration:underline}
 .foot-unsub{font-family:monospace;font-size:7px;color:rgba(255,255,255,.2);margin-top:7px;letter-spacing:.06em}
-.foot-unsub a{color:rgba(255,255,255,.25);text-decoration:none}
+.foot-unsub a{color:rgba(255,255,255,.4);text-decoration:underline}
 `
 
 // ── Scoring mode helper ───────────────────────────────────────────────────────
@@ -635,8 +781,8 @@ function shell(subject, dateStr, weekNum, sendLabel, mode = 'ppr') {
 <div class="wrap">
 <div class="mast">
   <div class="mast-logo">The Final Whistle</div>
-  <div class="mast-sub">nflboxscore.com &nbsp;·&nbsp; NFL Fantasy &amp; Scores</div>
-  <div class="mast-date">${dateStr} &nbsp;·&nbsp; Week ${weekNum} &nbsp;·&nbsp; ${sendLabel} &nbsp;·&nbsp; ${mode.toUpperCase()}</div>
+  <div class="mast-sub">nflboxscore.com &nbsp;·&nbsp; NFL Scores &amp; Stats</div>
+  <div class="mast-date">${dateStr} &nbsp;·&nbsp; Week ${weekNum} &nbsp;·&nbsp; ${sendLabel}</div>
 </div>`
 }
 
@@ -728,7 +874,7 @@ function renderFullGame(g, squad, mode = 'ppr') {
     ['First Downs',   'firstDowns',      true ],
     ['3rd Down Eff.', 'thirdDownEff',    null ],
     ['Turnovers',     'turnovers',       false],
-    ['Sacks',         'sacks',           true ],
+    ['Sacks',         'sacksYardsLost',  true ],
     ['Poss. Time',    'possessionTime',  null ],
   ].map(([lbl, key, moreBetter]) => {
     const av = awayStats[key] || '&mdash;'
@@ -802,6 +948,33 @@ ${metaLine}
 }
 
 // CONDENSED game card — for non-fav games
+// COMPACT SCORE STRIP — one row per game, final scores only. Much lighter
+// than renderCondensedGame's mini-card; built for Tuesday's "quick glance
+// at the whole week" alongside the detailed MNF game treatment.
+function renderScoreStrip(events, weekNum) {
+  if (!events?.length) return ''
+  const rows = events.map(ev => {
+    const comps  = ev.competitions?.[0]
+    const home   = comps?.competitors?.find(c => c.homeAway === 'home')
+    const away   = comps?.competitors?.find(c => c.homeAway === 'away')
+    const hAbbr  = home?.team?.abbreviation || '?'
+    const aAbbr  = away?.team?.abbreviation || '?'
+    const hScore = parseInt(home?.score ?? 0)
+    const aScore = parseInt(away?.score ?? 0)
+    const hWon   = hScore > aScore
+    const aWon   = aScore > hScore
+    const deepLink = `${SITE_URL}?game=${aAbbr}-${hAbbr}`
+    return `
+<a href="${deepLink}" class="ss-row">
+  <span class="${aWon?'ss-win':'ss-los'}">${aAbbr} ${aScore}</span><span class="ss-at">@</span><span class="${hWon?'ss-win':'ss-los'}">${hAbbr} ${hScore}</span>
+</a>`
+  }).join('')
+
+  return `
+<span class="sec-label">📊 Week ${weekNum} Final Scores</span>
+<div>${rows}</div>`
+}
+
 function renderCondensedGame(g) {
   if (!g) return ''
   const { home, away, winner, isOT, awayQ, homeQ,
@@ -861,7 +1034,7 @@ function renderScheduleLine(ev, oddsMap, weatherMap, favTeam) {
   const tv       = comp?.broadcasts?.[0]?.names?.[0] || ''
   const kickoff  = ev.date
     ? new Date(ev.date).toLocaleString('en-US',
-        { weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit' })
+        { timeZone: 'America/New_York', weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit' })
     : 'TBD'
   const isFav    = favTeam && favTeam !== 'All' && [homeAbbr, awayAbbr].includes(favTeam)
   const key      = `${awayAbbr}@${homeAbbr}`
@@ -872,18 +1045,30 @@ function renderScheduleLine(ev, oddsMap, weatherMap, favTeam) {
   const deepLink = `${SITE_URL}?game=${awayAbbr}-${homeAbbr}`
   const hl       = isFav ? 'background:rgba(200,168,75,.08);border-left:3px solid rgba(200,168,75,.5);' : 'border-left:3px solid transparent;'
 
+  // A single <a> wrapping this whole multi-line block gets fragmented by
+  // plain-text email renderers (Yahoo, etc.) into a separate bracketed
+  // link per visible line — exactly the "[TB @ CIN...] [FOX] [88°F]"
+  // look. Instead: only the team matchup itself is a link; everything
+  // else (kickoff, network, weather) is plain text in the same row.
+  //
+  // Also: CSS display:table/table-cell (no real <table>) let iOS Mail
+  // wrap the narrow left "cell" character-by-character when the layout
+  // got squeezed on a small screen — the "A / T / L / @ / P / I / T"
+  // vertical letter-stack bug. A real HTML <table> with white-space:
+  // nowrap on the team-name cell renders far more predictably across
+  // mobile mail clients.
   return `
-<a href="${deepLink}" style="text-decoration:none;display:block">
-<div style="display:table;width:100%;padding:8px 18px;border-bottom:1px solid rgba(42,31,14,.08);box-sizing:border-box;${hl}">
-  <span style="display:table-cell;vertical-align:top;color:#1a1209">
-    <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700">${awayAbbr} @ ${homeAbbr}${isFav ? ' ⚡' : ''}</span>
-    ${oddsStr ? `<br><span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6b5f4e">${oddsStr}</span>` : ''}
-  </span>
-  <span style="display:table-cell;text-align:right;vertical-align:top;font-family:'IBM Plex Mono',monospace;font-size:9px;color:#9e9080;white-space:nowrap">
-    ${kickoff}${tv ? `<br><span style="color:#c8a84b">${tv}</span>` : ''}${wxStr ? `<br>${wxStr}` : ''}
-  </span>
-</div>
-</a>`
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border-bottom:1px solid rgba(42,31,14,.08);${hl}">
+  <tr>
+    <td style="padding:8px 8px 8px 18px;vertical-align:top;color:#1a1209;white-space:nowrap">
+      <a href="${deepLink}" style="text-decoration:underline;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:#8b1a1a;white-space:nowrap">${awayAbbr} @ ${homeAbbr}${isFav ? ' ⚡' : ''}</a>
+      ${oddsStr ? `<br><span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6b5f4e;white-space:nowrap">${oddsStr}</span>` : ''}
+    </td>
+    <td style="padding:8px 18px 8px 8px;text-align:right;vertical-align:top;font-family:'IBM Plex Mono',monospace;font-size:9px;color:#9e9080;white-space:nowrap">
+      ${kickoff}${tv ? `<br><span style="color:#c8a84b">${tv}</span>` : ''}${wxStr ? `<br>${wxStr}` : ''}
+    </td>
+  </tr>
+</table>`
 }
 
 // Full compact schedule section — fetches odds + weather for all upcoming
@@ -921,8 +1106,12 @@ async function renderCompactSchedule(events, week, seasonType, favTeam, label, p
 </div>`
 }
 
-// WAIVER WIRE — auto-generated from real box score data
-function renderWaiverSection(parsedGames, nextWeek, squad, mode = 'ppr') {
+// TOP PERFORMERS — auto-generated from real box score data. Deliberately
+// NOT framed as waiver-wire advice: there's no actual roster-ownership
+// data behind this (no way to know who's already rostered in 100% of
+// leagues vs. genuinely available), so calling a locked-in star an "ADD"
+// was actively misleading. This just reports who actually balled out.
+function renderWaiverSection(parsedGames, recapWeek, squad, mode = 'ppr') {
   const seen       = new Set()
   const performers = []
 
@@ -944,36 +1133,106 @@ function renderWaiverSection(parsedGames, nextWeek, squad, mode = 'ppr') {
 
   if (!targets.length) return ''
 
-  const rows = targets.map(p => {
+  const rows = targets.map((p, i) => {
     const pts     = fp(p, mode)
-    const pri     = pts >= 25 ? 'HIGH' : pts >= 18 ? 'MED' : 'LOW'
-    const priCls  = pri === 'HIGH' ? 'ww-hi' : 'ww-md'
     const isSquad = squad.some(s => p.name.toLowerCase().includes(s.toLowerCase()))
 
-    const reason = p.pos === 'RB'
-      ? `${p.vals['CAR']||'?'} car, ${p.vals['YDS']||'?'} yds${p.vals['TD']&&p.vals['TD']!=='0'?`, ${p.vals['TD']} TD`:''} — usage trending up`
-      : `${p.vals['REC']||'?'} rec/${p.vals['TGT']||'?'} tgt, ${p.vals['YDS']||'?'} yds${p.vals['TD']&&p.vals['TD']!=='0'?`, ${p.vals['TD']} TD`:''} — target share rising`
+    const line = p.pos === 'RB'
+      ? `${p.vals['CAR']||'?'} car, ${p.vals['YDS']||'?'} yds${p.vals['TD']&&p.vals['TD']!=='0'?`, ${p.vals['TD']} TD`:''}`
+      : `${p.vals['REC']||'?'} rec/${p.vals['TGT']||'?'} tgt, ${p.vals['YDS']||'?'} yds${p.vals['TD']&&p.vals['TD']!=='0'?`, ${p.vals['TD']} TD`:''}`
 
     return `
 <div class="ww-item">
   <div>
-    <span class="ww-badge ww-add">ADD</span>
+    <span class="ww-rank">${i+1}</span>
     <strong class="ww-name">${p.name}${isSquad?' ⚡':''}</strong>
     <span style="font-family:monospace;font-size:8px;color:#9e9080"> ${p.pos} &middot; ${p.team}</span>
-    &nbsp;<span class="${priCls}">${pri} PRI</span>
   </div>
-  <div class="ww-reason">${reason}</div>
+  <div class="ww-reason">${line}</div>
   <div class="ww-stat">${pts} FPTS (${fpLabel(mode)}) &nbsp;&middot;&nbsp; ${p.game}</div>
 </div>`
   }).join('')
 
   return `
-<span class="sec-label">📋 Waiver Wire Targets — Week ${nextWeek}</span>
+<span class="sec-label">🔥 Top Fantasy Performers — Week ${recapWeek}</span>
 ${rows}
-<div class="callout">Claims close Wednesday in most leagues. Lead with your top priority — don\'t split waiver position across multiple speculative adds.</div>
-<div class="cta-wrap">
-  <a class="cta" href="${SITE_URL}">Full Waiver Analysis &rarr;</a>
-</div>`
+<div class="callout">Raw output, not roster availability — some of these are locked into 100% of rosters. See the site for real add/drop targets based on actual ownership.</div>`
+}
+
+// FANTASY & STATS CORNER — a single-week snapshot built entirely from this
+// week's already-parsed box scores (no extra fetch, no extra risk to
+// Supabase or ESPN). Deliberately NOT season-long totals — those need real
+// multi-week aggregation, a separate, bigger piece of work. This is the
+// "easy, interesting win" tier: today's actual results, framed with some
+// personality, closing with a push to the real FW Formula on-site rather
+// than trying to replicate it here.
+function renderFantasyStatsCorner(parsedGames, mode = 'ppr') {
+  if (!parsedGames?.length) return ''
+
+  // Flatten every skill-position player across every game this week,
+  // tagging their opponent for the Stat Line of the Week blurb.
+  const all = []
+  parsedGames.forEach(g => {
+    if (!g) return
+    ;['QB','RB','WR'].forEach(pos => {
+      g.byPos[pos]?.forEach(p => {
+        const opp = p.team === g.home.abbr ? g.away.abbr : g.home.abbr
+        all.push({ ...p, opp })
+      })
+    })
+  })
+  if (!all.length) return ''
+
+  const sorted = [...all].sort((a,b) => fp(b,mode) - fp(a,mode))
+  const star   = sorted[0]
+  if (!star) return ''
+
+  const statLine = (p) => {
+    if (p.pos === 'QB') {
+      const yds = p.vals['YDS']||'0', td = p.vals['TD']||'0', ca = p.vals['C/ATT']||''
+      return `${ca}, ${yds} yds, ${td} TD`
+    }
+    if (p.pos === 'RB') {
+      const yds = p.vals['YDS']||'0', td = p.vals['TD']||'0', car = p.vals['CAR']||'0'
+      return `${car} car, ${yds} yds${td!=='0' ? `, ${td} TD` : ''}`
+    }
+    const yds = p.vals['YDS']||'0', td = p.vals['TD']||'0', rec = p.vals['REC']||'0'
+    return `${rec} rec, ${yds} yds${td!=='0' ? `, ${td} TD` : ''}`
+  }
+
+  const leaders = (pos, n=5) =>
+    all.filter(p => p.pos === pos).sort((a,b) => fp(b,mode)-fp(a,mode)).slice(0, n)
+
+  const FIRE_THRESHOLD = 25
+  const fireClub = sorted.filter(p => fp(p,mode) >= FIRE_THRESHOLD).slice(0, 8)
+
+  const leaderRows = (pos) => leaders(pos).map((p,i) => `
+<div class="fc-row">
+  <span class="fc-rank">${i+1}</span>
+  <span class="fc-pname">${p.name} <span class="fc-team">${p.team}</span></span>
+  <span class="fc-pts">${fp(p,mode)}</span>
+  <div class="fc-line">${statLine(p)}</div>
+</div>`).join('')
+
+  const fireRow = fireClub.length
+    ? `<div class="fc-fire-row">${fireClub.map(p => `<span class="fc-fire-pill">🔥 ${p.name} — ${fp(p,mode)}</span>`).join(' ')}</div>`
+    : ''
+
+  const posBlock = (pos, label) => leaders(pos).length
+    ? `<div class="fc-pos-lbl">${label}</div>${leaderRows(pos)}`
+    : ''
+
+  return `
+<span class="sec-label">🎯 Fantasy &amp; Stats Corner — This Week</span>
+<div class="fc-statline">
+  <div class="fc-statline-lbl">Stat Line of the Week</div>
+  <div class="fc-statline-body"><strong class="pname">${star.name}</strong> (${star.team}) vs ${star.opp} — ${statLine(star)} &nbsp;&middot;&nbsp; ${fp(star,mode)} FPTS (${fpLabel(mode)})</div>
+</div>
+${fireRow}
+${posBlock('QB','Quarterbacks')}
+${posBlock('RB','Running Backs')}
+${posBlock('WR','Receivers')}
+<div class="callout">This week's raw output only — see full season Trend Scores, Start/Sit grades, and matchup breakdowns on the real <a href="${SITE_URL}?view=Fantasy&amp;tab=fw">FW Formula &rarr;</a></div>`
 }
 
 // SQUAD SUMMARY — "Your fantasy squad this week"
@@ -1093,9 +1352,37 @@ async function renderWeatherSection(events) {
 // requests per game.
 async function fetchOdds(week, seasonType) {
   const oddsMap = {}
+
+  // Read from the same Supabase cache scoreboard/summary calls already
+  // use — the cached scoreboard payload already contains real odds data
+  // (comp.odds[0]) since that's exactly what this function extracts.
+  // fetchOdds previously made its own live ESPN call, which — like every
+  // other direct call from this Vercel function — gets 403'd by ESPN's
+  // IP-range block. Confirmed via oddsDebug: 0 keys found, every time.
+  const cacheKey = `scoreboard:week${week}:type${seasonType}`
+  const cached = await readEspnCache(cacheKey)
+  if (cached) {
+    ;(cached.events || []).forEach(ev => {
+      const comp = ev.competitions?.[0]
+      const o    = comp?.odds?.[0]
+      if (!o) return
+      const homeTeam = comp.competitors?.find(c => c.homeAway === 'home')?.team?.abbreviation || ''
+      const awayTeam = comp.competitors?.find(c => c.homeAway === 'away')?.team?.abbreviation || ''
+      const key = `${awayTeam}@${homeTeam}`
+      oddsMap[key] = {
+        spread:    o.details    || null,
+        overUnder: o.overUnder  != null ? o.overUnder : null,
+      }
+    })
+    if (Object.keys(oddsMap).length) return oddsMap
+  }
+
+  // Fallback: try ESPN directly anyway — costs nothing extra to attempt,
+  // and would just work on its own if ESPN ever lifts the IP block.
   try {
     const r    = await fetch(
-      `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${week}&seasontype=${seasonType}&limit=20`
+      `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${week}&seasontype=${seasonType}&limit=20`,
+      { headers: ESPN_HEADERS }
     )
     const data = await r.json()
     ;(data.events || []).forEach(ev => {
@@ -1133,7 +1420,9 @@ async function fetchStandings() {
     // /apis/site/v2/.../standings returns an empty stub ({fullViewLink})
     // for NFL — confirmed live on the site itself. /apis/v2/ (no "site/")
     // returns the real, fully-resolved standings data instead.
-    const r = await fetch('https://site.api.espn.com/apis/v2/sports/football/nfl/standings?season=2026')
+    const r = await fetch('https://site.api.espn.com/apis/v2/sports/football/nfl/standings?season=2026', {
+      headers: ESPN_HEADERS,
+    })
     const data = await r.json()
     const teams = []
     // Response nests conference -> division -> entries, but exact depth
@@ -1268,7 +1557,8 @@ async function fetchInjuries(favTeam) {
   try {
     // Get league-wide injury report
     const r    = await fetch(
-      'https://site.api.espn.com/apis/site/v2/sports/football/nfl/injuries?limit=50'
+      'https://site.api.espn.com/apis/site/v2/sports/football/nfl/injuries?limit=50',
+      { headers: ESPN_HEADERS }
     )
     const data = await r.json()
     const items = data.injuries || []
@@ -1350,7 +1640,8 @@ async function fetchTeamNews(favTeam) {
   try {
     if (espnId) {
       const r    = await fetch(
-        `https://site.api.espn.com/apis/site/v2/sports/football/nfl/news?team=${espnId}&limit=4`
+        `https://site.api.espn.com/apis/site/v2/sports/football/nfl/news?team=${espnId}&limit=4`,
+        { headers: ESPN_HEADERS }
       )
       const data = await r.json()
       ;(data.articles || []).slice(0, 3).forEach(a => {
@@ -1428,7 +1719,7 @@ async function fetchFWTake(currentWeek, seasonType) {
 
     const boards = await Promise.all(
       weeks.map(w =>
-        fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${w}&seasontype=${seasonType}&limit=20`)
+        fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${w}&seasontype=${seasonType}&limit=20`, { headers: ESPN_HEADERS })
           .then(r => r.json()).catch(() => ({ events: [] }))
       )
     )
@@ -1442,7 +1733,7 @@ async function fetchFWTake(currentWeek, seasonType) {
 
     const summaries = await Promise.all(
       gameIds.slice(0, 30).map(g =>
-        fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${g.id}`)
+        fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${g.id}`, { headers: ESPN_HEADERS })
           .then(r => r.json()).then(d => ({ ...d, _week: g.week })).catch(() => null)
       )
     )
@@ -1486,8 +1777,20 @@ async function fetchFWTake(currentWeek, seasonType) {
       })
       .filter(Boolean)
 
+    // "Trending down" should mean an actually bad game, not just a quieter
+    // one for a stud. A 25.8-avg WR dropping to 14.0, or a 23.3-avg RB
+    // dropping to 9.8, are both still perfectly playable fantasy outputs —
+    // flagging those with the same ❄️ alarm as a real decline is misleading.
+    // Require the last game itself to fall below a position-specific floor
+    // (what a genuinely weak game looks like), in addition to being below
+    // the player's own average.
+    const DOWN_FLOOR = { QB: 12, RB: 9, WR: 9, TE: 8 }
+
     const risers  = scored.filter(p => p.delta > 0).sort((a,b) => b.delta - a.delta).slice(0, 3)
-    const fallers = scored.filter(p => p.seasonAvg >= 8 && p.delta < 0).sort((a,b) => a.delta - b.delta).slice(0, 3)
+    const fallers = scored
+      .filter(p => p.seasonAvg >= 8 && p.delta < 0 && p.last1 < (DOWN_FLOOR[p.pos] ?? 9))
+      .sort((a,b) => a.delta - b.delta)
+      .slice(0, 3)
 
     return { risers, fallers }
   } catch { return null }
@@ -1522,7 +1825,9 @@ async function fetchLeagueNews() {
   const articles = []
   try {
     // ESPN general NFL news — most viewed/recent
-    const r    = await fetch('https://site.api.espn.com/apis/site/v2/sports/football/nfl/news?limit=8')
+    const r    = await fetch('https://site.api.espn.com/apis/site/v2/sports/football/nfl/news?limit=8', {
+      headers: ESPN_HEADERS,
+    })
     const data = await r.json()
     ;(data.articles || []).forEach(a => {
       if (articles.length >= 5) return
@@ -1573,7 +1878,7 @@ function renderLeagueNewsSection(articles) {
     ${String(i + 1).padStart(2,'0')} ${a.category ? `· ${a.category}` : ''}
   </div>
   <a href="${a.url}" target="_blank" rel="noopener"
-     style="font-family:Georgia,serif;font-size:13px;font-weight:600;color:#1a1209;text-decoration:none;line-height:1.4;display:block">
+     style="font-family:Georgia,serif;font-size:13px;font-weight:600;color:#8b1a1a;text-decoration:underline;line-height:1.4;display:block">
     ${a.title}
   </a>
   <div style="font-family:monospace;font-size:8px;color:#9e9080;margin-top:3px;letter-spacing:.04em">
@@ -1587,7 +1892,7 @@ function renderLeagueNewsSection(articles) {
   ${rows}
 </div>
 <div style="text-align:center;padding:6px 0 12px">
-  <a href="https://nflboxscore.com" style="font-family:monospace;font-size:8px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#c8a84b;text-decoration:none">
+  <a href="https://nflboxscore.com" style="font-family:monospace;font-size:8px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#c8a84b;text-decoration:underline">
     More NFL News at nflboxscore.com →
   </a>
 </div>`
@@ -1601,7 +1906,7 @@ function renderTeamNewsSection(articles, favTeam) {
   const rows = articles.map(a => `
 <div style="padding:8px 0;border-bottom:1px solid rgba(42,31,14,.1)">
   <a href="${a.url}" target="_blank" rel="noopener"
-     style="font-family:Georgia,serif;font-size:13px;font-weight:600;color:#1a1209;text-decoration:none;line-height:1.4;display:block">
+     style="font-family:Georgia,serif;font-size:13px;font-weight:600;color:#8b1a1a;text-decoration:underline;line-height:1.4;display:block">
     ${a.title}
   </a>
   <div style="font-family:monospace;font-size:8px;color:#9e9080;margin-top:3px;letter-spacing:.04em">
@@ -1715,6 +2020,69 @@ const ALL_HOF = [
   ...FANTASY_WHATIF,
 ]
 
+// ── AUTO-LEDE ────────────────────────────────────────────────────────────────
+// A real "top story" line built entirely from data we already fetch — no
+// LLM call, no new API cost. Looks at completed games this week and picks
+// the single most notable thing: an upset (favored team lost), otherwise
+// the best individual fantasy performance. Falls back to nothing if there's
+// no real data yet, rather than showing a generic placeholder.
+function buildAutoLede(parsedGames, oddsMap, mode) {
+  if (!parsedGames?.length) return null
+
+  // 1. Check for an upset — the spread-favored team actually lost.
+  // odds.spread is a pre-formatted string like "SEA -3.5" — the team
+  // abbreviation at the front is who's favored.
+  for (const g of parsedGames) {
+    if (!g) continue
+    const key  = `${g.away.abbr}@${g.home.abbr}`
+    const odds = oddsMap?.[key]
+    if (!odds?.spread) continue
+    const favoredAbbr = odds.spread.split(' ')[0]
+    if (favoredAbbr && favoredAbbr !== g.winner && [g.home.abbr, g.away.abbr].includes(favoredAbbr)) {
+      const loserScore = g.winner === g.home.abbr ? g.away.score : g.home.score
+      const winnerScore = g.winner === g.home.abbr ? g.home.score : g.away.score
+      return {
+        icon: '😱',
+        label: 'Upset Alert',
+        text: `${g.winner} knocked off ${favoredAbbr} (${odds.spread}) — final ${winnerScore}-${loserScore}. Nobody saw that coming.`,
+      }
+    }
+  }
+
+  // 2. No upset found — lead with the single best fantasy performance
+  // across every game processed this week.
+  let best = null
+  parsedGames.forEach(g => {
+    if (!g) return
+    ;['QB','RB','WR'].forEach(pos => {
+      ;(g.byPos?.[pos] || []).forEach(p => {
+        const pts = fp(p, mode)
+        if (pts != null && (!best || pts > best.pts)) {
+          best = { ...p, pts, pos }
+        }
+      })
+    })
+  })
+  if (best && best.pts >= 20) {
+    return {
+      icon: '🔥',
+      label: 'Performance of the Week',
+      text: `${best.name} (${best.team}) put up ${best.pts} fantasy points — the best individual performance of the week so far.`,
+    }
+  }
+
+  return null
+}
+
+function renderAutoLede(lede) {
+  if (!lede) return ''
+  return `
+<div style="background-color:#1a1209;padding:18px 20px;margin-bottom:2px">
+  <div style="font-family:monospace;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#c8a84b;margin-bottom:6px">${lede.icon} ${lede.label}</div>
+  <div style="font-family:Georgia,serif;font-size:15px;line-height:1.5;color:#f5f0e8">${lede.text}</div>
+</div>`
+}
+
 function renderHOFTidbit(weekNum, sendType) {
   const dayOffset = { thursday:0, friday:7, monday:14, tuesday:21 }[sendType] || 0
   // During off-season (week 1 stuck), use day-of-year for variety
@@ -1765,8 +2133,11 @@ function renderHOFTidbit(weekNum, sendType) {
 // ── Full email assembler per send type ────────────────────────────────────────
 async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
   const { currentWeek, recapWeek } = weekCtx
-  const { email, fav_team: favTeam, squad_players: squadStr, scoring_mode: scoringMode } = sub
-  const mode    = scoringMode === 'std' ? 'std' : 'ppr'   // default to PPR if unset
+  const { email, fav_team: favTeam, squad_players: squadStr } = sub
+  // Scoring format is no longer a subscriber-facing choice — this isn't a
+  // fantasy-first newsletter, PPR is just the modern default for the
+  // occasional player-points number shown in a box score row.
+  const mode = 'ppr'
   const squad   = (squadStr || '').split(',').map(s => s.trim()).filter(Boolean)
   const hasFav  = favTeam && favTeam !== 'All'
   const dispWeek = recapWeek || currentWeek
@@ -1807,52 +2178,67 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
 
   // ── MONDAY: All Sunday games ──────────────────────────────────────────────
   if (sendType === 'monday') {
-    // Squad summary first if applicable
-    html += renderSquadSummary(parsedGames, squad, mode)
+    // Events for the week actually being recapped (Sunday's games) — this
+    // was missing entirely before, which is why the bye-week note and SNF
+    // lookup below were referencing a variable that only ever existed in
+    // the outer handler(), not here. That's the "recapEvents is not
+    // defined" crash — this is the actual fix, not a workaround.
+    const recapEvents = recapWeek ? await getWeekEvents(recapWeek) : []
+    const completedEvents = recapEvents.filter(ev => ev.status?.type?.completed)
 
-    if (hasFav) {
-      const favGame = parsedGames.find(g =>
-        g && (g.home.abbr === favTeam || g.away.abbr === favTeam))
+    // Same fix as the Scores tab's live-matching bug — a schedule/ESPN
+    // team-code mismatch (e.g. JAC vs JAX) would otherwise silently break
+    // the favorite-team lookup below.
+    const ABBR_MAP = { 'LAR': 'LA', 'WSH': 'WAS', 'JAX': 'JAC' }
+    const normAbbr = (a) => ABBR_MAP[a] || a
 
-      if (favGame) {
-        const won = favGame.winner === favTeam
-        html += `<span class="sec-label">⚡ ${favTeam} — ${won ? '✅ WIN' : '❌ LOSS'}</span>`
-        html += renderFullGame(favGame, squad, mode)
-        html += standingsHTML
-      } else {
-        html += renderByeWeekNote(favTeam, recapWeek, recapEvents)
-        html += standingsHTML
+    // ── PRIMARY CONTENT — a lightweight score strip built from just the
+    // scoreboard fetch, not the 16 separate per-game box-score fetches
+    // that used to be required here. That heavier path is exactly what
+    // has been failing when nothing had recently warmed the cache for
+    // every single game — this only needs the ONE scoreboard call to
+    // have real data, which is a much smaller, much more reliable ask.
+    if (completedEvents.length) {
+      if (hasFav) {
+        const favEvent = completedEvents.find(ev => {
+          const comps = ev.competitions?.[0]
+          return comps?.competitors?.some(c => normAbbr(c.team?.abbreviation) === favTeam)
+        })
+        if (favEvent) {
+          const comps = favEvent.competitions[0]
+          const home  = comps.competitors.find(c => c.homeAway === 'home')
+          const away  = comps.competitors.find(c => c.homeAway === 'away')
+          const isHome = normAbbr(home.team.abbreviation) === favTeam
+          const favScore = parseInt(isHome ? home.score : away.score)
+          const oppScore = parseInt(isHome ? away.score : home.score)
+          const won = favScore > oppScore
+          const oppAbbr = isHome ? away.team.abbreviation : home.team.abbreviation
+          const deepLink = `${SITE_URL}?game=${away.team.abbreviation}-${home.team.abbreviation}`
+          html += `<span class="sec-label">⚡ ${favTeam} — ${won ? '✅ WIN' : '❌ LOSS'}</span>`
+          html += `<div style="padding:10px 18px;font-family:Georgia,serif;font-size:14px;color:#1a1209"><a href="${deepLink}" style="color:inherit;text-decoration:none;border-bottom:1px dotted #9e9080"><strong>${favTeam} ${favScore} — ${oppAbbr} ${oppScore}</strong></a></div>`
+          html += standingsHTML
+        } else {
+          html += renderByeWeekNote(favTeam, recapWeek, recapEvents)
+          html += standingsHTML
+        }
       }
-
-      // SNF featured game (if different from fav team game)
-      const snfGame = findSNFGame(parsedGames, recapEvents)
-      if (snfGame && snfGame !== favGame) {
-        html += `<span class="sec-label">🌙 Sunday Night Football — Featured Game</span>`
-        html += renderFullGame(snfGame, squad, mode)
-      }
-
-      // All other games condensed
-      const others = parsedGames.filter(g =>
-        g && g !== favGame && g !== snfGame)
-      if (others.length) {
-        html += `<span class="sec-label">🏈 Sunday Results — Week ${recapWeek}</span>`
-        others.forEach(g => { html += renderCondensedGame(g) })
-      }
+      html += renderScoreStrip(completedEvents, recapWeek)
     } else {
-      // All Teams subscriber — show SNF featured, rest condensed
-      const snfGame = findSNFGame(parsedGames, recapEvents)
-      if (snfGame) {
-        html += `<span class="sec-label">🌙 Sunday Night Football — Featured Game</span>`
-        html += renderFullGame(snfGame, squad, mode)
-      }
-      const others = parsedGames.filter(g => g && g !== snfGame)
-      html += `<span class="sec-label">🏈 Sunday Results — Week ${recapWeek}</span>`
-      others.forEach(g => { html += renderCondensedGame(g) })
+      html += `<div style="padding:20px 18px;font-family:monospace;font-size:10px;color:#6b5f4e">Scores aren't posted yet — check nflboxscore.com for the latest.</div>`
+    }
+
+    // ── BONUS CONTENT — the richer, per-player detail below only shows up
+    // when the deeper box-score data happens to already be cached. It's
+    // real and worth having when available, but the email no longer
+    // depends on it to have real content at all.
+    if (parsedGames.length) {
+      const mondayOddsMap = await fetchOdds(recapWeek, 2)
+      const lede = buildAutoLede(parsedGames, mondayOddsMap, mode)
+      html += renderAutoLede(lede)
     }
 
     html += teamNewsHTML
     html += leagueNewsHTML
-    html += fwTakeHTML
 
     // Week ahead — compact schedule preview with odds/weather as they post
     const nextWeekEvents = await getWeekEvents(currentWeek + 1, 2)
@@ -1862,47 +2248,124 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
 
     html += renderPlayoffPicture(favTeam, standings)
     html += injuryHTML
-    html += renderWaiverSection(parsedGames, currentWeek, squad, mode)
+
+    // Fantasy content — pushed toward the bottom, games and news lead.
+    // Each of these already gracefully renders nothing on its own if
+    // parsedGames is empty, so no extra guarding needed here.
+    html += renderSquadSummary(parsedGames, squad, mode)
+    html += fwTakeHTML
+    html += renderWaiverSection(parsedGames, recapWeek, squad, mode)
+    html += renderFantasyStatsCorner(parsedGames, mode)
   }
 
   // ── TUESDAY: MNF game only ────────────────────────────────────────────────
   else if (sendType === 'tuesday') {
-    if (!parsedGames.length) {
+    // Tuesday's job is purely "what happened Monday night" — the full
+    // Sunday recap (including the fav team, if they played Sunday) is
+    // already owned entirely by Monday's send. No need to repeat it here.
+    const weekCompleted = allEvents.filter(ev => ev.status?.type?.completed)
+
+    if (!weekCompleted.length) {
       html += `<div style="padding:20px 18px;font-family:monospace;font-size:10px;color:#6b5f4e">No completed Monday Night game found yet — check nflboxscore.com for live scores.</div>`
     } else {
-      const mnfGame = parsedGames[0]
-      const isFavGame = hasFav &&
-        (mnfGame?.home.abbr === favTeam || mnfGame?.away.abbr === favTeam)
-
+      // MNF is always the chronologically last game of the week — find it
+      // from the raw scoreboard data alone, no per-game box-score fetch
+      // needed for this part.
+      const mnfEvent = [...weekCompleted].sort((a,b) => new Date(b.date) - new Date(a.date))[0]
+      const mComps = mnfEvent.competitions[0]
+      const mHome  = mComps.competitors.find(c => c.homeAway === 'home')
+      const mAway  = mComps.competitors.find(c => c.homeAway === 'away')
+      const mLink  = `${SITE_URL}?game=${mAway.team.abbreviation}-${mHome.team.abbreviation}`
       html += `<span class="sec-label">🌙 Monday Night Football — Week ${recapWeek} Final</span>`
-      html += isFavGame
-        ? renderFullGame(mnfGame, squad, mode)
-        : renderCondensedGame(mnfGame)
+      html += `<div style="padding:10px 18px;font-family:Georgia,serif;font-size:14px;color:#1a1209"><a href="${mLink}" style="color:inherit;text-decoration:none;border-bottom:1px dotted #9e9080"><strong>${mAway.team.abbreviation} ${mAway.score} — ${mHome.team.abbreviation} ${mHome.score}</strong></a></div>`
+
+      // Bonus — the richer per-player box score card, only shown when
+      // that deeper data happened to already be cached.
+      if (parsedGames.length) {
+        const mnfGame = parsedGames[0]
+        const isFavGame = hasFav &&
+          (mnfGame?.home.abbr === favTeam || mnfGame?.away.abbr === favTeam)
+        const tuesdayOddsMap = await fetchOdds(recapWeek, 2)
+        const lede = buildAutoLede([mnfGame], tuesdayOddsMap, mode)
+        html += renderAutoLede(lede)
+        html += isFavGame
+          ? renderFullGame(mnfGame, squad, mode)
+          : renderCondensedGame(mnfGame)
+      }
+
+      // Quick-glance recap of the whole week — allEvents already covers
+      // the full Sun+Mon slate here specifically, since currentWeek and
+      // recapWeek are the same value on Tuesdays (unlike Monday, which
+      // needs its own separate recapEvents fetch for this reason).
+      html += renderScoreStrip(weekCompleted, recapWeek)
     }
 
-    html += renderSquadSummary(parsedGames, squad, mode)
     html += teamNewsHTML
     html += leagueNewsHTML
-    html += fwTakeHTML
 
-    // Rest of the week ahead — compact schedule. Always regular season here:
-    // the newsletter's Tue/Thu/Fri sends are inherently about the regular
+    // Week ahead — compact schedule. Always regular season here: the
+    // newsletter's Tue/Thu/Fri sends are inherently about the regular
     // season week, even on a send date that technically falls just before
     // kickoff (getSeasonType() would otherwise still say "preseason").
-    const restOfWeekEvents = await getWeekEvents(currentWeek, 2)
+    // currentWeek+1 here, not currentWeek — Tuesday's currentWeek IS the
+    // week that just finished (that's what MNF was), so asking about
+    // currentWeek again just re-shows the same now-completed week instead
+    // of what's actually still ahead.
+    const nextWeek = currentWeek + 1
+    const restOfWeekEvents = await getWeekEvents(nextWeek, 2)
     const upcomingEvents = restOfWeekEvents.filter(ev => !ev.status?.type?.completed)
     if (upcomingEvents.length) {
-      html += await renderCompactSchedule(upcomingEvents, currentWeek, 2, favTeam, `Rest of Week ${currentWeek}`)
+      html += await renderCompactSchedule(upcomingEvents, nextWeek, 2, favTeam, `Week ${nextWeek} — Coming Up`)
     }
 
+    // Fantasy content — pushed toward the bottom, games and news lead
+    html += renderSquadSummary(parsedGames, squad, mode)
+    html += fwTakeHTML
     html += injuryHTML
-    html += renderWaiverSection(parsedGames, currentWeek, squad, mode)
+    html += renderWaiverSection(parsedGames, recapWeek, squad, mode)
+
+    // Closing trivia tidbit — Thursday and Friday already had this; Tuesday
+    // never did, purely an oversight. renderHOFTidbit already has a
+    // 'tuesday' entry built into its rotation offset, so this was always
+    // meant to be wired in here too.
+    html += renderHOFTidbit(currentWeek, sendType)
   }
 
   // ── THURSDAY: No recap — preview + HOF ───────────────────────────────────
   else if (sendType === 'thursday') {
-    // TNF game preview — now with network, odds, and weather
-    const tnf = allEvents.find(ev => new Date(ev.date).getDay() === 4)
+    // Scan for ANY completed game already played this week before tonight —
+    // not just a hardcoded assumption of "only Thursday exists mid-week".
+    // Catches things like a Wednesday season-opener/kickoff game, which the
+    // schedule can genuinely include (e.g. Week 1's NFL Kickoff Game).
+    const alreadyPlayed = allEvents.filter(ev => ev.status?.type?.completed)
+    if (alreadyPlayed.length) {
+      for (const ev of alreadyPlayed) {
+        const comps    = ev.competitions?.[0]
+        const home     = comps?.competitors?.find(c => c.homeAway === 'home')
+        const away     = comps?.competitors?.find(c => c.homeAway === 'away')
+        const homeAbbr = home?.team?.abbreviation || '?'
+        const awayAbbr = away?.team?.abbreviation || '?'
+        const homeScore = home?.score ?? '-'
+        const awayScore = away?.score ?? '-'
+        const dayLabel  = new Date(ev.date).toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long' })
+        const isFavGame = hasFav && [homeAbbr, awayAbbr].includes(favTeam)
+
+        html += `<span class="sec-label">🏈 ${dayLabel} Night — Final</span>
+<div style="padding:10px 18px;font-family:monospace;font-size:11px;color:#1a1209;border-bottom:1px solid rgba(42,31,14,.08)">
+  <strong>${awayAbbr} ${awayScore} @ ${homeAbbr} ${homeScore}</strong>${isFavGame ? ' ⚡' : ''}
+</div>`
+      }
+    }
+
+    // TNF game preview — now with network, odds, and weather.
+    // Vercel functions run in UTC (confirmed), so an 8:15 PM ET Thursday
+    // kickoff is past midnight UTC — new Date(ev.date).getDay() would
+    // return Friday (5), not Thursday (4), silently failing this lookup.
+    // Convert to US Eastern before checking the day of week instead.
+    const tnf = allEvents.find(ev => {
+      const etDay = new Date(ev.date).toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'short' })
+      return etDay === 'Thu'
+    })
     if (tnf) {
       const comps    = tnf.competitions?.[0]
       const home     = comps?.competitors?.find(c => c.homeAway === 'home')
@@ -1910,7 +2373,7 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
       const homeAbbr = home?.team?.abbreviation || '?'
       const awayAbbr = away?.team?.abbreviation || '?'
       const kickoff  = new Date(tnf.date).toLocaleTimeString('en-US',
-        {hour:'numeric', minute:'2-digit', timeZoneName:'short'})
+        { timeZone: 'America/New_York', hour:'numeric', minute:'2-digit', timeZoneName:'short'})
       const venue    = comps?.venue?.fullName || ''
       const tv       = comps?.broadcasts?.[0]?.names?.[0] || ''
       const isFavTNF = hasFav && [homeAbbr, awayAbbr].includes(favTeam)
@@ -1933,7 +2396,20 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
 </div>`
     }
 
-    // Start/Sit callout
+    // Rest of the weekend — always show the upcoming compact schedule,
+    // same as every other send. This was previously missing from Thursday.
+    const remainingEvents = allEvents.filter(ev => !ev.status?.type?.completed && ev !== tnf)
+    if (remainingEvents.length) {
+      html += await renderCompactSchedule(remainingEvents, currentWeek, 2, favTeam, `Rest of Week ${currentWeek}`)
+    }
+
+    // Real game context first — league news, team news — before any
+    // fantasy content. Games/storylines lead, fantasy trails.
+    html += teamNewsHTML
+    html += leagueNewsHTML
+
+    // Start/Sit + FW Formula — now positioned after game context, not
+    // immediately following the TNF card.
     html += `
 <span class="sec-label">⚖️ Start / Sit — Week ${currentWeek}</span>
 <div class="callout">
@@ -1943,34 +2419,65 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
 <div class="cta-wrap">
   <a class="cta" href="${SITE_URL}">FW Formula Scores &rarr;</a>
 </div>`
-
-    html += renderHOFTidbit(currentWeek, sendType)
-    html += teamNewsHTML
-    html += leagueNewsHTML
     html += fwTakeHTML
+
+    // Injuries
     html += injuryHTML
+
+    // Closer — a reward for reading this far, framed as one, not a
+    // random mid-email insert.
+    html += `<span class="sec-label">⏰ And Now, Your Moment of Football Zen</span>`
+    html += renderHOFTidbit(currentWeek, sendType)
   }
 
   // ── FRIDAY: TNF recap + fav team preview + odds + weather + injuries ───────
   else if (sendType === 'friday') {
-    // 1. TNF box score from last night (always full treatment)
-    if (parsedGames.length) {
-      const tnfGame  = parsedGames[0]
-      const isFavTNF = hasFav &&
-        (tnfGame?.home.abbr === favTeam || tnfGame?.away.abbr === favTeam)
-      html += `<span class="sec-label">📺 Thursday Night Football — Final</span>`
-      html += isFavTNF
-        ? renderFullGame(tnfGame, squad, mode)
-        : renderCondensedGame(tnfGame)
-    }
+    // Lightweight, reliable recap first — built from the scoreboard fetch
+    // alone (allEvents), not the per-game box-score fetches that used to
+    // be required for this section to show anything at all.
+    const fridayCompleted = allEvents.filter(ev => ev.status?.type?.completed)
+    if (fridayCompleted.length) {
+      fridayCompleted.forEach(ev => {
+        const comps = ev.competitions[0]
+        const home  = comps.competitors.find(c => c.homeAway === 'home')
+        const away  = comps.competitors.find(c => c.homeAway === 'away')
+        const link  = `${SITE_URL}?game=${away.team.abbreviation}-${home.team.abbreviation}`
+        const dayLabel = ev.date
+          ? new Date(ev.date).toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long' })
+          : 'Thursday'
+        html += `<span class="sec-label">📺 ${dayLabel} Night Football — Final</span>`
+        html += `<div style="padding:10px 18px;font-family:Georgia,serif;font-size:14px;color:#1a1209"><a href="${link}" style="color:inherit;text-decoration:none;border-bottom:1px dotted #9e9080"><strong>${away.team.abbreviation} ${away.score} — ${home.team.abbreviation} ${home.score}</strong></a></div>`
+      })
 
+      // Bonus — richer per-player box score cards, only when that deeper
+      // data happened to already be cached.
+      if (parsedGames.length) {
+        const fridayLedeOdds = await fetchOdds(currentWeek, 2)
+        const lede = buildAutoLede(parsedGames, fridayLedeOdds, mode)
+        html += renderAutoLede(lede)
+
+        parsedGames.forEach(g => {
+          const isFavGame = hasFav && (g?.home.abbr === favTeam || g?.away.abbr === favTeam)
+          html += isFavGame
+            ? renderFullGame(g, squad, mode)
+            : renderCondensedGame(g)
+        })
+      }
+    } else {
+      // Never ship silently empty — an honest one-liner instead of a gap,
+      // in case last night's game data hasn't posted yet for any reason.
+      html += `
+<div style="padding:14px 18px;font-family:monospace;font-size:10px;color:#6b5f4e;border-bottom:1px solid rgba(42,31,14,.08)">
+  📺 Thursday Night's box score isn't posted yet — check nflboxscore.com for the latest.
+</div>`
+    }
     // 2. Fetch odds once for the weekend — reused by both the fav-team
     // highlight card below and the compact schedule, avoiding a duplicate
     // fetch of the same data.
     const oddsMap = await fetchOdds(currentWeek, getSeasonType())
 
     // 3. Weekend schedule with odds inline
-    const upcoming = currentEvents.filter(ev => !ev.status?.type?.completed)
+    const upcoming = allEvents.filter(ev => !ev.status?.type?.completed)
     if (upcoming.length) {
       // Fav team's game — highlighted separately if they play Sunday
       if (hasFav) {
@@ -1988,11 +2495,19 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
           const tv       = comps?.broadcasts?.[0]?.names?.[0] || ''
           const kickoff  = favWeekend.date
             ? new Date(favWeekend.date).toLocaleString('en-US',
-                { weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit' })
+                { timeZone: 'America/New_York', weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit' })
             : ''
           const key  = `${awayAbbr}@${homeAbbr}`
           const odds = oddsMap[key]
           const oddsStr = odds ? formatOdds(odds) : ''
+          // Weather — was missing entirely here, unlike the general
+          // schedule rows below which already fetch it per-game.
+          const favWx = OUTDOOR_STADIUMS.has(homeAbbr)
+            ? await fetchGameWeather(homeAbbr, favWeekend.date)
+            : null
+          const favWxStr = favWx?.flags?.length
+            ? `⚠️ ${favWx.flags.map(f=>f.text).join(', ')}`
+            : (favWx ? `${favWx.tMax}°F` : '')
           html += `
 <span class="sec-label">⚡ ${favTeam} — This Sunday</span>
 <div style="background:rgba(200,168,75,.06);border-left:3px solid #c8a84b;padding:10px 18px;font-family:monospace;font-size:11px;color:#1a1209">
@@ -2000,6 +2515,7 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
   &nbsp;&nbsp;<span style="color:#9e9080">${kickoff}</span>
   ${tv ? `&nbsp;·&nbsp;<span style="color:#c8a84b">${tv}</span>` : ''}
   ${oddsStr ? `<div style="margin-top:5px;font-size:9px;color:#6b5f4e;letter-spacing:.06em">${oddsStr}</div>` : ''}
+  ${favWxStr ? `<div style="margin-top:3px;font-size:9px;color:#6b5f4e">${favWxStr}</div>` : ''}
 </div>`
           html += standingsHTML
         } else {
@@ -2012,6 +2528,13 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
       // fetched oddsMap in via a pre-fetched-odds variant so it doesn't
       // re-request the same data internally.
       html += await renderCompactSchedule(upcoming, currentWeek, getSeasonType(), favTeam, `Week ${currentWeek} — Full Schedule & Lines`, oddsMap)
+    } else {
+      // A real week's schedule should never actually be empty — if this
+      // shows, it's a data fetch issue, not a legitimately quiet week.
+      html += `
+<div style="padding:14px 18px;font-family:monospace;font-size:10px;color:#6b5f4e;border-bottom:1px solid rgba(42,31,14,.08)">
+  🏈 This week's schedule isn't loading right now — check nflboxscore.com for the full slate.
+</div>`
     }
 
     html += renderPlayoffPicture(favTeam, standings)
@@ -2024,11 +2547,14 @@ async function buildEmail(sendType, weekCtx, parsedGames, allEvents, sub) {
   <a class="cta" href="${SITE_URL}">FW Formula Scores &rarr;</a>
 </div>`
 
-    html += renderHOFTidbit(currentWeek, sendType)
     html += teamNewsHTML
     html += leagueNewsHTML
     html += fwTakeHTML
     html += injuryHTML
+
+    // Closer — a reward for reading this far, framed as one.
+    html += `<span class="sec-label">⏰ And Now, Your Moment of Football Zen</span>`
+    html += renderHOFTidbit(currentWeek, sendType)
   }
 
   html += foot(email)
@@ -2065,13 +2591,35 @@ async function logSend(type, week, count, status = 'ok', notes = '') {
 }
 
 // ── Main handler ──────────────────────────────────────────────────────────────
-export default async function handler(req) {
+// This environment's req object has turned out not to match a standard Fetch
+// API Request (confirmed by req.headers.get failing) — so every access below
+// is written to work whether req.headers is a real Headers instance or a
+// plain object, and whether the body needs Fetch-style .clone() or is
+// already parsed onto req.body, rather than assuming either.
+const getHeader = (req, name) =>
+  typeof req.headers?.get === 'function' ? req.headers.get(name) : (req.headers?.[name.toLowerCase()] ?? null)
+
+async function handler(req) {
+  // Reset per-request — these are static properties on shared functions,
+  // so a warm serverless instance could otherwise blend one request's
+  // fetch diagnostics into the next request's numbers.
+  espnFetch.stats     = { cacheHits: 0, liveAttempts: 0, liveSuccesses: 0, liveFailures: [] }
+  getGameSummary.stats = { cacheHits: 0, liveAttempts: 0, liveSuccesses: 0, liveFailures: [] }
+
   // Auth — Vercel cron sends secret via Authorization header
-  const url      = new URL(req.url)
-  const authHdr  = req.headers.get('authorization')?.replace('Bearer ','')
+  // Node functions only give req.url as a path ("/api/...?type=monday"),
+  // not a full URL like Edge runtime did — this is the actual cause of the
+  // crash. Passing a base handles both cases: it's used to resolve a
+  // relative path, and silently ignored if req.url is ever already
+  // absolute (e.g. under a future runtime change).
+  const url      = new URL(req.url, `https://${getHeader(req, 'host') || 'nflboxscore.com'}`)
+  const authHdr  = getHeader(req, 'authorization')?.replace('Bearer ','')
   const qSecret  = url.searchParams.get('secret')
   const body     = req.method === 'POST'
-    ? await req.clone().json().catch(() => ({})) : {}
+    ? await (typeof req.clone === 'function'
+        ? req.clone().json().catch(() => ({}))
+        : Promise.resolve(req.body || {}))
+    : {}
   const provided = authHdr || qSecret || body.secret
 
   if (provided !== CRON_SECRET) {
@@ -2096,12 +2644,18 @@ export default async function handler(req) {
     const currentEvents = await getWeekEvents(currentWeek)
 
     // 3. Identify which games to deep-fetch (completed since last night)
-    const targetEvents  = getTargetEvents(
-      sendType === 'tuesday' ? recapEvents :  // MNF = current week\'s final game
-      sendType === 'friday'  ? currentEvents : // TNF = current week Thursday game
-      recapEvents,
-      sendType
-    )
+    // Preview mode bypasses the freshness window on purpose — testing this
+    // days after the real games happened would otherwise silently exclude
+    // everything except the single most recent game, giving a false read
+    // on what's actually fetchable. The real send path is untouched.
+    const isPreview = url.searchParams.get('preview') === 'true'
+    const eventsForTargets =
+      sendType === 'tuesday' ? recapEvents :
+      sendType === 'friday'  ? currentEvents :
+      recapEvents
+    const targetEvents = isPreview
+      ? eventsForTargets.filter(ev => ev.status?.type?.completed)
+      : getTargetEvents(eventsForTargets, sendType)
 
     // 4. Fetch full box scores in parallel (cap at 16)
     const summaries  = await Promise.all(
@@ -2113,6 +2667,56 @@ export default async function handler(req) {
       .map((s, i) => parseGameSummary(s, targetEvents[i]))
       .filter(Boolean)
 
+    // Preview mode — renders exactly what a real send would produce,
+    // without ever touching subscribers or Resend. Visit with
+    // &preview=true to see the actual HTML in a browser tab instead of an
+    // inbox — safe to hit repeatedly while iterating, nothing goes out to
+    // anyone. Optional &team=SEA previews it personalized the way a real
+    // subscriber with that favorite team would see it.
+    if (url.searchParams.get('preview') === 'true') {
+      const previewSub = {
+        email: 'preview@nflboxscore.com',
+        fav_team: url.searchParams.get('team') || 'All',
+        squad_players: '',
+      }
+      const { html } = await buildEmail(
+        sendType, weekCtx, parsedGames, currentEvents, previewSub
+      )
+      // Real diagnostics, not a guess — exactly how many scoreboard/box
+      // score fetches came from the Supabase cache vs. attempted ESPN
+      // directly, and the real outcome (status code) of each live attempt.
+      // This answers "is ESPN's block total or inconsistent" with actual
+      // numbers instead of theorizing from what data happened to show up.
+      const sbStats = espnFetch.stats
+      const bsStats = getGameSummary.stats
+      const failList = (arr) => arr.length
+        ? ` (${arr.slice(0,8).map(f => f.status).join(', ')}${arr.length > 8 ? `, +${arr.length-8} more` : ''})`
+        : ''
+      // Same approach applied to the blank team-stats rows and missing
+      // player names reported in the full box score — real ESPN field
+      // names, not another guess at what they might be called.
+      const sampleGame   = parsedGames.find(g => g)
+      const teamStatKeys = sampleGame ? Object.keys(sampleGame.homeStats || {}) : []
+      const rawPassingGroup = summaries.find(s => s?.boxscore?.players?.length)
+        ?.boxscore.players.find(td => td.statistics?.some(s => s.name === 'passing'))
+        ?.statistics.find(s => s.name === 'passing')
+      const rawAthlete     = rawPassingGroup?.athletes?.[0]
+      const rawAthleteKeys = rawAthlete ? Object.keys(rawAthlete) : []
+      const rawAthleteSubKeys = rawAthlete?.athlete ? Object.keys(rawAthlete.athlete) : []
+      const diagHtml = `
+<div style="background:#1a1209;color:#c8a84b;font-family:monospace;font-size:10px;padding:12px 18px;line-height:1.7">
+<strong>🔧 PREVIEW DIAGNOSTICS</strong> (never shown in a real send)<br>
+Scoreboard/events — cache hits: ${sbStats.cacheHits} &middot; live attempts: ${sbStats.liveAttempts} &middot; live OK: ${sbStats.liveSuccesses} &middot; live failed: ${sbStats.liveFailures.length}${failList(sbStats.liveFailures)}<br>
+Box scores — cache hits: ${bsStats.cacheHits} &middot; live attempts: ${bsStats.liveAttempts} &middot; live OK: ${bsStats.liveSuccesses} &middot; live failed: ${bsStats.liveFailures.length}${failList(bsStats.liveFailures)}<br>
+Team stat keys ESPN actually returned: ${teamStatKeys.join(', ') || 'none found'}<br>
+First passing athlete — raw entry keys: ${rawAthleteKeys.join(', ') || 'none found'} &middot; athlete sub-object keys: ${rawAthleteSubKeys.join(', ') || 'none found'}
+</div>`
+      const htmlWithDiag = html.replace('<div class="wrap">', `<div class="wrap">${diagHtml}`)
+      return new Response(htmlWithDiag, {
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+      })
+    }
+
     // 6. Get subscribers
     const subscribers = await getSubscribers(sendType)
     if (!subscribers.length) {
@@ -2122,6 +2726,7 @@ export default async function handler(req) {
 
     // 7. Send emails in batches of 10
     let sent = 0, errors = 0
+    const errorDetails = []
 
     for (let i = 0; i < subscribers.length; i += 10) {
       const batch = subscribers.slice(i, i + 10)
@@ -2156,11 +2761,14 @@ export default async function handler(req) {
             }).catch(() => {})
           } else {
             errors++
-            console.error(`Resend error for ${sub.email}:`, await r.text())
+            const detail = await r.text()
+            console.error(`Resend error for ${sub.email}:`, detail)
+            errorDetails.push({ email: sub.email, stage: 'resend', status: r.status, detail: detail.slice(0, 500) })
           }
         } catch (e) {
           errors++
           console.error(`Exception sending to ${sub.email}:`, e)
+          errorDetails.push({ email: sub.email, stage: 'buildEmail_or_exception', message: e.message, stack: e.stack?.slice(0, 800) })
         }
       }))
       // Brief pause between batches — respect Resend rate limits
@@ -2176,9 +2784,65 @@ export default async function handler(req) {
       `Games: ${parsedGames.length} | Sent: ${sent} | Errors: ${errors}`
     )
 
+    const debugMode = url.searchParams.get('debug') === '1'
+
+    // Connectivity probe — test several different ESPN URL patterns to
+    // find out whether this is a total IP-range block (everything fails
+    // the same way) or specific to one path/domain. Only runs in debug
+    // mode so it doesn't slow down real sends.
+    let connectivityProbe = null
+    if (debugMode) {
+      const probeUrls = [
+        { name: 'site-v2-scoreboard', url: 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=1&seasontype=2&limit=1' },
+        { name: 'apis-v2-standings',  url: 'https://site.api.espn.com/apis/v2/sports/football/nfl/standings?season=2026' },
+        { name: 'no-headers-scoreboard', url: 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=1&seasontype=2&limit=1', noHeaders: true },
+        { name: 'non-espn-control', url: 'https://api.github.com/zen' },
+      ]
+      connectivityProbe = await Promise.all(probeUrls.map(async p => {
+        try {
+          const r = await fetch(p.url, p.noHeaders ? {} : { headers: ESPN_HEADERS })
+          return { name: p.name, status: r.status, ok: r.ok }
+        } catch (e) {
+          return { name: p.name, status: 'exception', error: e.message }
+        }
+      }))
+    }
+
+    // Direct odds test — fetchOdds calls ESPN live every time (it doesn't
+    // go through the Supabase cache the way scoreboard/summary data does),
+    // so it's still fully subject to the IP block the probe above already
+    // confirms. This makes that concrete: how many real odds entries (if
+    // any) came back for this week.
+    let oddsDebug = null
+    if (debugMode) {
+      const testOddsMap = await fetchOdds(currentWeek, 2)
+      oddsDebug = {
+        keysFound: Object.keys(testOddsMap).length,
+        sample: Object.entries(testOddsMap).slice(0, 3),
+      }
+    }
+
     return new Response(JSON.stringify({
       ok: true, type: sendType, week: currentWeek,
       gamesProcessed: parsedGames.length, sent, errors,
+      ...(debugMode ? {
+        errorDetails,
+        connectivityProbe,
+        oddsDebug,
+        diag: {
+          currentEventsCount: currentEvents.length,
+          recapEventsCount: recapEvents.length,
+          targetEventsCount: targetEvents.length,
+          lastFetchError: getWeekEvents.lastError,
+          currentEventsSample: currentEvents.slice(0, 3).map(ev => ({
+            id: ev.id,
+            date: ev.date,
+            completed: ev.status?.type?.completed,
+            state: ev.status?.type?.state,
+            teams: ev.competitions?.[0]?.competitors?.map(c => c.team?.abbreviation),
+          })),
+        },
+      } : {}),
     }), { headers: { 'Content-Type': 'application/json' } })
 
   } catch (err) {
@@ -2190,3 +2854,12 @@ export default async function handler(req) {
     )
   }
 }
+
+// Vercel's Node.js runtime needs a named export per HTTP method to hand
+// over a genuine Fetch-standard Request (real Headers, .clone(), absolute
+// .url) — a default export was giving a plain, non-standard req instead,
+// which was the actual cause of both prior errors. Cron triggers and the
+// dashboard "Run" button both use GET; POST is kept for the documented
+// manual-trigger-with-body path from the top-of-file comment.
+export async function GET(req)  { return handler(req) }
+export async function POST(req) { return handler(req) }
