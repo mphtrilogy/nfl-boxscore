@@ -3007,7 +3007,24 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
           const teamTrendNudge = teamTrend
             ? Math.max(-0.3, Math.min(0.3, teamTrend.pctChange * 0.015))
             : 0
-          const trendScore = Math.max(0, Math.min(10, trendScoreRaw + teamTrendNudge))
+
+          // Trend Score's label says "how good, right now" — but every
+          // input above (usage, efficiency, defense-adjusted production,
+          // TD role) is a flat average over the ENTIRE lookback window,
+          // with zero recency weighting. A player who was excellent weeks
+          // ago and has gone cold since keeps the same inflated score,
+          // even while the separate Trend column (which DOES compare
+          // last3avg to seasonAvg) correctly flags them Cold right next
+          // to it — producing exactly the "ELITE sitting beside Cold"
+          // contradiction that makes the table hard to trust. Blend in
+          // the player's own recent-vs-season ratio — the same comparison
+          // that Hot/Cold label already uses — so a real multi-week fade
+          // visibly drags the score down, and a real climb lifts it.
+          // Capped so one single huge/awful game can't swing it alone.
+          const recencyRatio = seasonAvg > 0 ? last3avg / seasonAvg : 1
+          const recencyAdj = Math.max(-3, Math.min(2, (recencyRatio - 1) * 4))
+
+          const trendScore = Math.max(0, Math.min(10, trendScoreRaw + teamTrendNudge + recencyAdj))
 
           // ── REST-OF-SEASON OUTLOOK — a different question from Start/Sit:
           // not "what about next week" but "who's positioned better across
@@ -3179,8 +3196,11 @@ function FWFormulaView({ currentWeek, mode, watchlist = [], toggleWatch }) {
 
   // Trend Score label — pure current-performance read (no next-week
   // matchup involved). This is what the big headline cell shows.
+  // Raised from 8.5/7 — with the recency adjustment above now actually
+  // pulling the score down for anyone fading, "ELITE" should mean a real
+  // top-tier handful of players, not most of a position's starters.
   const trendLabel = (s) =>
-    s >= 8.5 ? '🔥 ELITE' : s >= 7 ? '🟢 STRONG' :
+    s >= 9   ? '🔥 ELITE' : s >= 7.5 ? '🟢 STRONG' :
     s >= 5.5 ? '🟡 SOLID' : s >= 4 ? '🟠 SHAKY' : '🔴 COLD'
 
   // Start/Sit label — the old wording, kept for the forward-looking chip
@@ -3400,12 +3420,26 @@ function FWFormulaView({ currentWeek, mode, watchlist = [], toggleWatch }) {
                     <td className={`fw-last ${p.last1 > p.seasonAvg ? 'fw-up' : 'fw-dn'}`}>{p.last1}</td>
                     <td className="fw-avg">{p.last3avg}</td>
                     <td className="fw-trend">
-                      <span style={{
-                        display: 'inline-block', padding: '2px 8px', borderRadius: 10,
-                        fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap',
-                        background: p.trend === '🔥 Hot' ? '#fff1e0' : p.trend === '❄️ Cold' ? '#eaf1fb' : 'transparent',
-                        color:      p.trend === '🔥 Hot' ? '#b24a00' : p.trend === '❄️ Cold' ? '#2a5a8c' : 'inherit',
-                      }}>{p.trend}</span>
+                      {p.isRosterIR ? (
+                        // A confirmed IR/Suspended/PUP status is a bigger
+                        // deal than any Hot/Cold read on recent production
+                        // — the player isn't eligible to play at all. That
+                        // belongs in this same real-estate, loud, instead
+                        // of only showing as a small badge next to the
+                        // name that's easy to miss while scanning Trend.
+                        <span style={{
+                          display: 'inline-block', padding: '2px 8px', borderRadius: 10,
+                          fontSize: 11, fontWeight: 800, whiteSpace: 'nowrap',
+                          background: '#8b1a1a', color: '#fff',
+                        }} title={p.injuryStatus}>🚑 OUT (IR)</span>
+                      ) : (
+                        <span style={{
+                          display: 'inline-block', padding: '2px 8px', borderRadius: 10,
+                          fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap',
+                          background: p.trend === '🔥 Hot' ? '#fff1e0' : p.trend === '❄️ Cold' ? '#eaf1fb' : 'transparent',
+                          color:      p.trend === '🔥 Hot' ? '#b24a00' : p.trend === '❄️ Cold' ? '#2a5a8c' : 'inherit',
+                        }}>{p.trend}</span>
+                      )}
                     </td>
                     <td>
                       <div className="fw-mini-bar">
