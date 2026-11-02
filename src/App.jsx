@@ -3035,7 +3035,28 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
           // neutral 5.0 the fewer real games back it up; a full 4+ game
           // sample is unaffected (confidence = 1, no change at all).
           const sampleConfidence = Math.min(1, games / 4)
-          const trendScoreShrunk = 5 + (trendScoreRaw + teamTrendNudge + recencyAdj - 5) * sampleConfidence
+
+          // Concentration guard — catches a DIFFERENT shape of the same
+          // problem that games-count alone can't see: a player can have
+          // plenty of total games and still have almost his entire
+          // value come from ONE of them (a committee back who got 4
+          // touches most weeks and then 20 touches + a long TD in one
+          // game). usage/efficiency are cumulative-total averages, so
+          // that single outlier week quietly drags the whole-window rate
+          // up and stays there even with a normal games count. Compare
+          // how much of total fantasy output his single best week
+          // represents against what an evenly-distributed workload
+          // across `games` weeks would look like — only the EXCESS above
+          // a generous cushion over that baseline gets discounted, so a
+          // genuinely dominant, evenly-productive player is untouched.
+          const maxWeekPts = Math.max(...weekPts)
+          const concentrationShare = totalPts > 0 ? maxWeekPts / totalPts : 0
+          const evenShare = 1 / Math.max(games, 1)
+          const excessConcentration = Math.max(0, concentrationShare - Math.min(0.55, evenShare + 0.25))
+          const concentrationReliability = Math.max(0.15, 1 - excessConcentration * 2.5)
+
+          const reliability = sampleConfidence * concentrationReliability
+          const trendScoreShrunk = 5 + (trendScoreRaw + teamTrendNudge + recencyAdj - 5) * reliability
 
           const trendScore = Math.max(0, Math.min(10, trendScoreShrunk))
 
