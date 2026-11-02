@@ -3024,7 +3024,20 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
           const recencyRatio = seasonAvg > 0 ? last3avg / seasonAvg : 1
           const recencyAdj = Math.max(-3, Math.min(2, (recencyRatio - 1) * 4))
 
-          const trendScore = Math.max(0, Math.min(10, trendScoreRaw + teamTrendNudge + recencyAdj))
+          // Small-sample guard. usageScoreFor/efficiencyScoreFor/
+          // defAdjScoreFor/scoringRoleFor are all plain per-game averages.
+          // With only 1-2 real games in this window (a backup/committee
+          // guy who was buried on the depth chart until recently), one
+          // monster outing single-handedly maxes out the average, and the
+          // math can't tell "sustained excellence" from "one huge game,
+          // tiny sample" — which is how a guy with one good outing ends up
+          // reading as flat-out ELITE. Shrink the composite toward a
+          // neutral 5.0 the fewer real games back it up; a full 4+ game
+          // sample is unaffected (confidence = 1, no change at all).
+          const sampleConfidence = Math.min(1, games / 4)
+          const trendScoreShrunk = 5 + (trendScoreRaw + teamTrendNudge + recencyAdj - 5) * sampleConfidence
+
+          const trendScore = Math.max(0, Math.min(10, trendScoreShrunk))
 
           // ── REST-OF-SEASON OUTLOOK — a different question from Start/Sit:
           // not "what about next week" but "who's positioned better across
