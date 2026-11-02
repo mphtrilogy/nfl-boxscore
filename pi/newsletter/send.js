@@ -1702,6 +1702,8 @@ const KNOWN_TES_NL = new Set([
   'T.J. Hockenson','Luke Musgrave','Jake Ferguson','Juwan Johnson','Cade Otton',
   'Dallas Goedert','Grant Calcaterra','George Kittle','Trey McBride','Colby Parkinson',
   'Dalton Kincaid','Theo Johnson','Will Mallory','Elijah Higgins','Zach Ertz',
+  'Colston Loveland','Elijah Arroyo','Mason Taylor','Harold Fannin Jr.',
+  'Gunnar Helm','Terrance Ferguson','Oronde Gadsden II',
 ])
 
 function nlCalcFpts(vals, cat) {
