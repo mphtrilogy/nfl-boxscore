@@ -2244,6 +2244,24 @@ const KNOWN_TES = new Set([
   'Charlie Kolar','Devin Asiasi','Durham Smythe','Pharaoh Brown',
 ])
 
+// Pass-catching/passing-down running backs — the RB-side mirror of
+// KNOWN_TES above. When ESPN doesn't tag a real position for one of these
+// guys in the lookback window, the usage-based fallback (targets > carries
+// => WR) misreads a receiving back's normal role as a wide receiver. A
+// rookie or committee back who sees more targets than carries over a
+// short stretch (e.g. a passing-down role out of the backfield) is still
+// an RB — this list forces that correction the same way KNOWN_TES forces
+// a real TE out of a false "WR" guess. Not exhaustive; extend it whenever
+// another receiving back gets mislabeled.
+const KNOWN_RBS = new Set([
+  'Emmett Johnson','Christian McCaffrey','Alvin Kamara','Austin Ekeler',
+  'Jerome Ford','Justice Hill','Kenneth Gainwell','Tyjae Spears',
+  'Jaleel McLaughlin','Ty Chandler','Antonio Gibson','Khalil Herbert',
+  'Chuba Hubbard','Roschon Johnson','Samaje Perine','Kimani Vidal',
+  'Devin Singletary','Javonte Williams','Woody Marks','Jonah Coleman',
+  'Trey Benson','Bucky Irving','Tank Bigsby','Cordarrelle Patterson',
+])
+
 
 // ── FW FORMULA ENGINE — clean rewrite ─────────────────────────────────────────
 // Fetches ESPN box scores directly from browser (server-side gets 403)
@@ -2899,7 +2917,8 @@ function useFWFantasyScores(currentWeek, mode, forceRegularSeason = false) {
       // unlike the genuine RB/WR/TE ambiguity this heuristic targets.
       Object.values(pmap).forEach(p => {
         if (p.posConfident || p.pos === 'K' || p.pos === 'QB') return
-        if (p.targets > p.carries) p.pos = KNOWN_TES.has(p.name) ? 'TE' : 'WR'
+        if (KNOWN_RBS.has(p.name)) p.pos = 'RB'
+        else if (p.targets > p.carries) p.pos = KNOWN_TES.has(p.name) ? 'TE' : 'WR'
         else if (p.carries > p.targets) p.pos = 'RB'
         // else (0-0, or a genuine tie): leave the original category guess
       })
@@ -4502,7 +4521,8 @@ function TrendsView({ currentWeek, mode, setMode, range, setRange, pos, setPos }
       Object.values(playerMap).forEach(p => {
         if (p.posConfident || p.pos === 'K' || p.pos === 'QB') return
         const targets = p.targets || 0, carries = p.carries || 0
-        if (targets > carries) p.pos = KNOWN_TES.has(p.name) ? 'TE' : 'WR'
+        if (KNOWN_RBS.has(p.name)) p.pos = 'RB'
+        else if (targets > carries) p.pos = KNOWN_TES.has(p.name) ? 'TE' : 'WR'
         else if (carries > targets) p.pos = 'RB'
       })
 
